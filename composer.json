@@ -1,0 +1,28 @@
+{
+  "name": "nk-core/web-panel",
+  "description": "NK-Core VPN Web Management Panel",
+  "type": "project",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "NK-Core Team"
+    }
+  ],
+  "require": {
+    "php": "^8.5",
+    "twig/twig": "^3.8",
+    "firebase/php-jwt": "^7.0",
+    "monolog/monolog": "^3.0",
+    "pda/pheanstalk": "^5.0",
+    "ext-pdo": "*",
+    "ext-json": "*",
+    "ext-curl": "*",
+    "ext-gd": "*",
+    "ext-sodium": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "": "inc/"
+    }
+  }
+}

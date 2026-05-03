@@ -1,0 +1,346 @@
+{% extends "layout.twig" %}
+{% block title %}{{ t('map.title')|default('Intelligence Map') }} — {{ app_name }}{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+    /* Isolate Leaflet's z-indexes so they never cover the sticky navbar */
+    #mapWrapper {
+        isolation: isolate;
+        position: relative;
+    }
+
+    #map {
+        height: calc(100vh - 200px);
+        min-height: 400px;
+        width: 100%;
+        border-radius: 12px;
+        border: 1px solid rgba(255,255,255,0.07);
+        overflow: hidden;
+    }
+
+    /* Pulsing dot for online clients */
+    .pulse-dot {
+        width: 14px; height: 14px; border-radius: 50%;
+        background: #5b8def;
+        border: 2px solid rgba(91,141,239,0.5);
+        box-shadow: 0 0 8px rgba(91,141,239,0.8);
+        position: absolute; top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+    }
+    .pulse-ring {
+        width: 28px; height: 28px; border-radius: 50%;
+        background: rgba(91,141,239,0.25);
+        border: 2px solid rgba(91,141,239,0.4);
+        position: absolute; top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        animation: pulse-expand 2s ease-out infinite;
+    }
+    @keyframes pulse-expand {
+        0%   { transform: translate(-50%,-50%) scale(0.5); opacity: 1; }
+        100% { transform: translate(-50%,-50%) scale(2);   opacity: 0; }
+    }
+
+    /* Cluster badge (number of clients) */
+    .cluster-badge {
+        position: absolute; top: -6px; right: -6px;
+        background: #f87171; color: #fff;
+        font-size: 10px; font-weight: 700;
+        min-width: 18px; height: 18px;
+        border-radius: 999px;
+        display: flex; align-items: center; justify-content: center;
+        padding: 0 4px;
+        border: 2px solid #0f172a;
+        pointer-events: none;
+    }
+
+    /* Popup styles */
+    .leaflet-popup-content-wrapper {
+        background: #1e293b;
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 10px; color: #e2e8f0;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    .leaflet-popup-tip { background: #1e293b; }
+    .leaflet-popup-content { margin: 0; min-width: 220px; max-width: 280px; }
+    .leaflet-popup-close-button { color: #94a3b8 !important; top: 10px !important; right: 12px !important; }
+
+    /* Single client popup */
+    .popup-inner { padding: 14px 16px; }
+    .popup-name {
+        font-size: 14px; font-weight: 600; color: #e2e8f0;
+        margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+        padding-right: 18px;
+    }
+    .popup-status-badge {
+        font-size: 10px; padding: 2px 7px; border-radius: 999px;
+        font-weight: 600; letter-spacing: 0.04em; white-space: nowrap;
+    }
+    .popup-status-online  { background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); }
+    .popup-status-offline { background: rgba(100,116,139,0.2); color: #94a3b8; border: 1px solid rgba(100,116,139,0.3); }
+    .popup-row {
+        font-size: 12px; color: #94a3b8;
+        display: flex; align-items: flex-start; gap: 6px; margin-bottom: 4px;
+    }
+    .popup-row i { width: 14px; text-align: center; margin-top: 1px; color: #64748b; flex-shrink: 0; }
+    .popup-link {
+        display: inline-flex; align-items: center; gap: 5px;
+        margin-top: 10px; font-size: 12px; color: #5b8def;
+        text-decoration: none; font-weight: 500;
+    }
+    .popup-link:hover { color: #88aaee; }
+
+    /* Multi-client popup (list) */
+    .popup-header {
+        padding: 12px 16px 10px;
+        border-bottom: 1px solid rgba(255,255,255,0.08);
+        font-size: 12px; font-weight: 600;
+        color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em;
+    }
+    .popup-list { max-height: 260px; overflow-y: auto; padding: 6px 0; }
+    .popup-list::-webkit-scrollbar { width: 4px; }
+    .popup-list::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    .popup-list-item {
+        padding: 8px 16px;
+        border-bottom: 1px solid rgba(255,255,255,0.04);
+        cursor: pointer; transition: background 0.15s;
+    }
+    .popup-list-item:hover { background: rgba(255,255,255,0.04); }
+    .popup-list-item:last-child { border-bottom: none; }
+    .popup-item-name { font-size: 13px; font-weight: 600; color: #e2e8f0; display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
+    .popup-item-meta { font-size: 11px; color: #64748b; display: flex; gap: 10px; }
+
+    /* Map toolbar */
+    #mapToolbar {
+        position: absolute; top: 16px; right: 16px;
+        z-index: 1000; display: flex; gap: 8px;
+    }
+    .map-btn {
+        background: rgba(15,23,42,0.9); border: 1px solid rgba(255,255,255,0.1);
+        color: #94a3b8; padding: 7px 14px; border-radius: 8px;
+        font-size: 12px; font-weight: 500; cursor: pointer;
+        display: flex; align-items: center; gap: 6px;
+        backdrop-filter: blur(8px); transition: all 0.2s; white-space: nowrap;
+    }
+    .map-btn:hover { border-color: rgba(91,141,239,0.5); color: #e2e8f0; }
+    .map-btn.active { background: rgba(91,141,239,0.15); border-color: rgba(91,141,239,0.5); color: #5b8def; }
+
+    /* Stats bar */
+    #mapStats {
+        display: flex; align-items: center; gap: 20px;
+        padding: 10px 16px;
+        background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.07);
+        border-radius: 10px; margin-bottom: 12px; backdrop-filter: blur(8px); flex-wrap: wrap;
+    }
+    .stat-item { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+    .stat-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .stat-dot-online  { background: #5b8def; box-shadow: 0 0 6px rgba(91,141,239,0.6); }
+    .stat-dot-offline { background: #475569; }
+    .stat-label { color: #94a3b8; }
+    .stat-value { color: #e2e8f0; font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="w-full">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+        <h1 class="text-2xl font-bold text-primary flex items-center">
+            <div class="w-10 h-10 rounded-lg bg-surface-hover text-primary flex items-center justify-center mr-3">
+                <i class="fas fa-globe-europe"></i>
+            </div>
+            {{ t('map.title')|default('Intelligence Map') }}
+        </h1>
+    </div>
+
+    <!-- Stats Bar -->
+    <div id="mapStats">
+        <div class="stat-item">
+            <span class="stat-dot stat-dot-online"></span>
+            <span class="stat-label">{{ t('status.online')|default('Online') }}:</span>
+            <span class="stat-value" id="countOnline">—</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-dot stat-dot-offline"></span>
+            <span class="stat-label">{{ t('status.offline')|default('Offline') }}:</span>
+            <span class="stat-value" id="countOffline">—</span>
+        </div>
+        <div class="stat-item" style="margin-left:auto;">
+            <i class="fas fa-map-marker-alt text-muted text-xs"></i>
+            <span class="stat-label">{{ t('map.clients_plotted')|default('clients plotted') }}:</span>
+            <span class="stat-value" id="countTotal">—</span>
+        </div>
+    </div>
+
+    <!-- Map Container — isolated so Leaflet z-indexes don't escape -->
+    <div id="mapWrapper">
+        <div id="map"></div>
+        <!-- Filter Toolbar overlaid on map -->
+        <div id="mapToolbar">
+            <button class="map-btn active" id="btnAll" onclick="setFilter('all')">
+                <i class="fas fa-globe"></i> {{ t('common.status_all')|default('All') }}
+            </button>
+            <button class="map-btn" id="btnOnline" onclick="setFilter('online')">
+                <i class="fas fa-circle" style="color:#5b8def;font-size:8px;"></i> {{ t('common.status_online')|default('Online') }}
+            </button>
+            <button class="map-btn" id="btnOffline" onclick="setFilter('offline')">
+                <i class="fas fa-circle" style="color:#475569;font-size:8px;"></i> {{ t('common.status_offline')|default('Offline') }}
+            </button>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    const map = L.map('map', { center: [58, 60], zoom: 4 });
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+        subdomains: 'abcd', maxZoom: 19
+    }).addTo(map);
+
+    let allMarkers = [];
+    let currentFilter = 'all';
+    let cachedClients = [];
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+
+    function formatTraffic(mb) {
+        return mb >= 1024 ? (mb / 1024).toFixed(2) + ' GB' : mb.toFixed(2) + ' MB';
+    }
+
+    function statusBadge(status) {
+        const cls = status === 'online' ? 'popup-status-online' : 'popup-status-offline';
+        const label = status === 'online'
+            ? '{{ t("common.status_online")|default("Online") }}'
+            : '{{ t("common.status_offline")|default("Offline") }}';
+        return `<span class="popup-status-badge ${cls}">${label}</span>`;
+    }
+
+    // ── Marker factories ─────────────────────────────────────────────────
+
+    function makeIcon(hasOnline, count) {
+        const badge = count > 1 ? `<div class="cluster-badge">${count}</div>` : '';
+        if (hasOnline) {
+            return L.divIcon({
+                className: '',
+                html: `<div style="position:relative;width:28px;height:28px;">
+                           <div class="pulse-ring"></div>
+                           <div class="pulse-dot"></div>
+                           ${badge}
+                       </div>`,
+                iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -18]
+            });
+        } else {
+            // offline — use a circle SVG so we can badge it
+            return L.divIcon({
+                className: '',
+                html: `<div style="position:relative;width:16px;height:16px;">
+                           <svg width="16" height="16" viewBox="0 0 16 16">
+                               <circle cx="8" cy="8" r="6" fill="#475569" fill-opacity="0.8" stroke="#64748b" stroke-width="1.5"/>
+                           </svg>
+                           ${badge}
+                       </div>`,
+                iconSize: [16, 16], iconAnchor: [8, 8], popupAnchor: [0, -12]
+            });
+        }
+    }
+
+    // ── Popup builders ───────────────────────────────────────────────────
+
+    function buildSinglePopup(c) {
+        return `<div class="popup-inner">
+            <div class="popup-name">${c.name} ${statusBadge(c.status)}</div>
+            ${c.city  ? `<div class="popup-row"><i class="fas fa-map-marker-alt"></i>${c.city}, ${c.country}</div>` : ''}
+            ${c.isp   ? `<div class="popup-row"><i class="fas fa-network-wired"></i>${c.isp}</div>` : ''}
+            <div class="popup-row"><i class="fas fa-server"></i>${c.server_name || '—'}</div>
+            <div class="popup-row"><i class="fas fa-exchange-alt"></i>${formatTraffic(c.traffic_mb)}</div>
+            <div class="popup-row"><i class="fas fa-clock"></i>${c.last_seen}</div>
+            <a href="/clients/${c.id}" class="popup-link"><i class="fas fa-external-link-alt"></i> View Client</a>
+        </div>`;
+    }
+
+    function buildMultiPopup(group) {
+        const location = group[0].city ? `${group[0].city}, ${group[0].country}` : `${group[0].lat.toFixed(3)}, ${group[0].lon.toFixed(3)}`;
+        const onlineCount = group.filter(c => c.status === 'online').length;
+
+        const items = group.map(c => `
+            <div class="popup-list-item" onclick="window.location='/clients/${c.id}'">
+                <div class="popup-item-name">
+                    ${c.name}
+                    ${statusBadge(c.status)}
+                </div>
+                <div class="popup-item-meta">
+                    <span><i class="fas fa-server" style="margin-right:3px;color:#475569;"></i>${c.server_name || '—'}</span>
+                    <span><i class="fas fa-exchange-alt" style="margin-right:3px;color:#475569;"></i>${formatTraffic(c.traffic_mb)}</span>
+                    <span><i class="fas fa-clock" style="margin-right:3px;color:#475569;"></i>${c.last_seen}</span>
+                </div>
+            </div>`).join('');
+
+        return `<div class="popup-header">
+                    <i class="fas fa-map-marker-alt" style="margin-right:5px;color:#5b8def;"></i>
+                    ${location} &mdash; ${group.length} clients, ${onlineCount} online
+                </div>
+                <div class="popup-list">${items}</div>`;
+    }
+
+    // ── Render ───────────────────────────────────────────────────────────
+
+    function renderMarkers(clients) {
+        allMarkers.forEach(m => map.removeLayer(m));
+        allMarkers = [];
+
+        // Filter first
+        const visible = clients.filter(c => currentFilter === 'all' || c.status === currentFilter);
+
+        // Group by rounded coordinate key (same IP → same coords)
+        const groups = {};
+        visible.forEach(c => {
+            const key = `${c.lat.toFixed(4)},${c.lon.toFixed(4)}`;
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(c);
+        });
+
+        let online = 0, offline = 0;
+
+        Object.values(groups).forEach(group => {
+            const hasOnline = group.some(c => c.status === 'online');
+            const { lat, lon } = group[0];
+
+            group.forEach(c => { c.status === 'online' ? online++ : offline++; });
+
+            const marker = L.marker([lat, lon], { icon: makeIcon(hasOnline, group.length) });
+            const popup  = group.length === 1 ? buildSinglePopup(group[0]) : buildMultiPopup(group);
+            marker.bindPopup(popup, { maxWidth: 300 });
+            marker.addTo(map);
+            allMarkers.push(marker);
+        });
+
+        document.getElementById('countOnline').textContent  = online;
+        document.getElementById('countOffline').textContent = offline;
+        document.getElementById('countTotal').textContent   = online + offline;
+    }
+
+    // ── Filter toggle ────────────────────────────────────────────────────
+
+    window.setFilter = function (filter) {
+        currentFilter = filter;
+        ['btnAll','btnOnline','btnOffline'].forEach(id => document.getElementById(id).classList.remove('active'));
+        document.getElementById({ all:'btnAll', online:'btnOnline', offline:'btnOffline' }[filter]).classList.add('active');
+        renderMarkers(cachedClients);
+    };
+
+    // ── Load data ────────────────────────────────────────────────────────
+
+    fetch('/api/map/clients')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) return;
+            cachedClients = data.clients;
+            renderMarkers(cachedClients);
+        })
+        .catch(err => console.error('Map data error:', err));
+});
+</script>
+{% endblock %}

@@ -1,0 +1,524 @@
+{% extends "layout.twig" %}
+
+{% block title %}
+	{{ t('dashboard.title') }}
+	-
+	{{ app_name }}
+{% endblock %}
+
+{% block content %}
+	<div
+		class="w-full space-y-8">
+		<!-- Summary Widgets -->
+		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+			<div class="panel p-5 border-l-4 border-primary">
+				<div class="flex items-center justify-between mb-2">
+					<span class="text-xs font-semibold text-muted uppercase tracking-wider">{{ t('dashboard.total_servers') }}</span>
+					<div class="w-8 h-8 rounded-full bg-accent opacity-20 flex items-center justify-center">
+						<i class="fas fa-server text-primary text-xs"></i>
+					</div>
+				</div>
+				<div class="flex items-end gap-2">
+					<div class="text-3xl font-bold text-primary">{{ servers|length }}</div>
+				</div>
+			</div>
+
+			<div class="panel p-5 border-l-4 border-primary">
+				<div class="flex items-center justify-between mb-2">
+					<span class="text-xs font-semibold text-muted uppercase tracking-wider">{{ t('dashboard.total_clients') }}</span>
+					<div class="w-8 h-8 rounded-full bg-primary-light flex items-center justify-center">
+						<i class="fas fa-users text-primary text-xs"></i>
+					</div>
+				</div>
+				<div class="flex items-end gap-2">
+					<div class="text-3xl font-bold text-primary">{{ summary.total_clients|default(0) }}</div>
+					<div class="text-xs text-accent opacity-80/80 mb-1.5">
+						<span class="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400 mr-1 animate-pulse"></span>
+						{{ summary.active_clients }}
+						{{ t('status.online')|default('Online')|lower }}
+					</div>
+				</div>
+			</div>
+
+			<div class="panel p-5 border-l-4 border-blue-500">
+				<div class="flex items-center justify-between mb-2">
+					<span class="text-xs font-semibold text-muted uppercase tracking-wider">{{ t('common.downloaded') }}</span>
+					<div class="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center">
+						<i class="fas fa-arrow-down text-blue-500 text-xs"></i>
+					</div>
+				</div>
+				<div class="text-2xl font-bold text-primary font-mono">
+					{{ (summary.total_download / 1024 / 1024 / 1024)|number_format(2) }}
+					<span class="text-xs font-normal text-muted uppercase">{{ t('common.gb') }}</span>
+				</div>
+			</div>
+
+			<div class="panel p-5 border-l-4 border-indigo-500">
+				<div class="flex items-center justify-between mb-2">
+					<span class="text-xs font-semibold text-muted uppercase tracking-wider">{{ t('common.uploaded') }}</span>
+					<div class="w-8 h-8 rounded-full bg-indigo-500/10 flex items-center justify-center">
+						<i class="fas fa-arrow-up text-indigo-500 text-xs"></i>
+					</div>
+				</div>
+				<div class="text-2xl font-bold text-primary font-mono">
+					{{ (summary.total_upload / 1024 / 1024 / 1024)|number_format(2) }}
+					<span class="text-xs font-normal text-muted uppercase">{{ t('common.gb') }}</span>
+				</div>
+			</div>
+		</div>
+
+		<!-- Fleet Health Overview -->
+		<div class="panel overflow-hidden">
+			<div class="px-5 py-4 border-b border-default bg-panel/30 flex justify-between items-center">
+				<h2 class="text-sm font-semibold text-primary uppercase tracking-widest opacity-70">{{ t('dashboard.health_overview', [], 'Fleet Health') }}</h2>
+				{% if beszel_config.url %}
+					<a href="{{ beszel_config.url }}" target="_blank" class="text-[10px] text-amber-500 hover:text-amber-400 transition-colors flex items-center font-bold">
+						{{ t('dashboard.fleet_health') }}
+						<i class="fas fa-external-link-alt ml-1.5"></i>
+					</a>
+				{% endif %}
+			</div>
+			<div class="p-5">
+				<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4" id="fleet-health-grid">
+					{% for server in servers %}
+						<a href="/servers/{{ server.id }}" class="panel p-3 border border-default hover:border-primary transition-all group" data-server-ip="{{ server.host }}">
+							<div class="flex items-center justify-between mb-2">
+								<span class="text-xs font-bold text-primary truncate pr-2">{{ server.name }}</span>
+								<span class="w-1.5 h-1.5 rounded-full {% if server.status == 'active' %}bg-primary animate-pulse{% else %}bg-surface-border{% endif %}"></span>
+							</div>
+							<div
+								class="space-y-1.5">
+								<!-- CPU -->
+								<div class="flex items-center justify-between">
+									<span class="text-[10px] text-muted uppercase">CPU</span>
+									<span class="text-[10px] text-primary font-mono server-cpu-val">-</span>
+								</div>
+								<div class="h-1 w-full bg-surface-hover rounded-full overflow-hidden">
+									<div class="h-full bg-amber-500 server-cpu-bar" style="width: 0%"></div>
+								</div>
+								<!-- RAM -->
+								<div class="flex items-center justify-between">
+									<span class="text-[10px] text-muted uppercase">RAM</span>
+									<span class="text-[10px] text-primary font-mono server-ram-val">-</span>
+								</div>
+								<div class="h-1 w-full bg-surface-hover rounded-full overflow-hidden">
+									<div class="h-full bg-cyan-500 server-ram-bar" style="width: 0%"></div>
+								</div>
+								<!-- Bandwidth -->
+								<div class="flex items-center justify-between text-[10px] opacity-70">
+									<span class="text-muted">
+										<i class="fas fa-exchange-alt mr-1"></i>
+										BW</span>
+									<span class="text-primary font-mono server-bw-val">- Mbps</span>
+								</div>
+							</div>
+						</a>
+					{% endfor %}
+				</div>
+			</div>
+		</div>
+
+		<!-- Fleet Search -->
+		<div class="panel overflow-hidden flex flex-col min-h-[400px]">
+			<div class="px-5 py-4 border-b border-default bg-panel/30">
+				<div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+					<div class="flex items-center gap-4">
+                        <h2 class="text-sm font-semibold text-primary uppercase tracking-widest opacity-70">{{ t('dashboard.fleet_search')|default('Global Search') }}</h2>
+                        <!-- Batch Actions Bar (Responsive) -->
+                        <div id="batchActionBar" class="hidden flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-full animate-fade-in 
+                             fixed bottom-6 left-4 right-4 md:relative md:bottom-auto md:left-auto md:right-auto md:bg-primary/10 
+                             bg-surface-panel shadow-2xl md:shadow-none p-3 md:p-1 border-primary/40 md:border-primary/20 z-[100]">
+                            
+                            <div class="flex flex-col md:flex-row items-center w-full gap-3 md:gap-2">
+                                <div class="flex items-center w-full md:w-auto border-b md:border-b-0 border-default/50 pb-2 md:pb-0">
+                                    <span class="text-[11px] md:text-[10px] font-bold text-primary uppercase tracking-widest mr-auto md:mr-2" id="selectedCountText">0 SELECTED</span>
+                                    <button onclick="document.querySelectorAll('.client-checkbox').forEach(cb => cb.checked = false); updateBatchBar();" class="md:hidden text-[10px] text-muted hover:text-primary uppercase font-bold px-2 py-1">
+                                        <i class="fas fa-times mr-1"></i>{{ t('common.clear')|default('Clear') }}
+                                    </button>
+                                </div>
+                                
+                                <div class="flex items-center justify-around w-full md:w-auto gap-2">
+                                    <button onclick="handleBatchAction('revoke')" class="flex-1 md:flex-none text-[11px] md:text-[10px] font-bold text-orange-400 hover:text-orange-300 uppercase tracking-tight px-3 py-2.5 md:px-2 md:py-1 transition-colors bg-orange-500/10 md:bg-transparent rounded-lg border border-orange-500/20 md:border-0 text-center">
+                                        <i class="fas fa-user-slash mr-1.5 md:hidden"></i>{{ t('common.revoke')|default('Revoke') }}
+                                    </button>
+                                    <button onclick="handleBatchAction('restore')" class="flex-1 md:flex-none text-[11px] md:text-[10px] font-bold dark:text-green-400 text-green-600 hover:dark:text-green-300 hover:text-green-700 uppercase tracking-tight px-3 py-2.5 md:px-2 md:py-1 transition-colors bg-green-500/10 md:bg-transparent rounded-lg border border-green-500/20 md:border-0 text-center">
+                                        <i class="fas fa-user-check mr-1.5 md:hidden"></i>{{ t('common.restore')|default('Restore') }}
+                                    </button>
+                                    <button onclick="handleBatchAction('delete')" class="flex-1 md:flex-none text-[11px] md:text-[10px] font-bold dark:text-red-400 text-red-600 hover:dark:text-red-300 hover:text-red-700 uppercase tracking-tight px-3 py-2.5 md:px-2 md:py-1 transition-colors bg-red-500/10 md:bg-transparent rounded-lg border border-red-500/20 md:border-0 text-center">
+                                        <i class="fas fa-trash-alt mr-1.5 md:hidden"></i>{{ t('common.delete')|default('Delete') }}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+					<div class="flex flex-wrap items-center gap-3">
+						<div class="relative w-full md:w-64">
+							<input type="text" id="clientSearch" class="w-full bg-base border border-default rounded-lg py-2 pl-10 pr-4 text-sm text-primary placeholder-slate-500 focus:outline-none focus:border-primary transition-all" placeholder="{{ t('dashboard.search_placeholder', [], 'Search clients...') }}">
+							<div class="absolute left-3 top-2.5 text-muted">
+								<i class="fas fa-search text-xs"></i>
+							</div>
+						</div>
+                        <select id="statusFilter" class="bg-base border border-default rounded-lg py-2 px-3 text-[11px] text-secondary focus:outline-none focus:border-primary transition-all cursor-pointer">
+							<option value="all">{{ t('common.status_all', [], 'All Status') }}</option>
+							<option value="online">{{ t('common.status_online', [], 'Online') }}</option>
+							<option value="offline">{{ t('common.status_offline', [], 'Offline') }}</option>
+							<option value="revoked">{{ t('common.status_revoked', [], 'Revoked') }}</option>
+						</select>
+						<select id="trafficFilter" class="bg-base border border-default rounded-lg py-2 px-3 text-[11px] text-secondary focus:outline-none focus:border-primary transition-all cursor-pointer">
+							<option value="all">{{ t('common.traffic_all', [], 'All Traffic') }}</option>
+							<option value="medium">{{ t('common.traffic_medium', [], '> 100MB') }}</option>
+							<option value="high">{{ t('common.traffic_high', [], '> 1GB') }}</option>
+						</select>
+							<select id="sortFilter" class="bg-base border border-default rounded-lg py-2 px-3 text-[11px] text-secondary focus:outline-none focus:border-primary transition-all cursor-pointer">
+							<option value="recent">{{ t('common.sort_newest', [], 'Newest') }}</option>
+							<option value="handshake">{{ t('common.sort_handshake', [], 'Last Activity') }}</option>
+							<option value="traffic">{{ t('common.sort_traffic', [], 'Most Traffic') }}</option>
+                            <option value="oldest">{{ t('common.sort_oldest', [], 'Oldest') }}</option>
+						</select>
+					</div>
+				</div>
+			</div>
+
+			<div id="searchResults" class="flex-grow">
+				<!-- Results will be loaded here via AJAX -->
+				<div class="flex items-center justify-center h-full p-10">
+					<div class="text-center">
+						<div class="animate-spin text-primary text-2xl mb-3">
+							<i class="fas fa-circle-notch"></i>
+						</div>
+						<p class="text-sm text-muted">{{ t('common.loading') }}</p>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+{% endblock %}
+
+{% block scripts %}
+	<script>
+		document.addEventListener('DOMContentLoaded', function () {
+const searchInput = document.getElementById('clientSearch');
+const resultsContainer = document.getElementById('searchResults');
+const statusFilter = document.getElementById('statusFilter');
+const trafficFilter = document.getElementById('trafficFilter');
+const sortFilter = document.getElementById('sortFilter');
+const batchActionBar = document.getElementById('batchActionBar');
+const selectedCountText = document.getElementById('selectedCountText');
+
+let searchTimeout = null;
+
+// Multi-language labels from PHP/Twig
+const labels = {
+    clientServer: "{{ t('clients.list', [], 'Client') }}/   {{ t('servers.list', [], 'Server') }}",
+    statusIp: "{{ t('common.status', [], 'Status') }}/ IP",
+    trafficSeen: "{{ t('common.traffic', [], 'Traffic') }}/   {{ t('clients.last_seen', [], 'Last seen') }}",
+    actions: "{{ t('servers.actions', [], 'Actions') }}",
+    online: "{{ t('status.online') }}",
+    offline: "{{ t('status.offline') }}",
+    never: "{{ t('status.never')|default('Never Connected') }}",
+    searching: "{{ t('common.searching') }}",
+    noMatches: "{{ t('common.no_matches') }}",
+    tryAgain: "{{ t('common.try_different_search') }}",
+    sync: "{{ t('common.sync') }}",
+    revoke: "{{ t('common.revoke') }}",
+    restore: "{{ t('common.restore') }}",
+    delete: "{{ t('common.delete') }}",
+    confirmDelete: "{{ t('common.confirm_delete') }}",
+    revoked: "{{ t('common.revoked') }}",
+    edit: "{{ t('common.edit') }}",
+    selected: "{{ t('common.selected_count', [], '%s items selected') }}",
+    traffic: "{{ t('common.traffic') }}",
+    lastSeenLabel: "{{ t('common.last_seen') }}"
+};
+
+function performSearch() {
+    const query = searchInput.value.trim();
+    const status = statusFilter.value;
+    const traffic = trafficFilter.value;
+    const sort = sortFilter.value;
+    
+    const url = `/api/search-clients?q=${encodeURIComponent(query)}&status=${status}&traffic=${traffic}&sort=${sort}`;
+    
+    resultsContainer.innerHTML = `
+        <div class="flex items-center justify-center h-64">
+            <div class="text-center">
+                <div class="animate-spin text-primary text-2xl mb-3">
+                    <i class="fas fa-circle-notch"></i>
+                </div>
+                <p class="text-sm text-muted">${labels.searching}</p>
+            </div>
+        </div>
+    `;
+
+    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) throw new Error(data.error);
+            renderResults(data.results);
+            updateBatchBar();
+        })
+        .catch(err => {
+            resultsContainer.innerHTML = `<div class="p-10 text-center text-red-500">Error: ${err.message}</div>`;
+        });
+}
+
+function renderResults(results) {
+    if (!results || results.length === 0) {
+        resultsContainer.innerHTML = `
+            <div class="flex flex-col items-center justify-center h-64 text-center p-10">
+                <i class="fas fa-search text-muted text-4xl mb-4"></i>
+                <p class="text-secondary">${labels.noMatches}</p>
+                <p class="text-xs text-muted mt-1">${labels.tryAgain}</p>
+            </div>
+        `;
+        return;
+    }
+
+    const isMobile = window.innerWidth < 768;
+    let html = '';
+
+    if (isMobile) {
+        html = `<div class="grid grid-cols-1 gap-4 p-4">`;
+        results.forEach(client => {
+            const isDisabled = (client.db_status === 'disabled');
+            html += `
+                <div class="panel p-4 space-y-4 relative group" id="client-card-${client.id}">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <input type="checkbox" name="client_ids[]" value="${client.id}" class="client-checkbox rounded border-default bg-base text-primary focus:ring-primary/20 cursor-pointer">
+                            <div class="w-8 h-8 rounded bg-surface-hover flex items-center justify-center text-sm">${client.flag}</div>
+                            <div>
+                                <span class="text-sm font-bold ${isDisabled ? 'text-muted line-through' : 'text-primary'} block">${client.name}</span>
+                                <span class="text-[10px] text-secondary flex items-center">
+                                    <i class="fas fa-server mr-1 text-accent opacity-60"></i> ${client.server_name}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <div class="flex items-center px-1.5 py-1 rounded ${isDisabled ? 'bg-orange-500/10' : (client.connection_status === 'online' ? 'bg-sky-500/10' : (client.connection_status === 'never' ? 'bg-slate-500/10' : 'bg-red-500/10'))} border ${isDisabled ? 'border-orange-500/20' : (client.connection_status === 'online' ? 'border-sky-500/20' : (client.connection_status === 'never' ? 'border-slate-500/20' : 'border-red-500/20'))}">
+                                <span class="w-1 h-1 rounded-full ${isDisabled ? 'bg-orange-500' : (client.connection_status === 'online' ? 'bg-sky-500 animate-pulse' : (client.connection_status === 'never' ? 'bg-slate-400' : 'bg-red-500'))} mr-1.5"></span>
+                                <span class="text-[8px] uppercase tracking-wider ${isDisabled ? 'text-orange-500' : (client.connection_status === 'online' ? 'text-sky-500' : (client.connection_status === 'never' ? 'text-slate-500' : 'text-red-500'))} font-bold">${isDisabled ? labels.revoked : (client.connection_status === 'online' ? labels.online : (client.connection_status === 'never' ? labels.never : labels.offline))}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between text-[10px] bg-panel/50 rounded p-2">
+                        <div class="flex flex-col">
+                            <span class="text-muted uppercase font-bold tracking-tighter">${labels.traffic}</span>
+                            <span class="text-primary font-mono font-medium">${client.total_traffic}</span>
+                            <div class="flex gap-2">
+                                <span class="text-[9px] dark:text-sky-400 text-sky-600 font-bold flex items-center bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20"><i class="fas fa-arrow-down mr-1 opacity-70"></i>${client.speed_down}</span>
+                                <span class="text-[9px] dark:text-indigo-400 text-indigo-600 font-bold flex items-center bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20"><i class="fas fa-arrow-up mr-1 opacity-70"></i>${client.speed_up}</span>
+                            </div>
+                        </div>
+                        <div class="flex flex-col text-right">
+                            <span class="text-muted uppercase font-bold tracking-tighter">${labels.lastSeenLabel}</span>
+                            <span class="text-primary font-mono font-medium">${client.last_seen}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between pt-2 border-t border-default/50">
+                        <code class="text-[10px] text-secondary font-mono">${client.external_ip || 'No IP'}</code>
+                        <div class="flex items-center gap-1">
+                            <button onclick="clientAction(${client.id}, 'sync-stats', this)" class="p-2 text-muted hover:text-cyan-400"><i class="fas fa-sync-alt"></i></button>
+                            <button onclick="clientAction(${client.id}, '${isDisabled ? 'restore' : 'revoke'}', this)" class="p-2 ${isDisabled ? 'text-green-500' : 'text-muted hover:text-orange-400'}"><i class="fas ${isDisabled ? 'fa-user-check' : 'fa-user-slash'}"></i></button>
+                            <button onclick="clientAction(${client.id}, 'delete', this)" class="p-2 text-muted hover:text-red-500"><i class="fas fa-trash-alt"></i></button>
+                            <a href="/clients/${client.id}" class="ml-2 text-[10px] bg-primary text-primary px-3 py-1.5 rounded uppercase font-bold tracking-wider">${labels.edit}</a>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        html += `</div>`;
+    } else {
+        html = `
+            <div class="table-wrapper">
+                <table class="min-w-full">
+                    <thead>
+                        <tr class="bg-panel/50">
+                            <th class="px-5 py-3 text-left w-10">
+                                <input type="checkbox" id="selectAll" class="rounded border-default bg-base text-primary focus:ring-primary/20 cursor-pointer">
+                            </th>
+                            <th class="px-5 py-3 text-left text-[10px] uppercase tracking-widest text-muted font-bold">${labels.clientServer}</th>
+                            <th class="px-5 py-3 text-left text-[10px] uppercase tracking-widest text-muted font-bold">${labels.statusIp}</th>
+                            <th class="px-5 py-3 text-left text-[10px] uppercase tracking-widest text-muted font-bold">${labels.trafficSeen}</th>
+                            <th class="px-5 py-3 text-right text-[10px] uppercase tracking-widest text-muted font-bold">${labels.actions}</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-700/50">
+        `;
+
+        results.forEach(client => {
+            const isDisabled = (client.db_status === 'disabled');
+            html += `
+                <tr class="hover:bg-surface-hover/50 transition-colors group" id="client-row-${client.id}">
+                    <td class="px-5 py-4">
+                        <input type="checkbox" name="client_ids[]" value="${client.id}" class="client-checkbox rounded border-default bg-base text-primary focus:ring-primary/20 cursor-pointer">
+                    </td>
+                    <td class="px-5 py-4">
+                        <div class="flex items-center">
+                            <div class="w-8 h-8 rounded bg-surface-hover flex items-center justify-center mr-3 text-sm">
+                                ${client.flag}
+                            </div>
+                            <div>
+                                <span class="text-sm font-medium ${isDisabled ? 'text-muted line-through' : 'text-primary'} block">${client.name}</span>
+                                <span class="text-xs text-secondary flex items-center mt-0.5">
+                                    <i class="fas fa-server mr-1.5 text-[8px] text-accent opacity-60"></i> ${client.server_name}
+                                </span>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-5 py-4">
+                        <div class="flex flex-col">
+                            <div class="flex items-center gap-1.5 mb-1">
+                                <div class="flex items-center px-1.5 py-1 rounded ${isDisabled ? 'bg-orange-500/10' : (client.connection_status === 'online' ? 'bg-sky-500/10' : (client.connection_status === 'never' ? 'bg-slate-500/10' : 'bg-red-500/10'))} border ${isDisabled ? 'border-orange-500/20' : (client.connection_status === 'online' ? 'border-sky-500/20' : (client.connection_status === 'never' ? 'border-slate-500/20' : 'border-red-500/20'))} h-5">
+                                    <span class="w-1 h-1 rounded-full ${isDisabled ? 'bg-orange-500' : (client.connection_status === 'online' ? 'bg-sky-500 animate-pulse' : (client.connection_status === 'never' ? 'bg-slate-400' : 'bg-red-500'))} mr-1.5"></span>
+                                    <span class="text-[9px] uppercase tracking-wider ${isDisabled ? 'text-orange-500' : (client.connection_status === 'online' ? 'text-sky-500' : (client.connection_status === 'never' ? 'text-slate-500' : 'text-red-500'))} font-bold leading-none">
+                                        ${isDisabled ? labels.revoked : (client.connection_status === 'online' ? labels.online : (client.connection_status === 'never' ? labels.never : labels.offline))}
+                                    </span>
+                                </div>
+                            </div>
+                            <code class="text-[10px] text-secondary font-mono">${client.external_ip || 'No IP'}</code>
+                        </div>
+                    </td>
+                    <td class="px-5 py-4 text-primary font-mono text-xs">
+                        <div class="flex flex-col">
+                            <span class="font-medium">${client.total_traffic}</span>
+                            <div class="flex items-center gap-2 mt-1.5">
+                                <span class="text-[9px] dark:text-sky-400 text-sky-600 font-bold flex items-center bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/10"><i class="fas fa-arrow-down mr-1 opacity-70"></i>${client.speed_down}</span>
+                                <span class="text-[9px] dark:text-indigo-400 text-indigo-600 font-bold flex items-center bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/10"><i class="fas fa-arrow-up mr-1 opacity-70"></i>${client.speed_up}</span>
+                            </div>
+                            <span class="text-[10px] text-muted mt-1 uppercase tracking-tighter">${client.last_seen}</span>
+                        </div>
+                    </td>
+                    <td class="px-5 py-4 text-right">
+                        <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onclick="clientAction(${client.id}, 'sync-stats', this)" class="p-1.5 text-muted hover:text-cyan-400" title="${labels.sync}">
+                                <i class="fas fa-sync-alt text-xs"></i>
+                            </button>
+                            <button onclick="clientAction(${client.id}, '${isDisabled ? 'restore' : 'revoke'}', this)" class="p-1.5 ${isDisabled ? 'text-green-500 hover:text-green-400' : 'text-muted hover:text-orange-400'}" title="${isDisabled ? labels.restore : labels.revoke}">
+                                <i class="fas ${isDisabled ? 'fa-user-check' : 'fa-user-slash'} text-xs"></i>
+                            </button>
+                            <button onclick="clientAction(${client.id}, 'delete', this)" class="p-1.5 text-muted hover:text-red-500" title="${labels.delete}">
+                                <i class="fas fa-trash-alt text-xs"></i>
+                            </button>
+                            <a href="/clients/${client.id}" class="ml-2 text-[10px] bg-panel hover:bg-primary text-secondary hover:text-primary px-2 py-1 rounded border border-default uppercase font-bold tracking-wider transition-all">
+                                ${labels.edit}
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+        html += `</tbody></table></div>`;
+    }
+    
+    resultsContainer.innerHTML = html;
+
+    // Re-attach event listeners for checkboxes
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.client-checkbox');
+
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+            updateBatchBar();
+        });
+    }
+
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', updateBatchBar);
+    });
+}
+
+function updateBatchBar() {
+    const selected = document.querySelectorAll('.client-checkbox:checked');
+    if (selected.length > 0) {
+        batchActionBar.classList.remove('hidden');
+        selectedCountText.innerText = labels.selected.replace('%s', selected.length);
+    } else {
+        batchActionBar.classList.add('hidden');
+    }
+}
+
+window.handleBatchAction = async function(action) {
+    const selected = Array.from(document.querySelectorAll('.client-checkbox:checked')).map(cb => cb.value);
+    if (selected.length === 0) return;
+
+    const confirmMsg = action === 'delete' ? labels.confirmDelete : null;
+    if (confirmMsg && !confirm(confirmMsg)) return;
+
+    handleAjaxAction('/clients/batch', { ids: selected, action: action }, null);
+};
+
+window.clientAction = async function (id, action, btn) {
+    const confirmMsg = action === 'delete' ? labels.confirmDelete : null;
+    handleAjaxAction(`/clients/${id}/${action}`, {}, confirmMsg);
+};
+
+// Event Listeners
+searchInput.addEventListener('input', function (e) {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => performSearch(), 300);
+});
+
+[statusFilter, trafficFilter, sortFilter].forEach(el => {
+    el.addEventListener('change', () => performSearch());
+});
+
+// Initial load
+performSearch();
+
+// Beszel Fleet Monitoring
+function updateFleetHealth() {
+const servers = document.querySelectorAll('#fleet-health-grid [data-server-ip]');
+const ips = Array.from(servers).map(s => s.dataset.serverIp);
+
+if (ips.length === 0) 
+return;
+
+
+
+servers.forEach(card => {
+const ip = card.dataset.serverIp;
+fetch('/api/monitoring/beszel/' + ip).then(response => response.json()).then(res => {
+if (res.success && res.data) {
+const info = res.data.info || {};
+const cpu = info.cpu || 0;
+const ram = info.mp || 0;
+
+card.querySelector('.server-cpu-val').innerText = Math.round(cpu) + '%';
+card.querySelector('.server-cpu-bar').style.width = cpu + '%';
+card.querySelector('.server-ram-val').innerText = Math.round(ram) + '%';
+card.querySelector('.server-ram-bar').style.width = ram + '%';
+
+// Bandwidth calculation (Mbps) - use 'bb' (bytes per second) from info
+const total_bps = (info.bb || 0) * 8;
+const total_mbps = total_bps / 1000000;
+
+const fmtBw = (val) => val >= 1000 ? (val / 1000).toFixed(1) + ' Gbps' : val.toFixed(1) + ' Mbps';
+
+const bwLabel = card.querySelector('.server-bw-val');
+if (bwLabel) {
+bwLabel.innerText = fmtBw(total_mbps);
+}
+}
+}).catch(err => console.error('Beszel error for ' + ip, err));
+});
+}
+
+updateFleetHealth();
+// Refresh every 15 seconds to match Beszel agent
+setInterval(updateFleetHealth, 15000);
+});
+
+function copyToClipboard(text, btn) {
+navigator.clipboard.writeText(text).then(() => {
+const icon = btn.querySelector('i');
+const originalClass = icon.className;
+icon.className = 'fas fa-check text-primary';
+setTimeout(() => {
+icon.className = originalClass;
+}, 2000);
+});
+}
+	</script>
+{% endblock %}

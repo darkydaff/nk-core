@@ -1,0 +1,225 @@
+{
+  "main": {
+    "id": "72e7842b54ee4fab",
+    "type": "split",
+    "children": [
+      {
+        "id": "4e707d5652842d82",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "d2b8571aa9c33bfc",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "01_architecture/System Architecture.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "System Architecture"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "f0b71b3420d05699",
+    "type": "split",
+    "children": [
+      {
+        "id": "ec7605e12bc4ce40",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "39740af84a33f494",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "4d414a95901df0af",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "4fcb2647193bff60",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "c6572fd3d04950dd",
+    "type": "split",
+    "children": [
+      {
+        "id": "e045581d83a707d4",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "894007db80dc817f",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "01_architecture/System Architecture.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for System Architecture"
+            }
+          },
+          {
+            "id": "d52f2757615271c9",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "01_architecture/System Architecture.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from System Architecture"
+            }
+          },
+          {
+            "id": "a963e62bed2d8c24",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "d4134abaac339ee4",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "1e9a0bead78d7f2b",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "01_architecture/System Architecture.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of System Architecture"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "d2b8571aa9c33bfc",
+  "lastOpenFiles": [
+    "01_architecture/index.md",
+    "index.md",
+    "Appendix MOC.md",
+    "99_appendix/index.md",
+    "99_appendix/Glossary of Terms.md",
+    "99_appendix",
+    "11_debugging/Troubleshooting.md",
+    "11_debugging/Logging & Monitoring.md",
+    "11_debugging/index.md",
+    "11_debugging",
+    "10_workflows/index.md",
+    "10_workflows/Data Flow.md",
+    "10_workflows",
+    "09_infrastructure/index.md",
+    "09_infrastructure/Infrastructure Overview.md",
+    "09_infrastructure/Background Jobs & Async Processing.md",
+    "09_infrastructure",
+    "08_deployment/index.md",
+    "08_deployment/Deployment Guide.md",
+    "08_deployment",
+    "07_security/Security Model.md",
+    "07_security/index.md",
+    "07_security/Authentication System.md",
+    "07_security",
+    "06_services/index.md",
+    "06_services/Backup Management (S3).md",
+    "06_services",
+    "05_api/index.md",
+    "05_api/API Reference.md",
+    "05_api",
+    "04_database/index.md",
+    "04_database/Database Schema.md",
+    "04_database",
+    "03_frontend/index.md",
+    "03_frontend",
+    "02_backend/index.md"
+  ]
+}

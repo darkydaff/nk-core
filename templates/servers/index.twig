@@ -1,0 +1,99 @@
+{% extends "layout.twig" %}
+
+{% block title %}{{ t('servers.title') }}{% endblock %}
+
+{% block content %}
+<div class="w-full">
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-primary flex items-center">
+                <div class="w-10 h-10 rounded-lg bg-surface-hover text-primary flex items-center justify-center mr-3">
+                    <i class="fas fa-server"></i>
+                </div>
+                {{ t('servers.title') }}
+            </h1>
+        </div>
+        <a href="/servers/create" class="btn-primary flex items-center px-5 py-2.5 text-sm">
+            <i class="fas fa-plus mr-2"></i> {{ t('servers.add') }}
+        </a>
+    </div>
+
+    {% if servers|length > 0 %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for server in servers %}
+        <div class="panel p-5 hover:border-slate-500 transition-colors server-card">
+            <div class="flex items-start justify-between mb-4">
+                <div class="flex items-center">
+                    <div class="w-10 h-10 rounded-lg bg-surface-hover text-primary flex items-center justify-center mr-3">
+                        <i class="fas fa-server"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-primary font-semibold">{{ server.name }}</h3>
+                        <code class="text-xs text-secondary">{{ server.host }}</code>
+                    </div>
+                </div>
+                {% if server.status == 'active' %}
+                    <div class="flex flex-col items-end gap-1">
+                        <span class="badge-active text-[10px] px-1.5 py-0.5 rounded-md flex items-center">
+                            <span class="w-1 h-1 rounded-full bg-cyan-400 mr-1"></span>
+                            {{ t('status.active') }}
+                        </span>
+                        {% if server.last_ping_ms is not null %}
+                            <span class="text-[10px] font-mono {% if server.last_ping_ms < 100 %}dark:text-green-400 dark:bg-green-500/10 dark:border-green-500/20 text-white bg-green-600{% elseif server.last_ping_ms < 300 %}dark:text-yellow-400 dark:bg-yellow-500/10 dark:border-yellow-500/20 text-white bg-amber-600{% else %}dark:text-red-400 dark:bg-red-500/10 dark:border-red-500/20 text-white bg-red-600{% endif %} flex items-center px-2 py-0.5 rounded-md font-bold shadow-sm">
+                                <i class="fas fa-bolt text-[8px] mr-1"></i>
+                                {{ server.last_ping_ms }}ms
+                            </span>
+                        {% endif %}
+                        {% if server.last_check_at %}
+                            <span class="text-[9px] text-muted flex items-center opacity-60 mt-0.5" title="{{ t('common.last_sync') }}">
+                                <i class="fas fa-history text-[8px] mr-1"></i>
+                                {{ server.last_check_at|date('H:i:s') }}
+                            </span>
+                        {% endif %}
+                    </div>
+                {% elseif server.status == 'deploying' %}
+                    <span class="badge-warning text-xs px-2 py-1 rounded-md flex items-center">
+                        <span class="w-1.5 h-1.5 rounded-full bg-yellow-400 mr-1.5"></span>
+                        {{ t('status.deploying') }}
+                    </span>
+                {% else %}
+                    <span class="badge-error text-xs px-2 py-1 rounded-md flex items-center">
+                        <span class="w-1.5 h-1.5 rounded-full bg-red-400 mr-1.5"></span>
+                        {{ t('status.' ~ server.status)|default(server.status) }}
+                    </span>
+                {% endif %}
+            </div>
+            
+            <div class="grid grid-cols-2 gap-2 mb-4 text-xs">
+                <div class="bg-panel/50 p-2 rounded">
+                    <span class="text-muted block mb-0.5">{{ t('servers.vpn_port') }}</span>
+                    <span class="text-primary font-mono">{{ server.vpn_port }}</span>
+                </div>
+                <div class="bg-panel/50 p-2 rounded">
+                    <span class="text-muted block mb-0.5">{{ t('servers.clients') }}</span>
+                    <span class="text-primary">{{ server.client_count|default(0) }}</span>
+                </div>
+            </div>
+            
+            <div class="flex gap-2 pt-3 border-t border-default">
+                <a href="/servers/{{ server.id }}" class="btn-secondary flex-1 text-center py-2 text-xs">
+                    <i class="fas fa-eye mr-1"></i> {{ t('servers.view') }}
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="panel p-12 text-center">
+        <div class="w-16 h-16 rounded-full bg-panel flex items-center justify-center mx-auto mb-4">
+            <i class="fas fa-server text-muted text-2xl"></i>
+        </div>
+        <h2 class="text-xl text-primary mb-2">{{ t('servers.no_servers_yet') }}</h2>
+        <p class="text-secondary mb-6">{{ t('servers.add_first_hint') }}</p>
+        <a href="/servers/create" class="btn-primary inline-flex items-center px-6 py-3">
+            <i class="fas fa-plus mr-2"></i> {{ t('servers.add_first_server') }}
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

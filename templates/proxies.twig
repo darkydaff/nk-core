@@ -1,0 +1,278 @@
+{% extends "layout.twig" %}
+
+{% block title %}
+	{{ t('proxies.title') }} - {{ app_name }}
+{% endblock %}
+
+{% block content %}
+	<div class="w-full space-y-8">
+		<!-- Page Header -->
+		<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+			<div>
+				<h1 class="text-2xl font-bold text-primary">{{ t('proxies.title') }}</h1>
+				<p class="text-sm text-muted">{{ t('proxies.description')|default('Manage lightweight HTTP proxies via 3proxy') }}</p>
+			</div>
+			<div class="flex items-center gap-3">
+				<button onclick="globalSyncAll(this)" class="btn-secondary px-5 py-2.5 text-[13px] flex items-center gap-2 whitespace-nowrap flex-shrink-0">
+					<i class="fas fa-sync-alt"></i>
+					{{ t('common.sync_all')|default('Sync All Stats') }}
+				</button>
+				<button onclick="openCreateModal()" class="btn-primary px-5 py-2.5 text-[13px] flex items-center gap-2 whitespace-nowrap flex-shrink-0">
+					<i class="fas fa-plus"></i>
+					{{ t('proxies.create')|default('Create Proxy') }}
+				</button>
+			</div>
+		</div>
+
+		<!-- Proxy List -->
+		<div class="panel overflow-hidden">
+			<div class="table-wrapper">
+				<table class="min-w-full">
+					<thead>
+						<tr class="bg-panel/50">
+							<th class="px-5 py-3 text-left text-[10px] uppercase tracking-widest text-muted font-bold">{{ t('proxies.username') }} / {{ t('proxies.type')|default('Type') }}</th>
+							<th class="px-5 py-3 text-left text-[10px] uppercase tracking-widest text-muted font-bold">{{ t('proxies.server') }} / {{ t('proxies.port') }}</th>
+							<th class="px-5 py-3 text-left text-[10px] uppercase tracking-widest text-muted font-bold">{{ t('proxies.status') }}</th>
+							<th class="px-5 py-3 text-left text-[10px] uppercase tracking-widest text-muted font-bold">{{ t('proxies.traffic') }}</th>
+							<th class="px-5 py-3 text-left text-[10px] uppercase tracking-widest text-muted font-bold">{{ t('proxies.created') }}</th>
+							<th class="px-5 py-3 text-right text-[10px] uppercase tracking-widest text-muted font-bold">{{ t('proxies.actions') }}</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-slate-700/50">
+						{% for proxy in proxies %}
+							<tr class="hover:bg-surface-hover/50 transition-colors group">
+								<td class="px-5 py-4">
+									<div class="flex items-center gap-4">
+										<div class="w-10 h-10 rounded-lg bg-surface-hover flex items-center justify-center text-primary border border-default">
+											<i class="fas fa-shield-alt"></i>
+										</div>
+										<div class="flex-grow max-w-sm">
+											<div class="flex items-center justify-between mb-1">
+												<div class="flex items-center gap-2">
+													<span class="text-sm font-bold text-primary">{{ proxy.username }}</span>
+													<span class="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-surface-border text-muted">
+														{{ proxy.type == 'socks5' ? 'SOCKS5' : 'HTTP' }}
+													</span>
+												</div>
+												<span class="text-[10px] text-muted font-mono bg-base px-1.5 py-0.5 rounded border border-default">
+													{{ t('proxies.password') }}: {{ proxy.password }}
+												</span>
+											</div>
+											<div class="relative group/copy">
+												<div class="flex items-center bg-base rounded border border-default overflow-hidden">
+													<div class="px-2 py-1.5 text-[10px] text-accent font-mono truncate select-all flex-grow">
+														{% set proto = proxy.type == 'socks5' ? 'socks5' : 'http' %}
+														{{ proto }}://{{ proxy.username|url_encode }}:{{ proxy.password|url_encode }}@{{ proxy.server_host }}:{{ proxy.port }}
+													</div>
+													<button onclick="copyToClipboard('{{ proto }}://{{ proxy.username|url_encode }}:{{ proxy.password|url_encode }}@{{ proxy.server_host }}:{{ proxy.port }}', this)" 
+															class="px-3 py-1.5 bg-surface-hover hover:bg-surface-border text-muted hover:text-primary transition-colors border-l border-default"
+															title="{{ t('common.copy') }}">
+														<i class="fas fa-copy text-xs"></i>
+													</button>
+												</div>
+											</div>
+										</div>
+									</div>
+								</td>
+								<td class="px-5 py-4">
+									<div class="flex flex-col">
+										<span class="text-sm text-primary">{{ proxy.server_name }}</span>
+										<code class="text-[10px] text-accent font-mono">{{ proxy.server_host }}:{{ proxy.port }}</code>
+									</div>
+								</td>
+								<td class="px-5 py-4">
+									<div class="flex items-center gap-1.5">
+										<span class="w-1.5 h-1.5 rounded-full {% if proxy.status == 'active' %}bg-primary animate-pulse{% elseif proxy.status == 'paused' %}bg-amber-500{% else %}bg-red-500{% endif %}"></span>
+										<span class="text-[10px] uppercase tracking-tighter font-bold {% if proxy.status == 'active' %}text-primary{% elseif proxy.status == 'paused' %}text-amber-500{% else %}text-red-500{% endif %}">
+											{{ t('proxies.' ~ proxy.status) }}
+										</span>
+									</div>
+								</td>
+								<td class="px-5 py-4">
+									<div class="flex flex-col">
+										<span class="text-xs text-primary font-mono font-medium">
+											{{ ( (proxy.bytes_sent + proxy.bytes_received) / 1024 / 1024 )|number_format(2) }} MB
+										</span>
+										<div class="flex items-center gap-2 mt-1">
+											<span class="text-[8px] text-muted flex items-center gap-1">
+												<i class="fas fa-arrow-up text-indigo-500"></i> {{ (proxy.bytes_sent / 1024 / 1024)|number_format(1) }}
+											</span>
+											<span class="text-[8px] text-muted flex items-center gap-1">
+												<i class="fas fa-arrow-down text-blue-500"></i> {{ (proxy.bytes_received / 1024 / 1024)|number_format(1) }}
+											</span>
+										</div>
+									</div>
+								</td>
+								<td class="px-5 py-4">
+									<span class="text-xs text-muted">{{ proxy.created_at|date('Y-m-d H:i') }}</span>
+								</td>
+								<td class="px-5 py-4 text-right">
+										<div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+											{% if proxy.status == 'active' %}
+												<button onclick="handleAjaxAction('/proxies/{{ proxy.id }}/pause')" class="group/btn flex items-center gap-0 hover:gap-2 p-1.5 text-muted hover:text-amber-500 transition-all duration-300" title="{{ t('proxies.pause') }}">
+													<i class="fas fa-pause text-xs"></i>
+													<span class="max-w-0 overflow-hidden group-hover/btn:max-w-[100px] transition-all duration-300 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap">
+														{{ t('proxies.pause') }}
+													</span>
+												</button>
+											{% else %}
+												<button onclick="handleAjaxAction('/proxies/{{ proxy.id }}/resume')" class="group/btn flex items-center gap-0 hover:gap-2 p-1.5 text-muted hover:text-green-500 transition-all duration-300" title="{{ t('proxies.resume') }}">
+													<i class="fas fa-play text-xs"></i>
+													<span class="max-w-0 overflow-hidden group-hover/btn:max-w-[100px] transition-all duration-300 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap">
+														{{ t('proxies.resume') }}
+													</span>
+												</button>
+											{% endif %}
+											
+											<button onclick="handleAjaxAction('/proxies/{{ proxy.id }}/delete', {}, '{{ t('proxies.delete_confirm') }}')" class="group/btn flex items-center gap-0 hover:gap-2 p-1.5 text-muted hover:text-red-500 transition-all duration-300" title="{{ t('proxies.delete') }}">
+												<i class="fas fa-trash-alt text-xs"></i>
+												<span class="max-w-0 overflow-hidden group-hover/btn:max-w-[100px] transition-all duration-300 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap">
+													{{ t('proxies.delete') }}
+												</span>
+											</button>
+										</div>
+								</td>
+							</tr>
+						{% else %}
+							<tr>
+								<td colspan="6" class="px-5 py-10 text-center">
+									<div class="flex flex-col items-center">
+										<i class="fas fa-shield-alt text-muted text-4xl mb-4 opacity-20"></i>
+										<p class="text-secondary">{{ t('proxies.no_proxies') }}</p>
+									</div>
+								</td>
+							</tr>
+						{% endfor %}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</div>
+
+	<!-- Create Proxy Modal -->
+	<div id="createModal" class="modal fixed inset-0 z-50 flex items-center justify-center hidden">
+		<div class="modal-overlay absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+		<div class="modal-container bg-panel w-full max-w-md mx-auto rounded-xl shadow-2xl z-50 overflow-hidden border border-default">
+			<div class="px-6 py-4 border-b border-default flex justify-between items-center">
+				<h3 class="text-lg font-bold text-primary">{{ t('proxies.create') }}</h3>
+				<button onclick="closeCreateModal()" class="text-muted hover:text-primary transition-colors">
+					<i class="fas fa-times"></i>
+				</button>
+			</div>
+			<form onsubmit="handleAjaxForm(event, '/proxies/create')" class="p-6 space-y-4">
+				<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+				
+				<div>
+					<label class="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">{{ t('proxies.type')|default('Proxy Type') }}</label>
+					<select name="type" required class="w-full bg-base border border-default rounded-lg py-2 px-3 text-sm text-primary focus:outline-none focus:border-primary">
+						<option value="http">HTTP</option>
+						<option value="socks5">SOCKS5</option>
+					</select>
+				</div>
+
+				<div>
+					<label class="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">{{ t('proxies.server') }}</label>
+					<select name="server_id" required class="w-full bg-base border border-default rounded-lg py-2 px-3 text-sm text-primary focus:outline-none focus:border-primary">
+						<option value="">{{ t('form.select_server') }}</option>
+						{% for server in servers %}
+							<option value="{{ server.id }}">{{ server.name }}</option>
+						{% endfor %}
+					</select>
+				</div>
+
+				<div>
+					<label class="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">{{ t('proxies.username') }}</label>
+					<div class="flex gap-2">
+						<input type="text" name="username" id="proxy_username" class="flex-grow bg-base border border-default rounded-lg py-2 px-3 text-sm text-primary focus:outline-none focus:border-primary" placeholder="{{ t('proxies.leave_blank_auto') }}">
+						<button type="button" onclick="generateUsername()" class="px-3 py-2 bg-surface-hover text-muted hover:text-primary rounded-lg transition-colors">
+							<i class="fas fa-sync-alt"></i>
+						</button>
+					</div>
+				</div>
+
+				<div>
+					<label class="block text-xs font-semibold text-muted uppercase tracking-wider mb-2">{{ t('proxies.password') }}</label>
+					<div class="flex gap-2">
+						<input type="text" name="password" id="proxy_password" class="flex-grow bg-base border border-default rounded-lg py-2 px-3 text-sm text-primary focus:outline-none focus:border-primary" placeholder="{{ t('proxies.leave_blank_auto') }}">
+						<button type="button" onclick="generatePassword()" class="px-3 py-2 bg-surface-hover text-muted hover:text-primary rounded-lg transition-colors">
+							<i class="fas fa-sync-alt"></i>
+						</button>
+					</div>
+				</div>
+
+				<div class="pt-4 flex gap-3">
+					<button type="button" onclick="closeCreateModal()" class="flex-grow py-2.5 bg-surface-hover text-primary font-bold rounded-lg hover:bg-surface-border transition-colors">
+						{{ t('form.cancel') }}
+					</button>
+					<button type="submit" class="flex-grow py-2.5 btn-primary text-sm font-bold rounded-lg shadow-lg shadow-primary/20 transition-all">
+						{{ t('form.create') }}
+					</button>
+				</div>
+			</form>
+		</div>
+	</div>
+
+	<script>
+		function openCreateModal() {
+			document.getElementById('createModal').classList.remove('hidden');
+		}
+		function closeCreateModal() {
+			document.getElementById('createModal').classList.add('hidden');
+		}
+		function copyToClipboard(text, btn) {
+			const icon = btn.querySelector('i');
+			const originalClass = icon.className;
+
+			const doCopy = (txt) => {
+				if (navigator.clipboard && window.isSecureContext) {
+					return navigator.clipboard.writeText(txt);
+				} else {
+					// Fallback for non-HTTPS
+					const textArea = document.createElement("textarea");
+					textArea.value = txt;
+					textArea.style.position = "fixed";
+					textArea.style.left = "-9999px";
+					textArea.style.top = "0";
+					document.body.appendChild(textArea);
+					textArea.focus();
+					textArea.select();
+					try {
+						document.execCommand('copy');
+						textArea.remove();
+						return Promise.resolve();
+					} catch (err) {
+						textArea.remove();
+						return Promise.reject(err);
+					}
+				}
+			};
+
+			doCopy(text).then(() => {
+				icon.className = 'fas fa-check text-primary';
+				if (typeof showToast === 'function') {
+					showToast('{{ t("common.copied")|default("Copied!") }}', 'success');
+				}
+				setTimeout(() => {
+					icon.className = originalClass;
+				}, 2000);
+			}).catch(err => {
+				console.error('Failed to copy: ', err);
+				if (typeof showToast === 'function') {
+					showToast('Copy failed', 'error');
+				}
+			});
+		}
+		function generateUsername() {
+			const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+			let res = 'user_';
+			for(let i=0; i<8; i++) res += chars.charAt(Math.floor(Math.random() * chars.length));
+			document.getElementById('proxy_username').value = res;
+		}
+		function generatePassword() {
+			const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+			let res = '';
+			for(let i=0; i<16; i++) res += chars.charAt(Math.floor(Math.random() * chars.length));
+			document.getElementById('proxy_password').value = res;
+		}
+	</script>
+{% endblock %}

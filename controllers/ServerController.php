@@ -1,0 +1,561 @@
+<?php
+declare(strict_types=1);
+
+
+class ServerController
+{
+    private function respond($success, $message, $error = null, $redirect = null) {
+        $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') || 
+                  (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false);
+
+        if ($isAjax) {
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => $success,
+                'message' => $message,
+                'error' => $error,
+                'redirect' => $redirect
+            ]);
+            exit;
+        }
+
+        if ($redirect) {
+            header('Location: ' . $redirect . '?success=' . urlencode($message));
+            exit;
+        }
+
+        if ($success) {
+            $_SESSION['success_message'] = $message;
+        } else {
+            $_SESSION['error_message'] = $error ?: $message;
+        }
+        
+        $back = $_SERVER['HTTP_REFERER'] ?? '/servers';
+        header('Location: ' . $back);
+        exit;
+    }
+    public function dashboard()
+    {
+        requireAuth();
+        $user = Auth::user();
+        $pdo = DB::conn();
+
+        // One-time translation migration trigger via URL param
+        if (isset($_GET['migrate_db']) && Auth::isAdmin()) {
+            try {
+                $translations = [
+                    ['en', 'common', 'batch_actions', 'Batch Actions'],
+                    ['en', 'common', 'select_all', 'Select All'],
+                    ['en', 'common', 'delete_selected', 'Delete Selected'],
+                    ['en', 'common', 'revoke_selected', 'Revoke Selected'],
+                    ['en', 'common', 'restore_selected', 'Restore Selected'],
+                    ['en', 'common', 'selected_count', '%s items selected'],
+                    ['en', 'common', 'sort_handshake', 'Last Activity'],
+                    ['en', 'common', 'sort_oldest', 'Oldest First'],
+                    ['en', 'common', 'filter_status', 'Status Filter'],
+                    ['en', 'common', 'filter_traffic', 'Traffic Filter'],
+                    ['en', 'common', 'apply_filters', 'Apply Filters'],
+                    ['en', 'common', 'sort_newest', 'Newest First'],
+                    ['en', 'common', 'sort_traffic', 'Most Traffic'],
+                    ['uk', 'common', 'batch_actions', 'Групові дії'],
+                    ['uk', 'common', 'select_all', 'Вибрати все'],
+                    ['uk', 'common', 'delete_selected', 'Видалити вибрані'],
+                    ['uk', 'common', 'revoke_selected', 'Відкликати вибрані'],
+                    ['uk', 'common', 'restore_selected', 'Відновити вибрані'],
+                    ['uk', 'common', 'selected_count', 'Вибрано: %s'],
+                    ['uk', 'common', 'sort_handshake', 'Остання активність'],
+                    ['uk', 'common', 'sort_oldest', 'Спочатку старі'],
+                    ['uk', 'common', 'filter_status', 'Фільтр статусу'],
+                    ['uk', 'common', 'filter_traffic', 'Фільтр трафіку'],
+                    ['uk', 'common', 'apply_filters', 'Застосувати'],
+                    ['uk', 'common', 'sort_newest', 'Найновіші'],
+                    ['uk', 'common', 'sort_traffic', 'Найбільше трафіку'],
+                    ['ru', 'common', 'batch_actions', 'Групповые действия'],
+                    ['ru', 'common', 'select_all', 'Выбрать все'],
+                    ['ru', 'common', 'delete_selected', 'Удалить выбранные'],
+                    ['ru', 'common', 'revoke_selected', 'Отозвать выбранные'],
+                    ['ru', 'common', 'restore_selected', 'Восстановить выбранные'],
+                    ['ru', 'common', 'selected_count', 'Выбрано: %s'],
+                    ['ru', 'common', 'sort_handshake', 'Последняя активность'],
+                    ['ru', 'common', 'sort_oldest', 'Сначала старые'],
+                    ['ru', 'common', 'filter_status', 'Фильтр статуса'],
+                    ['ru', 'common', 'filter_traffic', 'Фильтр трафика'],
+                    ['ru', 'common', 'apply_filters', 'Применить'],
+                    ['ru', 'common', 'sort_newest', 'Сначала новые'],
+                    ['ru', 'common', 'sort_traffic', 'Больше всего трафика'],
+                    ['en', 'status', 'never', 'Never Connected'],
+                    ['uk', 'status', 'never', 'Ніколи не підключався'],
+                    ['ru', 'status', 'never', 'Никогда не подключался']
+                ];
+                $stmt = $pdo->prepare("INSERT INTO translations (locale, category, key_name, translation) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE translation = VALUES(translation)");
+                foreach ($translations as $row) { $stmt->execute($row); }
+                $_SESSION['success_message'] = "Translations migrated successfully!";
+                header('Location: /dashboard');
+                exit;
+            } catch (Exception $e) {
+                $_SESSION['error_message'] = "Migration error: " . $e->getMessage();
+            }
+        }
+
+        $servers = Auth::isAdmin() ? VpnServer::listAll() : VpnServer::listByUser($user['id']);
+
+        // Use parameterized queries for safety
+        $vpnStmt = Auth::isAdmin()
+            ? $pdo->query("SELECT COUNT(CASE WHEN deleted_at IS NULL THEN 1 END) as total_clients, SUM(bytes_sent) as vpn_upload, SUM(bytes_received) as vpn_download, SUM(CASE WHEN last_handshake > DATE_SUB(NOW(), INTERVAL 5 MINUTE) AND deleted_at IS NULL THEN 1 ELSE 0 END) as active_clients FROM vpn_clients")
+            : $pdo->prepare("SELECT COUNT(CASE WHEN deleted_at IS NULL THEN 1 END) as total_clients, SUM(bytes_sent) as vpn_upload, SUM(bytes_received) as vpn_download, SUM(CASE WHEN last_handshake > DATE_SUB(NOW(), INTERVAL 5 MINUTE) AND deleted_at IS NULL THEN 1 ELSE 0 END) as active_clients FROM vpn_clients WHERE user_id = ?");
+        if (!Auth::isAdmin()) { $vpnStmt->execute([$user['id']]); }
+        $vpnStats = $vpnStmt->fetch(PDO::FETCH_ASSOC);
+
+        $proxyStmt = Auth::isAdmin()
+            ? $pdo->query("SELECT SUM(bytes_sent) as proxy_upload, SUM(bytes_received) as proxy_download FROM http_proxies")
+            : $pdo->prepare("SELECT SUM(bytes_sent) as proxy_upload, SUM(bytes_received) as proxy_download FROM http_proxies WHERE user_id = ?");
+        if (!Auth::isAdmin()) { $proxyStmt->execute([$user['id']]); }
+        $proxyStats = $proxyStmt->fetch(PDO::FETCH_ASSOC);
+
+        $summary = [
+            'total_clients' => $vpnStats['total_clients'],
+            'total_upload' => ($vpnStats['vpn_upload'] ?? 0) + ($proxyStats['proxy_upload'] ?? 0),
+            'total_download' => ($vpnStats['vpn_download'] ?? 0) + ($proxyStats['proxy_download'] ?? 0),
+            'active_clients' => $vpnStats['active_clients']
+        ];
+
+        View::render('dashboard.twig', [
+            'servers' => $servers,
+            'summary' => $summary,
+            'beszel_config' => [
+                'url' => Config::get('BESZEL_URL')
+            ]
+        ]);
+    }
+
+    public function index()
+    {
+        requireAuth();
+        $user = Auth::user();
+
+        $servers = Auth::isAdmin()
+            ? VpnServer::listAll()
+            : VpnServer::listByUser($user['id']);
+
+        View::render('servers/index.twig', ['servers' => $servers]);
+    }
+
+    public function create()
+    {
+        requireAuth();
+        $randomPort = rand(30000, 65000);
+        View::render('servers/create.twig', ['random_port' => $randomPort]);
+    }
+
+    public function store()
+    {
+        requireAuth();
+        $user = Auth::user();
+
+        $name = trim($_POST['name'] ?? '');
+        $host = trim($_POST['host'] ?? '');
+        $port = (int) ($_POST['port'] ?? 22);
+        $username = trim($_POST['username'] ?? 'root');
+        $password = $_POST['password'] ?? '';
+
+        if (empty($name) || empty($host) || empty($password)) {
+            View::render('servers/create.twig', ['error' => 'All fields are required']);
+            return;
+        }
+
+        try {
+            $serverId = VpnServer::create([
+                'user_id' => $user['id'],
+                'name' => $name,
+                'host' => $host,
+                'port' => $port,
+                'username' => $username,
+                'password' => $password,
+                'vpn_port' => !empty($_POST['vpn_port']) ? (int) $_POST['vpn_port'] : NULL,
+                'mimicry_type' => $_POST['mimicry_type'] ?? 'quic'
+            ]);
+
+            redirect('/servers/' . $serverId . '/deploy');
+        } catch (Exception $e) {
+            View::render('servers/create.twig', ['error' => $e->getMessage()]);
+        }
+    }
+
+    public function delete($params)
+    {
+        requireAuth();
+        $user = Auth::user();
+        $serverId = (int) $params['id'];
+
+        try {
+            $server = new VpnServer($serverId);
+            $serverData = $server->getData();
+
+            if ($serverData['user_id'] != $user['id'] && !Auth::isAdmin()) {
+                http_response_code(403);
+                echo Translator::t('message.forbidden');
+                return;
+            }
+
+            // Safety Check: Verify server name from POST
+            $confirmName = $_POST['confirm_name'] ?? '';
+            if (empty($confirmName) || $confirmName !== $serverData['name']) {
+                return $this->respond(false, 'Deletion failed', 'Confirmation name did not match or was empty.');
+            }
+
+            unlockSession();
+            $server->delete();
+            relockSession();
+            
+            return $this->respond(true, 'Server deleted successfully', null, '/servers');
+        } catch (Exception $e) {
+            relockSession();
+            return $this->respond(false, 'Delete failed', $e->getMessage());
+        }
+    }
+
+    public function showDeploy($params)
+    {
+        requireAuth();
+        $serverId = (int) $params['id'];
+
+        try {
+            $server = new VpnServer($serverId);
+            $serverData = $server->getData();
+
+            $user = Auth::user();
+            if ($serverData['user_id'] != $user['id'] && !Auth::isAdmin()) {
+                http_response_code(403);
+                echo Translator::t('message.forbidden');
+                return;
+            }
+
+            View::render('servers/deploy.twig', ['server' => $serverData]);
+        } catch (Exception $e) {
+            http_response_code(404);
+            echo Translator::t('servers.not_found');
+        }
+    }
+
+    public function deploy($params)
+    {
+        requireAuth();
+        header('Content-Type: application/json');
+
+        $serverId = (int) $params['id'];
+        ob_start();
+
+        unlockSession();
+
+        try {
+            $server = new VpnServer($serverId);
+            $serverData = $server->getData();
+
+            $user = Auth::user();
+            if ($serverData['user_id'] != $user['id'] && !Auth::isAdmin()) {
+                http_response_code(403);
+                echo json_encode(['error' => Translator::t('message.forbidden')]);
+                return;
+            }
+
+            // Ensure Queue class is available
+            if (!class_exists('Queue')) {
+                require_once __DIR__ . '/../inc/Queue.php';
+            }
+
+            // Set DB status to deploying
+            $pdo = DB::conn();
+            $pdo->prepare("UPDATE vpn_servers SET status = 'deploying' WHERE id = ?")->execute([$serverId]);
+
+            Queue::push('deployments', [
+                'type' => 'provision_server',
+                'server_id' => $serverId
+            ]);
+
+            ob_get_clean();
+            echo json_encode(['success' => true, 'message' => 'Deployment queued']);
+        } catch (Throwable $e) {
+            $unexpectedOutput = trim((string) ob_get_clean());
+            http_response_code(500);
+            
+            if (class_exists('Logger')) {
+                Logger::error('Deploy queueing failed', ['error' => $e->getMessage()]);
+            } else {
+                \Logger::error('Deploy queueing failed: ' . $e->getMessage());
+            }
+
+            echo json_encode([
+                'success' => false,
+                'error' => $e->getMessage(),
+                'details' => $unexpectedOutput !== '' ? substr(strip_tags($unexpectedOutput), 0, 500) : null
+            ]);
+        }
+    }
+
+    public function view($params)
+    {
+        requireAuth();
+        $serverId = (int) $params['id'];
+
+        try {
+            $server = new VpnServer($serverId);
+            $serverData = $server->getData();
+
+            $user = Auth::user();
+            if ($serverData['user_id'] != $user['id'] && !Auth::isAdmin()) {
+                http_response_code(403);
+                echo Translator::t('message.forbidden');
+                return;
+            }
+
+            $clients = VpnClient::listByServer($serverId);
+
+            // Calculate summary stats for the "Mini Dashboard"
+            $totalClients = count($clients);
+            $onlineClients = 0;
+            
+            // Online count — 300s threshold (consistent with metrics and getData())
+            foreach ($clients as $c) {
+                if (!empty($c['last_handshake'])) {
+                    $diff = time() - strtotime($c['last_handshake']);
+                    if ($diff < 300) $onlineClients++;
+                }
+            }
+
+            // Traffic stats include historical data (even from deleted clients)
+            $pdo = DB::conn();
+            $trafficStmt = $pdo->prepare("SELECT SUM(bytes_sent) as sent, SUM(bytes_received) as received FROM vpn_clients WHERE server_id = ?");
+            $trafficStmt->execute([$serverId]);
+            $vpnTraffic = $trafficStmt->fetch();
+
+            // Also include proxy traffic for this server
+            $proxyTrafficStmt = $pdo->prepare("SELECT SUM(bytes_sent) as sent, SUM(bytes_received) as received FROM http_proxies WHERE server_id = ?");
+            $proxyTrafficStmt->execute([$serverId]);
+            $proxyTraffic = $proxyTrafficStmt->fetch();
+            
+            $totalSent = (float)($vpnTraffic['sent'] ?? 0) + (float)($proxyTraffic['sent'] ?? 0);
+            $totalReceived = (float)($vpnTraffic['received'] ?? 0) + (float)($proxyTraffic['received'] ?? 0);
+
+            View::render('servers/view.twig', [
+                'server' => $serverData,
+                'clients' => $clients,
+                'stats_summary' => [
+                    'total' => $totalClients,
+                    'online' => $onlineClients,
+                    'traffic' => [
+                        'sent' => $totalSent,
+                        'received' => $totalReceived,
+                        'total' => $totalSent + $totalReceived
+                    ]
+                ],
+                'beszel_config' => [
+                    'url' => Config::get('BESZEL_URL')
+                ]
+            ]);
+        } catch (Exception $e) {
+            \Logger::error('Server view error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
+            http_response_code(404);
+            echo 'Server not found: ' . htmlspecialchars($e->getMessage());
+        }
+    }
+
+    public function syncStats($params)
+    {
+        requireAuth();
+        $serverId = (int) $params['id'];
+
+        header('Content-Type: application/json');
+
+        unlockSession();
+
+        try {
+            $server = new VpnServer($serverId);
+            $serverData = $server->getData();
+
+            $user = Auth::user();
+            if ($serverData['user_id'] != $user['id'] && !Auth::isAdmin()) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Forbidden']);
+                return;
+            }
+
+            $server->updatePingAndStatus();
+            $synced = VpnClient::syncAllStatsForServer($serverId);
+            echo json_encode(['success' => true, 'synced' => $synced]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+    }
+
+    public function syncAll()
+    {
+        requireAuth();
+        $user = Auth::user();
+        if (isJsonRequest()) {
+            header('Content-Type: application/json');
+        }
+
+        unlockSession();
+
+        try {
+            $servers = Auth::isAdmin()
+                ? VpnServer::listAll()
+                : VpnServer::listByUser($user['id']);
+
+            $count = 0;
+            foreach ($servers as $serverData) {
+                $server = new VpnServer((int) $serverData['id']);
+                $server->updatePingAndStatus();
+                // Also sync stats while we are at it
+                try {
+                    VpnClient::syncAllStatsForServer((int) $serverData['id']);
+                } catch (Exception $e) {
+                    // Log error but continue with other servers
+                    \Logger::error("Failed to sync stats for server {$serverData['id']}: " . $e->getMessage());
+                }
+
+                // Sync HTTP Proxy stats
+                try {
+                    $proxyServer = new ProxyServer((int) $serverData['id']);
+                    $proxyServer->updateTrafficStats();
+                } catch (Exception $e) {
+                    // It's possible the server doesn't have 3proxy yet or connection failed
+                    \Logger::error("Failed to sync proxy stats for server {$serverData['id']}: " . $e->getMessage());
+                }
+                $count++;
+            }
+
+            if (isJsonRequest() || (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest')) {
+                echo json_encode(['success' => true, 'count' => $count]);
+            } else {
+                return $this->respond(true, "Synced status for $count servers");
+            }
+        } catch (Exception $e) {
+            if (isJsonRequest() || (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest')) {
+                http_response_code(500);
+                echo json_encode(['error' => $e->getMessage()]);
+            } else {
+                return $this->respond(false, "Sync failed", $e->getMessage());
+            }
+        }
+    }
+
+    public function searchClients()
+    {
+        try {
+            requireAuth();
+            header('Content-Type: application/json');
+
+            $user = Auth::user();
+            $query = trim($_GET['q'] ?? '');
+            $serverId = (int) ($_GET['server_id'] ?? 0);
+            $statusFilter = $_GET['status'] ?? 'all';
+            $trafficFilter = $_GET['traffic'] ?? 'all';
+            $sortBy = $_GET['sort'] ?? 'recent';
+            $pdo = DB::conn();
+
+            $where = Auth::isAdmin() ? "c.deleted_at IS NULL" : "c.user_id = " . (int) $user['id'] . " AND c.deleted_at IS NULL";
+            $where .= " AND s.deleted_at IS NULL"; // Hide clients of deleted servers
+            
+            if ($serverId > 0) {
+                $where .= " AND c.server_id = :sid";
+            }
+
+            // Apply Status Filter
+            if ($statusFilter === 'online') {
+                $where .= " AND c.last_handshake > DATE_SUB(NOW(), INTERVAL 5 MINUTE) AND c.status = '" . ClientStatus::ACTIVE->value . "'";
+            } elseif ($statusFilter === 'revoked') {
+                $where .= " AND c.status = '" . ClientStatus::DISABLED->value . "'";
+            } elseif ($statusFilter === 'offline') {
+                $where .= " AND (c.last_handshake IS NULL OR c.last_handshake <= DATE_SUB(NOW(), INTERVAL 5 MINUTE)) AND c.status = '" . ClientStatus::ACTIVE->value . "'";
+            }
+
+            // Apply Traffic Filter
+            if ($trafficFilter === 'high') {
+                $where .= " AND (c.bytes_sent + c.bytes_received) > 1073741824";
+            } elseif ($trafficFilter === 'medium') {
+                $where .= " AND (c.bytes_sent + c.bytes_received) > 104857600";
+            }
+
+            $params = [];
+            if ($serverId > 0) {
+                $params['sid'] = $serverId;
+            }
+
+            $sql = "
+                SELECT c.*, s.name as server_name, s.host as server_host
+                FROM vpn_clients c
+                LEFT JOIN vpn_servers s ON c.server_id = s.id
+                WHERE ($where)
+            ";
+
+            if ($query !== '') {
+                $sql .= " AND (c.name LIKE :q1 OR c.external_ip LIKE :q2 OR s.name LIKE :q3)";
+                $params['q1'] = "%$query%";
+                $params['q2'] = "%$query%";
+                $params['q3'] = "%$query%";
+            }
+
+            $orderBy = "c.created_at DESC";
+            if ($sortBy === 'traffic') {
+                $orderBy = "(COALESCE(c.bytes_sent,0) + COALESCE(c.bytes_received,0)) DESC";
+            } elseif ($sortBy === 'handshake') {
+                $orderBy = "c.last_handshake DESC";
+            } elseif ($sortBy === 'oldest') {
+                $orderBy = "c.created_at ASC";
+            }
+            $sql .= " ORDER BY $orderBy LIMIT 500";
+
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $truncated = count($results) === 500;
+
+            // Format for JSON
+            foreach ($results as &$r) {
+                $bytes = (float) ($r['bytes_sent'] ?? 0) + (float) ($r['bytes_received'] ?? 0);
+                if ($bytes > 1073741824) {
+                    $r['total_traffic'] = number_format($bytes / 1073741824, 2) . ' GB';
+                } else {
+                    $r['total_traffic'] = number_format($bytes / 1048576, 2) . ' MB';
+                }
+
+                $r['db_status'] = $r['status']; // Active, Disabled, etc.
+                
+                // Format speeds
+                $up = (float)($r['speed_up_kbps'] ?? 0);
+                $down = (float)($r['speed_down_kbps'] ?? 0);
+                $r['speed_up'] = $up >= 1000 ? number_format($up / 1000, 1) . ' Mbps' : number_format($up, 0) . ' Kbps';
+                $r['speed_down'] = $down >= 1000 ? number_format($down / 1000, 1) . ' Mbps' : number_format($down, 0) . ' Kbps';
+
+                $r['connection_status'] = 'offline';
+                if (!empty($r['last_handshake'])) {
+                    $lastHandshake = strtotime($r['last_handshake']);
+                    $diff = time() - $lastHandshake;
+                    if ($diff < 300) {
+                        $r['connection_status'] = 'online';
+                    }
+                    if ($diff < 60)
+                        $r['last_seen'] = 'Just now';
+                    elseif ($diff < 3600)
+                        $r['last_seen'] = floor($diff / 60) . 'm ago';
+                    elseif ($diff < 86400)
+                        $r['last_seen'] = floor($diff / 3600) . 'h ago';
+                    else
+                        $r['last_seen'] = floor($diff / 86400) . 'd ago';
+                } else {
+                    $r['connection_status'] = 'never';
+                    $r['last_seen'] = 'Never';
+                }
+                $r['flag'] = View::getFlag($r['ip_country_code'] ?? '');
+            }
+
+            echo json_encode(['results' => $results, 'truncated' => $truncated ?? false]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage(), 'results' => []]);
+        }
+    }
+}

@@ -1,0 +1,38 @@
+-- Add translation keys for batch actions and filters
+INSERT INTO translations (locale, category, key_name, translation) VALUES
+('en', 'common', 'batch_actions', 'Batch Actions'),
+('en', 'common', 'select_all', 'Select All'),
+('en', 'common', 'delete_selected', 'Delete Selected'),
+('en', 'common', 'revoke_selected', 'Revoke Selected'),
+('en', 'common', 'restore_selected', 'Restore Selected'),
+('en', 'common', 'selected_count', '%s items selected'),
+('en', 'common', 'sort_handshake', 'Last Activity'),
+('en', 'common', 'sort_oldest', 'Oldest First'),
+('en', 'common', 'filter_status', 'Status Filter'),
+('en', 'common', 'filter_traffic', 'Traffic Filter'),
+('en', 'common', 'apply_filters', 'Apply Filters'),
+
+('uk', 'common', 'batch_actions', 'Групові дії'),
+('uk', 'common', 'select_all', 'Вибрати все'),
+('uk', 'common', 'delete_selected', 'Видалити вибрані'),
+('uk', 'common', 'revoke_selected', 'Відкликати вибрані'),
+('uk', 'common', 'restore_selected', 'Відновити вибрані'),
+('uk', 'common', 'selected_count', 'Вибрано: %s'),
+('uk', 'common', 'sort_handshake', 'Остання активність'),
+('uk', 'common', 'sort_oldest', 'Спочатку старі'),
+('uk', 'common', 'filter_status', 'Фільтр статусу'),
+('uk', 'common', 'filter_traffic', 'Фільтр трафіку'),
+('uk', 'common', 'apply_filters', 'Застосувати'),
+
+('ru', 'common', 'batch_actions', 'Групповые действия'),
+('ru', 'common', 'select_all', 'Выбрать все'),
+('ru', 'common', 'delete_selected', 'Удалить выбранные'),
+('ru', 'common', 'revoke_selected', 'Отозвать выбранные'),
+('ru', 'common', 'restore_selected', 'Восстановить выбранные'),
+('ru', 'common', 'selected_count', 'Выбрано: %s'),
+('ru', 'common', 'sort_handshake', 'Последняя активность'),
+('ru', 'common', 'sort_oldest', 'Сначала старые'),
+('ru', 'common', 'filter_status', 'Фильтр статуса'),
+('ru', 'common', 'filter_traffic', 'Фильтр трафика'),
+('ru', 'common', 'apply_filters', 'Применить')
+ON DUPLICATE KEY UPDATE translation = VALUES(translation);

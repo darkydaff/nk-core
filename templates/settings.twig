@@ -1,0 +1,544 @@
+{% extends "layout.twig" %}
+
+{% block title %}{{ t('menu.settings') }} - {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 w-full">
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold text-primary flex items-center">
+            <div class="w-10 h-10 rounded-lg bg-surface-hover text-primary flex items-center justify-center mr-3">
+                <i class="fas fa-cog"></i>
+            </div>
+            {{ t('menu.settings') }}
+        </h1>
+        <p class="mt-2 ml-13 text-sm text-secondary">{{ t('settings.description') }}</p>
+    </div>
+
+    {% if success %}
+    <div class="mb-6 bg-primary/10 border border-primary/30 dark:text-primary text-primary-hover px-4 py-3 rounded-lg flex items-center">
+        <i class="fas fa-check-circle mr-3"></i>
+        <p class="text-sm font-medium">{{ success }}</p>
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div class="mb-6 bg-red-500/10 border border-red-500/30 dark:text-red-400 text-red-600 px-4 py-3 rounded-lg flex items-center">
+        <i class="fas fa-exclamation-circle mr-3"></i>
+        <p class="text-sm font-medium">{{ error }}</p>
+    </div>
+    {% endif %}
+
+    {% if warning %}
+    <div class="mb-6 bg-amber-500/10 border border-amber-500/30 dark:text-amber-400 text-amber-600 px-4 py-3 rounded-lg flex items-center">
+        <i class="fas fa-exclamation-triangle mr-3"></i>
+        <p class="text-sm font-medium">{{ warning }}</p>
+    </div>
+    {% endif %}
+
+    <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
+        <button onclick="showTab('profile')" id="tab-profile" class="tab-btn tab-btn-active px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap">
+            <i class="fas fa-user mr-2"></i>{{ t('settings.profile') }}
+        </button>
+        <button onclick="showTab('backups')" id="tab-backups" class="tab-btn px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap">
+            <i class="fas fa-shield-alt mr-2"></i>{{ t('settings.backups') }}
+        </button>
+        <button onclick="showTab('telegram')" id="tab-telegram" class="tab-btn px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap">
+            <i class="fab fa-telegram-plane mr-2"></i>{{ t('settings.telegram') }}
+        </button>
+        <button onclick="showTab('beszel')" id="tab-beszel" class="tab-btn px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap">
+            <i class="fas fa-microchip mr-2"></i>{{ t('settings.beszel') }}
+        </button>
+    </div>
+
+    <div id="content-profile">
+        <div class="panel overflow-hidden">
+            <div class="px-5 py-4 border-b border-default bg-panel/30">
+                <h2 class="text-base font-semibold text-primary flex items-center">
+                    <i class="fas fa-lock mr-2 text-primary"></i>{{ t('settings.change_password') }}
+                </h2>
+            </div>
+            <div class="p-5">
+                <form onsubmit="handleAjaxForm(event, '/settings/change-password')" class="max-w-md">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-primary mb-2">{{ t('settings.current_password') }}</label>
+                            <input type="password" name="current_password" required class="input-field w-full px-4 py-2.5 font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-primary mb-2">{{ t('settings.new_password') }}</label>
+                            <input type="password" name="new_password" required minlength="6" class="input-field w-full px-4 py-2.5 font-mono">
+                            <p class="mt-1 text-xs text-muted">{{ t('settings.min_6_chars') }}</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-primary mb-2">{{ t('settings.confirm_password') }}</label>
+                            <input type="password" name="confirm_password" required minlength="6" class="input-field w-full px-4 py-2.5 font-mono">
+                        </div>
+                        <div class="pt-2">
+                            <button type="submit" class="btn-primary px-5 py-2.5 text-sm">
+                                <i class="fas fa-save mr-2"></i>{{ t('settings.change_password') }}
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <div class="mt-8 pt-8 border-t border-default/50">
+                    <h2 class="text-base font-semibold text-primary mb-6 flex items-center">
+                        <i class="fas fa-users-cog mr-2 text-primary"></i>{{ t('settings.user_management') }}
+                    </h2>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <!-- User List -->
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="text-[10px] uppercase tracking-wider text-muted border-b border-default/50">
+                                        <th class="pb-3 font-semibold">{{ t('common.username') }}</th>
+                                        <th class="pb-3 font-semibold text-right">{{ t('common.actions') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-700/30">
+                                    {% for u in users %}
+                                    <tr class="group hover:bg-surface-hover/50 transition-colors">
+                                        <td class="py-3 text-sm text-primary font-medium">{{ u.email }}</td>
+                                        <td class="py-3 text-right">
+                                            {% if u.id != user.id %}
+                                            <button onclick="handleAjaxAction('/settings/delete-user/{{ u.id }}', {}, 'Delete user {{ u.email }}?')" class="text-[10px] dark:text-red-400 text-red-600 hover:scale-110 bg-red-500/10 px-2 py-1 rounded transition-all">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                            {% else %}
+                                            <span class="text-[10px] text-muted px-2 py-1 italic">{{ t('common.current') }}</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Add User Form -->
+                        <div class="bg-panel/20 p-4 rounded-xl border border-default/50">
+                            <h3 class="text-xs font-bold text-muted uppercase tracking-widest mb-4">{{ t('common.add_user') }}</h3>
+                            <form onsubmit="handleAjaxForm(event, '/settings/create-user')" class="space-y-4">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <div>
+                                    <label class="block text-[11px] font-medium text-secondary mb-1.5">{{ t('common.username') }}</label>
+                                    <input type="text" name="new_username" required class="input-field w-full px-3 py-2 text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-medium text-secondary mb-1.5">{{ t('common.new_password') }}</label>
+                                    <input type="password" name="new_password" required class="input-field w-full px-3 py-2 text-sm">
+                                </div>
+                                <div class="pt-2">
+                                    <button type="submit" class="w-full btn-primary py-2 text-xs font-bold">
+                                        <i class="fas fa-user-plus mr-2"></i>{{ t('settings.create_admin') }}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="content-backups" class="hidden">
+        <div class="panel overflow-hidden mb-6">
+            <div class="px-5 py-4 border-b border-default bg-panel/30 flex justify-between items-center">
+                <h2 class="text-base font-semibold text-primary flex items-center">
+                    <i class="fas fa-cloud-upload-alt mr-2 text-primary"></i>{{ t('settings.s3_backups') }}
+                </h2>
+                <div class="flex items-center">
+                    <span class="flex h-2 w-2 rounded-full bg-green-500 mr-2"></span>
+                    <span class="text-[10px] text-secondary font-mono uppercase">{{ s3_provider }}</span>
+                </div>
+            </div>
+            <div class="p-6">
+                <!-- Automation Section -->
+                <div class="mb-10 pb-8 border-b border-default/50">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h3 class="text-sm font-semibold text-primary mb-1">{{ t('settings.backup_automation') }}</h3>
+                            <p class="text-xs text-muted">{{ t('settings.backup_automation_desc') }}</p>
+                        </div>
+                        <div class="flex flex-col items-end">
+                            <div class="flex items-center mb-1">
+                                <span class="text-[10px] text-muted uppercase tracking-widest font-bold mr-2">{{ t('common.server_time') }}</span>
+                                <span class="text-xs font-mono text-accent">{{ server_time }}</span>
+                            </div>
+                            <span class="text-[10px] text-muted uppercase tracking-widest font-bold mb-1">{{ t('common.cron_status') }}</span>
+                            <div class="flex items-center">
+                                {% if backup_last_run %}
+                                    <span class="text-[10px] {% if 'failed' in backup_last_status %}dark:text-red-400 text-red-600{% else %}dark:text-green-400 text-green-600{% endif %} font-mono">
+                                        {{ t('settings.last_run_label') }}: {{ backup_last_run }} ({{ backup_last_status }})
+                                    </span>
+                                {% else %}
+                                    <span class="text-[10px] text-amber-500 font-mono italic">{{ t('settings.waiting_first_run') }}</span>
+                                {% endif %}
+                                <div class="ml-2 w-2 h-2 rounded-full bg-green-500 animate-pulse" title="Cron Service Active"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form onsubmit="handleAjaxForm(event, '/settings/save-backup-schedule')" class="grid grid-cols-1 md:grid-cols-3 gap-6 bg-surface/20 p-4 rounded-xl border border-default/50">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <div class="flex items-center space-x-3">
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" name="backup_auto_enabled" value="true" {% if backup_auto_enabled == 'true' %}checked{% endif %} class="sr-only peer">
+                                <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+                            </label>
+                            <span class="text-xs font-medium text-primary">{{ t('settings.enable_auto_backup') }}</span>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-[10px] font-bold text-muted uppercase tracking-widest mb-1.5">{{ t('settings.backup_time') }}</label>
+                            <input type="time" name="backup_schedule_time" value="{{ backup_schedule_time }}" required class="input-field w-full px-3 py-2 text-sm font-mono">
+                        </div>
+
+                        <div class="flex items-end">
+                            <button type="submit" class="w-full btn-primary py-2 text-xs font-bold shadow-lg shadow-accent/10">
+                                <i class="fas fa-save mr-2"></i>{{ t('settings.apply_schedule') }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                    <div>
+                        <h3 class="text-sm font-medium text-primary mb-1">{{ t('settings.manual_snapshot') }}</h3>
+                        <p class="text-xs text-muted">
+                            {{ t('settings.manual_snapshot_desc') }}
+                            {% if s3_configured %}
+                                <span class="text-[10px] text-accent font-medium ml-1">
+                                    <i class="fas fa-cloud-upload-alt mr-1"></i>+ {{ s3_provider }}
+                                </span>
+                            {% else %}
+                                <span class="text-[10px] text-amber-500 font-medium ml-1">
+                                    <i class="fas fa-hdd mr-1"></i>({{ t('common.local_only')|default('Local only') }})
+                                </span>
+                            {% endif %}
+                        </p>
+                    </div>
+                    <form onsubmit="handleAjaxForm(event, '/settings/run-backup')">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit" class="btn-primary px-6 py-3 text-sm flex items-center shadow-lg shadow-accent/20">
+                            <i class="fas fa-play mr-2 text-xs"></i>{{ t('settings.create_snapshot') }}
+                        </button>
+                    </form>
+                </div>
+
+                <div class="mt-8 pt-8 border-t border-default/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h3 class="text-sm font-medium text-primary mb-1">{{ t('settings.upload_restore') }}</h3>
+                        <p class="text-xs text-muted">{{ t('settings.upload_restore_desc') }}</p>
+                    </div>
+                    <form onsubmit="handleAjaxForm(event, '/settings/upload-restore', true)" enctype="multipart/form-data" class="flex flex-col md:flex-row gap-3">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <div class="relative group">
+                            <input type="file" name="backup_file" id="backup_file_input" accept=".tar.gz,.sql.gz" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="updateFileName(this)">
+                            <div class="px-4 py-2.5 rounded-lg bg-panel border border-default text-secondary group-hover:border-primary transition-all flex items-center min-w-[200px]">
+                                <i class="fas fa-file-upload mr-2 text-xs"></i>
+                                <span class="text-xs" id="file-name-label">{{ t('common.select_file') }}</span>
+                            </div>
+                        </div>
+                        <input type="password" name="confirm_password" required placeholder="{{ t('settings.admin_password') }}" class="input-field px-4 py-2 text-xs font-mono w-full md:w-48">
+                        <button type="submit" class="btn-primary px-5 py-2.5 text-xs font-bold shadow-lg shadow-accent/10 whitespace-nowrap">
+                            <i class="fas fa-upload mr-2"></i>{{ t('settings.upload_and_start') }}
+                        </button>
+                    </form>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-12">
+                    <!-- Local Backups -->
+                    <div>
+                        <h3 class="text-sm font-medium text-primary mb-4 flex items-center">
+                            <i class="fas fa-hdd mr-2 text-muted"></i>{{ t('settings.local_snapshots') }}
+                        </h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="text-[10px] uppercase tracking-wider text-muted border-b border-default/50">
+                                        <th class="pb-3 font-semibold">{{ t('common.filename') }}</th>
+                                        <th class="pb-3 font-semibold text-right">{{ t('common.actions') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-700/30">
+                                    {% for backup in local_backups %}
+                                    <tr class="group hover:bg-surface-hover/50 transition-colors">
+                                        <td class="py-3">
+                                            <div class="flex flex-col">
+                                                <span class="text-xs text-primary font-mono truncate max-w-[180px]">{{ backup.key }}</span>
+                                                <span class="text-[10px] text-muted">{{ backup.last_modified|date('Y-m-d H:i') }} • {{ (backup.size / 1024)|number_format(0) }} KB</span>
+                                            </div>
+                                        </td>
+                                        <td class="py-3 text-right flex items-center justify-end gap-2">
+                                            <button onclick="confirmRestore('{{ backup.key }}', 'local')" class="text-[10px] dark:text-primary text-primary-hover bg-primary/10 px-2 py-1 rounded transition-all font-bold">
+                                                <i class="fas fa-undo-alt mr-1"></i>{{ t('common.restore') }}
+                                            </button>
+                                            <button onclick="deleteBackup('{{ backup.key }}', 'local')" class="text-[10px] dark:text-red-400 text-red-600 bg-red-500/10 px-2 py-1 rounded transition-all">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr><td colspan="2" class="py-4 text-center text-muted text-xs">{{ t('settings.no_backups_found') }}</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Cloud Backups -->
+                    <div>
+                        <h3 class="text-sm font-medium text-primary mb-4 flex items-center">
+                            <i class="fas fa-cloud mr-2 text-muted"></i>{{ t('settings.cloud_snapshots') }}
+                        </h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="text-[10px] uppercase tracking-wider text-muted border-b border-default/50">
+                                        <th class="pb-3 font-semibold">{{ t('common.filename') }}</th>
+                                        <th class="pb-3 font-semibold text-right">{{ t('common.actions') }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-700/30">
+                                    {% for backup in cloud_backups %}
+                                    <tr class="group hover:bg-surface-hover/50 transition-colors">
+                                        <td class="py-3">
+                                            <div class="flex flex-col">
+                                                <span class="text-xs text-primary font-mono truncate max-w-[180px]">{{ backup.key|replace({'backups/': ''}) }}</span>
+                                                <span class="text-[10px] text-muted">{{ backup.last_modified|date('Y-m-d H:i') }} • {{ (backup.size / 1024)|number_format(0) }} KB</span>
+                                            </div>
+                                        </td>
+                                        <td class="py-3 text-right flex items-center justify-end gap-2">
+                                            <button onclick="confirmRestore('{{ backup.key }}', 'cloud')" class="text-[10px] dark:text-amber-400 text-amber-600 bg-amber-500/10 px-2 py-1 rounded transition-all font-bold">
+                                                <i class="fas fa-undo-alt mr-1"></i>{{ t('common.restore') }}
+                                            </button>
+                                            <button onclick="deleteBackup('{{ backup.key }}', 'cloud')" class="text-[10px] dark:text-red-400 text-red-600 bg-red-500/10 px-2 py-1 rounded transition-all">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% else %}
+                                    <tr><td colspan="2" class="py-4 text-center text-muted text-xs">{{ t('settings.no_backups_found') }}</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-8 pt-6 border-t border-default/50">
+                    <div class="bg-base/50 rounded-lg p-4 border border-default/50">
+                        <div class="flex items-start">
+                            <div class="w-8 h-8 rounded bg-panel flex items-center justify-center mr-3 mt-1 text-secondary">
+                                <i class="fas fa-info-circle text-sm"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-semibold text-primary uppercase tracking-wider mb-1">{{ t('settings.backup_info') }}</h4>
+                                <p class="text-xs text-muted leading-relaxed">
+                                    {{ t('settings.backup_location_info') }}: <code class="bg-panel px-1 rounded text-primary">{{ s3_bucket }}</code><br>
+                                    {{ t('settings.backup_path_info') }}: <code class="bg-panel px-1 rounded text-secondary">backups/nk_backup_YYYY-MM-DD.sql.gz</code>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="content-telegram" class="hidden">
+        <div class="panel overflow-hidden mb-6">
+            <div class="px-5 py-4 border-b border-default bg-panel/30">
+                <h2 class="text-base font-semibold text-primary flex items-center">
+                    <i class="fab fa-telegram-plane mr-2 text-primary"></i>{{ t('settings.telegram_backups') }}
+                </h2>
+            </div>
+            <div class="p-5">
+                <form onsubmit="handleAjaxForm(event, '/settings/save-telegram')" class="max-w-4xl">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="space-y-4">
+                            <h3 class="text-xs font-bold text-muted uppercase tracking-widest mb-4">{{ t('settings.bot_settings') }}</h3>
+                            <div>
+                                <label class="block text-sm font-medium text-primary mb-2">{{ t('settings.bot_token') }}</label>
+                                <input type="password" name="tg_bot_token" value="{{ tg_config.bot_token }}" placeholder="123456:ABC-DEF..." class="input-field w-full px-4 py-2.5 font-mono">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-primary mb-2">{{ t('settings.chat_id') }}</label>
+                                <input type="text" name="tg_chat_id" value="{{ tg_config.chat_id }}" placeholder="-100123456789" class="input-field w-full px-4 py-2.5 font-mono">
+                            </div>
+                        </div>
+
+                        <div class="space-y-4 border-l border-default/50 pl-0 md:pl-8">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-xs font-bold text-muted uppercase tracking-widest">{{ t('settings.proxy_settings') }}</h3>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" name="tg_proxy_enabled" value="true" {% if tg_config.proxy_enabled == 'true' %}checked{% endif %} class="sr-only peer">
+                                    <div class="w-9 h-5 toggle-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
+                                </label>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-primary mb-2">{{ t('settings.proxy_url')|default('Proxy Connection String') }}</label>
+                                <input type="text" name="tg_proxy_url" placeholder="http://user:pass@host:port" class="input-field w-full px-4 py-2.5 font-mono text-xs">
+                                <p class="mt-1 text-[10px] text-muted">Paste a full URL or fill separate details below (HTTP only).</p>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3">
+                                <div class="col-span-2">
+                                    <label class="block text-sm font-medium text-primary mb-2">{{ t('settings.proxy_host') }}</label>
+                                    <input type="text" name="tg_proxy_host" value="{{ tg_config.proxy_host }}" placeholder="1.2.3.4" class="input-field w-full px-4 py-2.5 font-mono text-xs">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-primary mb-2">{{ t('settings.proxy_port') }}</label>
+                                    <input type="text" name="tg_proxy_port" value="{{ tg_config.proxy_port }}" placeholder="1080" class="input-field w-full px-4 py-2.5 font-mono text-xs">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-primary mb-2">{{ t('settings.proxy_auth') }}</label>
+                                <input type="text" name="tg_proxy_auth" value="{{ tg_config.proxy_auth }}" placeholder="user:pass" class="input-field w-full px-4 py-2.5 font-mono text-xs">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="pt-8 border-t border-default/50 mt-8 flex justify-end gap-3">
+                        <button type="submit" class="btn-primary px-8 py-3 text-sm">
+                            <i class="fas fa-save mr-2"></i>{{ t('common.save_settings') }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div id="content-beszel" class="hidden">
+        <div class="panel overflow-hidden mb-6">
+            <div class="px-5 py-4 border-b border-default bg-panel/30">
+                <h2 class="text-base font-semibold text-primary flex items-center">
+                    <i class="fas fa-microchip mr-2 text-primary"></i>{{ t('settings.beszel') }}
+                </h2>
+            </div>
+            <div class="p-5">
+                <form onsubmit="handleAjaxForm(event, '/settings/save-beszel')" class="max-w-4xl">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="space-y-4">
+                            <h3 class="text-xs font-bold text-muted uppercase tracking-widest mb-4">{{ t('settings.beszel_hub') }}</h3>
+                            <div>
+                                <label class="block text-sm font-medium text-primary mb-2">{{ t('settings.beszel_url')|default('Beszel URL') }}</label>
+                                <input type="text" name="beszel_url" value="{{ beszel_config.url }}" placeholder="http://bz.example.com:8090" class="input-field w-full px-4 py-2.5 font-mono">
+                                <p class="mt-1 text-xs text-secondary">{{ t('settings.beszel_url_desc') }}</p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4 border-l border-default/50 pl-0 md:pl-8">
+                            <h3 class="text-xs font-bold text-muted uppercase tracking-widest mb-4">{{ t('common.credentials') }}</h3>
+                            <div>
+                                <label class="block text-sm font-medium text-primary mb-2">{{ t('common.email_address') }}</label>
+                                <input type="email" name="beszel_email" value="{{ beszel_config.email }}" placeholder="admin@example.com" class="input-field w-full px-4 py-2.5 font-mono">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-primary mb-2">{{ t('common.password') }}</label>
+                                <input type="password" name="beszel_password" value="{{ beszel_config.password }}" placeholder="••••••••" class="input-field w-full px-4 py-2.5 font-mono">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="pt-8 border-t border-default/50 mt-8 flex justify-end gap-3">
+                        <button type="submit" class="btn-primary px-8 py-3 text-sm">
+                            <i class="fas fa-save mr-2"></i>{{ t('common.save_settings') }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Restore Confirmation Modal -->
+<div id="restoreModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-base backdrop-blur-sm p-4">
+    <div class="panel max-w-md w-full shadow-2xl border-amber-500/30 overflow-hidden">
+        <div class="bg-amber-500/10 px-6 py-4 border-b border-amber-500/20 flex items-center">
+            <div class="w-10 h-10 rounded-full bg-amber-500/20 text-amber-500 flex items-center justify-center mr-4">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-bold text-primary">{{ t('settings.confirm_restore') }}</h3>
+                <p class="text-xs text-amber-500/70 uppercase tracking-widest font-bold">{{ t('common.danger_zone') }}</p>
+            </div>
+        </div>
+        <form onsubmit="handleAjaxForm(event, '/settings/restore-backup')" class="p-6">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="hidden" name="key" id="restoreKeyInput">
+            <input type="hidden" name="type" id="restoreTypeInput">
+            
+            <p class="text-sm text-secondary mb-6 leading-relaxed">
+                {{ t('settings.restore_warning') }}
+                <br><br>
+                <span class="text-primary font-semibold">{{ t('settings.confirm_with_password') }}:</span>
+            </p>
+            
+            <div class="mb-6">
+                <input type="password" name="confirm_password" required placeholder="{{ t('settings.enter_admin_password') }}" 
+                    class="input-field w-full px-4 py-3 text-primary placeholder-slate-600 focus:border-amber-500 transition-all">
+            </div>
+<div class="flex gap-3">
+                <button type="button" onclick="closeRestoreModal()" class="flex-1 px-4 py-3 rounded-lg bg-panel text-primary hover:bg-surface-hover transition-colors text-sm font-medium">
+                    {{ t('common.cancel') }}
+                </button>
+                <button type="submit" class="flex-1 px-4 py-3 rounded-lg bg-amber-600 text-primary hover:bg-amber-500 transition-all text-sm font-bold shadow-lg shadow-amber-900/20">
+                    {{ t('settings.start_restore') }}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+    .tab-btn { background: var(--color-surface-hover); color: var(--color-content-secondary); }
+    .tab-btn:hover { background: var(--color-surface-border); color: var(--color-content-primary); }
+    .tab-btn-active { background: var(--color-primary); color: white; }
+    .tab-btn-active:hover { background: var(--color-primary-hover); }
+</style>
+<script>
+    function confirmRestore(key, type) {
+        document.getElementById('restoreKeyInput').value = key;
+        document.getElementById('restoreTypeInput').value = type;
+        document.getElementById('restoreModal').classList.remove('hidden');
+    }
+
+    function closeRestoreModal() {
+        document.getElementById('restoreModal').classList.add('hidden');
+    }
+
+    function showTab(tab) {
+        document.querySelectorAll('[id^="content-"]').forEach(el => el.classList.add('hidden'));
+        document.getElementById('content-' + tab).classList.remove('hidden');
+        
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('tab-btn-active'));
+        document.getElementById('tab-' + tab).classList.add('tab-btn-active');
+        
+        window.location.hash = tab;
+    }
+
+    function updateFileName(input) {
+        const label = document.getElementById('file-name-label');
+        if (input.files && input.files[0]) {
+            label.textContent = input.files[0].name;
+            label.classList.add('text-primary');
+            label.classList.remove('text-secondary');
+        } else {
+            label.textContent = "{{ t('common.select_file') }}";
+            label.classList.remove('text-primary');
+            label.classList.add('text-secondary');
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const hash = window.location.hash.substring(1);
+        if (hash && document.getElementById('tab-' + hash)) {
+            showTab(hash);
+        }
+    });
+
+    async function deleteBackup(key, type) {
+        handleAjaxAction('/settings/delete-backup', { key: key, type: type }, "{{ t('settings.confirm_delete_backup') }}");
+    }
+</script>
+{% endblock %}
