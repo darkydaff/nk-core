@@ -88,11 +88,11 @@ while (true) {
                 }
 
                 try {
-                    Logger::channel('deployments')->info('Starting client provisioning', ['client_id' => $clientId]);
+                    Logger::channel('deployments')->info('Starting client provisioning', ['client_id' => $clientId, 'server_id' => $serverId]);
                     require_once __DIR__ . '/../inc/VpnClient.php';
                     $client = new VpnClient($clientId);
                     $client->syncToRemote();
-                    Logger::channel('deployments')->info('Client provisioning successful', ['client_id' => $clientId]);
+                    Logger::channel('deployments')->info('Client provisioning successful', ['client_id' => $clientId, 'server_id' => $serverId]);
                 } finally {
                     Lock::release($lockName);
                 }
@@ -135,7 +135,7 @@ while (true) {
                 }
 
                 try {
-                    Logger::channel('deployments')->info('Revoking client infrastructure', ['client_id' => $clientId]);
+                    Logger::channel('deployments')->info('Revoking client infrastructure', ['client_id' => $clientId, 'server_id' => $serverId]);
                     require_once __DIR__ . '/../inc/VpnClient.php';
                     $client = new VpnClient($clientId);
                     $clientData = $client->getData();
@@ -161,7 +161,7 @@ while (true) {
                 }
 
                 try {
-                    Logger::channel('deployments')->info('Deleting client infrastructure', ['client_id' => $clientId]);
+                    Logger::channel('deployments')->info('Deleting client infrastructure', ['client_id' => $clientId, 'server_id' => $serverId]);
                     require_once __DIR__ . '/../inc/VpnClient.php';
                     
                     // We need to get the public key BEFORE we mark it as deleted if possible
@@ -178,7 +178,7 @@ while (true) {
                     $pdo->prepare('UPDATE vpn_clients SET deleted_at = NOW(), status = ? WHERE id = ?')
                         ->execute([ClientStatus::DELETED->value, $clientId]);
                         
-                    Logger::channel('deployments')->info('Client deletion successful', ['client_id' => $clientId]);
+                    Logger::channel('deployments')->info('Client deletion successful', ['client_id' => $clientId, 'server_id' => $serverId]);
                 } finally {
                     Lock::release($lockName);
                 }

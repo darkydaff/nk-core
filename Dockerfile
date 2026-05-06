@@ -13,6 +13,9 @@ RUN apt-get update && apt-get install -y \
     openssh-client \
     cron \
     nginx \
+    openssl \
+    nodejs \
+    npm \
     default-mysql-client \
     iputils-ping \
     fping \
@@ -58,6 +61,9 @@ COPY opcache.ini /usr/local/etc/php/conf.d/opcache.ini
 # Create Twig cache directory
 RUN mkdir -p /var/www/html/storage/cache/twig
 
+# Build Tailwind CSS (moved to start.sh to support volume mounts)
+RUN npm install
+
 # Create SSH ControlMaster socket directory
 RUN mkdir -p /tmp/ssh_mux
 
@@ -73,42 +79,11 @@ RUN echo "* * * * * www-data cd /var/www/html && /usr/local/bin/php bin/run_back
     && touch /var/log/cron.log \
     && chown www-data:www-data /var/log/cron.log
 
-# Create startup script that starts all services
-RUN echo '#!/bin/bash\n\
-# Ensure storage structure exists\n\
-mkdir -p /var/www/html/storage/backups\n\
-mkdir -p /var/www/html/storage/cache/twig\n\
-\n\
-# Ensure .env exists and is writable\n\
-if [ ! -f /var/www/html/.env ]; then\n\
-    touch /var/www/html/.env\n\
-fi\n\
-\n\
-# Set runtime permissions for volumes\n\
-chown -R www-data:www-data /var/www/html/storage\n\
-chown www-data:www-data /var/www/html/.env\n\
-chmod 664 /var/www/html/.env\n\
-\n\
-# Ensure logs are writable\n\
-mkdir -p /var/log/nk-panel\n\
-touch /var/log/cron.log\n\
-touch /var/log/metrics_collector.log\n\
-chown -R www-data:www-data /var/log/nk-panel\n\
-chmod -R 755 /var/log/nk-panel\n\
-chown www-data:www-data /var/log/cron.log\n\
-chown www-data:www-data /var/log/metrics_collector.log\n\
-\n\
-# Start metrics collector in background as www-data\n\
-su -s /bin/bash -c "php /var/www/html/bin/collect_metrics.php >> /var/log/metrics_collector.log 2>&1 &" www-data\n\
-\n\
-service cron start\n\
-# Start Nginx in background\n\
-nginx\n\
-# Start PHP-FPM in foreground\n\
-php-fpm' > /start.sh \
-    && chmod +x /start.sh
+# Copy and prepare startup script
+COPY bin/start.sh /start.sh
+RUN chmod +x /start.sh
 
-# Expose port 80
-EXPOSE 80
+# Expose port 80 and 443
+EXPOSE 80 443
 
 CMD ["/start.sh"]

@@ -755,57 +755,48 @@ class VpnClient {
         try {
             require_once __DIR__ . '/ServerMonitoring.php';
             $monitoring = new ServerMonitoring($this->data['server_id']);
-            $monitoring->collectClientMetrics();
+            $metricsData = $monitoring->collectClientMetrics(); 
+            $allStats = $metricsData['peer_stats'] ?? [];
         } catch (Exception $e) {
             \Logger::error('syncStats(): ServerMonitoring failed for client #' . $this->data['id'] . ': ' . $e->getMessage());
+            $allStats = []; 
         }
 
-        // 2. Get ALL peer stats to check IP endpoint
-        $allStats = self::getAllPeerStatsFromServer($serverData);
-        $publicKey = $this->data['public_key'];
-
+        // 2. If monitoring didn't return the peer map, fetch it manually (legacy fallback or error)
         if (empty($allStats)) {
-            throw new Exception('Could not retrieve peer stats from server (SSH/Docker failed or no peers)');
+            $allStats = self::getAllPeerStatsFromServer($serverData);
         }
+
+        $publicKey = $this->data['public_key'];
         if (!isset($allStats[$publicKey])) {
             throw new Exception('Client peer not found in server WireGuard dump (key: ' . substr($publicKey, 0, 12) . '…)');
         }
 
         $stats = $allStats[$publicKey];
-        $newExternalIp = $stats['endpoint'];
+        $newExternalIp = $stats['endpoint'] ?? null;
 
         // Fetch geo data if the external IP changed OR if we don't have geo data yet
-        $geo = null;
-        if ($newExternalIp && ($newExternalIp !== ($this->data['external_ip'] ?? null) || empty($this->data['ip_country']))) {
+        if ($newExternalIp && $newExternalIp !== '(none)' && ($newExternalIp !== ($this->data['external_ip'] ?? null) || empty($this->data['ip_country']))) {
             $geo = self::lookupIpGeo($newExternalIp);
+            if ($geo) {
+                $pdo = DB::conn();
+                $stmt = $pdo->prepare('
+                    UPDATE vpn_clients
+                    SET external_ip = ?,
+                        ip_country = ?, ip_country_code = ?, ip_city = ?, ip_isp = ?, ip_org = ?,
+                        ip_lat = ?, ip_lon = ?
+                    WHERE id = ?
+                ');
+                return $stmt->execute([
+                    $newExternalIp,
+                    $geo['country'], $geo['countryCode'], $geo['city'], $geo['isp'], $geo['org'],
+                    $geo['lat'] ?? null, $geo['lon'] ?? null,
+                    $this->clientId
+                ]);
+            }
         }
 
-        $pdo = DB::conn();
-
-        if ($geo) {
-            $stmt = $pdo->prepare('
-                UPDATE vpn_clients
-                SET external_ip = ?,
-                    ip_country = ?, ip_country_code = ?, ip_city = ?, ip_isp = ?, ip_org = ?,
-                    ip_lat = ?, ip_lon = ?
-                WHERE id = ?
-            ');
-            return $stmt->execute([
-                $newExternalIp,
-                $geo['country'], $geo['countryCode'], $geo['city'], $geo['isp'], $geo['org'],
-                $geo['lat'] ?? null, $geo['lon'] ?? null,
-                $this->clientId
-            ]);
-        } else {
-            $stmt = $pdo->prepare('
-                UPDATE vpn_clients
-                SET external_ip = ?
-                WHERE id = ?
-            ');
-            return $stmt->execute([
-                $newExternalIp, $this->clientId
-            ]);
-        }
+        return true;
     }
     
     /**
@@ -826,55 +817,48 @@ class VpnClient {
         $lines = explode("\n", trim($output));
         
         foreach ($lines as $line) {
-            if (empty(trim($line))) continue;
+            $line = trim($line);
+            if (empty($line)) continue;
             
-            $parts = preg_split('/\t+/', trim($line));
+            // Split by any whitespace (tabs or spaces) to be more resilient
+            $parts = preg_split('/\s+/', $line);
+            $count = count($parts);
             
-            // Peer lines have the interface prefix + 8 peer fields = at least 9 columns
-            // Format: iface  publicKey  presharedKey  endpoint  allowedIPs  latestHandshake  transferRx  transferTx  persistentKeepalive
-            if (count($parts) >= 8) {
-                // Find the public key (usually the first or second column)
-                $keyIndex = (strpos($parts[0], 'wg') === 0 && strlen($parts[0]) <= 5) ? 1 : 0;
-                $publicKey = $parts[$keyIndex];
+            $isKey0 = (strlen($parts[0]) === 44 && str_ends_with($parts[0], '='));
+            $isKey1 = (strlen($parts[1]) === 44 && str_ends_with($parts[1], '='));
 
-                // Find handshake and traffic columns dynamically
-                $handshakeIndex = -1;
-                foreach ($parts as $i => $val) {
-                    $v = (int)$val;
-                    if ($v > 1600000000 && $v < 2000000000) {
-                        $handshakeIndex = $i;
-                        break;
-                    }
-                }
+            if ($count === 8 && $isKey0) {
+                // Peer line, no interface prefix
+                $offset = 0;
+            } elseif ($count === 9 && $isKey1) {
+                // Peer line, with interface prefix
+                $offset = 1;
+            } else {
+                continue; // Interface line or unrecognized format
+            }
 
-                if ($handshakeIndex !== -1 && isset($parts[$handshakeIndex + 2])) {
-                    $handshake = (int)$parts[$handshakeIndex];
-                    $bytesRx = (int)$parts[$handshakeIndex + 1];
-                    $bytesTx = (int)$parts[$handshakeIndex + 2];
-                    
-                    // Endpoint is usually before handshake, let's try to find it
-                    // In standard wg it's index 3 (or 4 with iface)
-                    // In AWG it might be different, but let's assume it's before handshake
-                    $endpoint = $parts[$handshakeIndex - 2] ?? '(none)';
-                    
-                    // Extract just the IP from the endpoint (strip port)
-                    $externalIp = null;
-                    if ($endpoint && $endpoint !== '(none)' && strpos($endpoint, ':') !== false) {
-                        if (preg_match('/^(.+):(\d+)$/', $endpoint, $m)) {
-                            $externalIp = $m[1];
-                        } else {
-                            $externalIp = $endpoint;
-                        }
-                    }
-                    
-                    $peers[$publicKey] = [
-                        'bytes_sent' => $bytesRx,       // client sent (server received)
-                        'bytes_received' => $bytesTx,   // client received (server sent)
-                        'last_handshake' => $handshake,
-                        'endpoint' => $externalIp,
-                    ];
+            $publicKey = $parts[0 + $offset];
+            $endpoint = $parts[2 + $offset] ?? '(none)';
+            $handshake = (int)($parts[4 + $offset] ?? 0);
+            $bytesRx = (int)($parts[5 + $offset] ?? 0);
+            $bytesTx = (int)($parts[6 + $offset] ?? 0);
+            
+            // Clean endpoint IP (strip port, handle IPv6)
+            $externalIp = $endpoint;
+            if ($endpoint !== '(none)') {
+                if (strpos($endpoint, ']:') !== false) { // IPv6 [addr]:port
+                    $externalIp = substr($endpoint, 1, strpos($endpoint, ']:') - 1);
+                } elseif (strpos($endpoint, ':') !== false) { // IPv4 addr:port
+                    $externalIp = explode(':', $endpoint)[0];
                 }
             }
+            
+            $peers[$publicKey] = [
+                'bytes_sent' => $bytesRx,       // client upload
+                'bytes_received' => $bytesTx,   // client download
+                'last_handshake' => $handshake,
+                'endpoint' => $externalIp,
+            ];
         }
         
         return $peers;
@@ -1025,8 +1009,17 @@ class VpnClient {
             'received' => $received,
             'total' => $total,
             'last_seen' => $lastSeen,
-            'is_online' => !empty($this->data['last_handshake']) && (time() - strtotime($this->data['last_handshake'])) < 300
+            'is_online' => !empty($this->data['last_handshake']) && (time() - strtotime($this->data['last_handshake'])) < 300,
+            'speed_up' => self::formatSpeed((float)($this->data['speed_up_kbps'] ?? 0)),
+            'speed_down' => self::formatSpeed((float)($this->data['speed_down_kbps'] ?? 0))
         ];
+    }
+
+    public static function formatSpeed(float $kbps): string {
+        if ($kbps >= 1000) {
+            return number_format($kbps / 1000, 1) . ' Mbps';
+        }
+        return number_format($kbps, 0) . ' Kbps';
     }
     
     /**

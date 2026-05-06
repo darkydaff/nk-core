@@ -84,7 +84,7 @@
 					<i class="fas fa-users text-muted text-xs"></i>
 				</div>
 				<div class="flex items-end gap-2">
-					<span class="text-2xl font-bold text-primary">{{ stats_summary.total }}</span>
+					<span class="text-2xl font-bold text-primary" id="summary-total">{{ stats_summary.total }}</span>
 				</div>
 			</div>
 			<div class="panel p-5 border-l-4 border-primary">
@@ -93,7 +93,7 @@
 					<i class="fas fa-signal text-cyan-900 text-xs"></i>
 				</div>
 				<div class="flex items-end gap-2">
-					<span class="text-2xl font-bold text-primary">{{ stats_summary.online }}</span>
+					<span class="text-2xl font-bold text-primary" id="summary-online">{{ stats_summary.online }}</span>
 					<span class="text-[10px] text-cyan-600 mb-1 font-bold animate-pulse">LIVE</span>
 				</div>
 			</div>
@@ -103,7 +103,7 @@
 					<i class="fas fa-arrow-down text-blue-900 text-xs"></i>
 				</div>
 				<div class="flex items-end gap-2">
-					<span class="text-2xl font-bold text-blue-400">{{ (stats_summary.traffic.received / 1024 / 1024 / 1024)|number_format(2) }}</span>
+					<span class="text-2xl font-bold text-blue-400" id="summary-inbound">{{ (stats_summary.traffic.received / 1024 / 1024 / 1024)|number_format(2) }}</span>
 					<span class="text-[10px] text-muted mb-1 font-bold">GB</span>
 				</div>
 			</div>
@@ -113,7 +113,7 @@
 					<i class="fas fa-arrow-up text-purple-900 text-xs"></i>
 				</div>
 				<div class="flex items-end gap-2">
-					<span class="text-2xl font-bold text-purple-400">{{ (stats_summary.traffic.sent / 1024 / 1024 / 1024)|number_format(2) }}</span>
+					<span class="text-2xl font-bold text-purple-400" id="summary-outbound">{{ (stats_summary.traffic.sent / 1024 / 1024 / 1024)|number_format(2) }}</span>
 					<span class="text-[10px] text-muted mb-1 font-bold">GB</span>
 				</div>
 			</div>
@@ -318,29 +318,29 @@
 			<!-- Terminal chrome -->
 			<div class="flex items-center gap-2 px-4 py-3 bg-[#1e1e2e] border-b border-slate-700/50 flex-shrink-0">
 				<div class="flex gap-1.5">
-					<button onclick="closeLogsModal()" class="w-3 h-3 rounded-full bg-red-500 hover:bg-red-400 transition-colors" title="Close"></button>
+					<button onclick="closeLogsModal()" class="w-3 h-3 rounded-full bg-red-500 hover:bg-red-400 transition-colors" title="{{ t('common.close') }}"></button>
 					<span class="w-3 h-3 rounded-full bg-yellow-500"></span>
 					<span class="w-3 h-3 rounded-full bg-green-500"></span>
 				</div>
-				<span class="ml-3 text-xs font-mono text-slate-400 flex-1" id="logsModalTitle">nk-panel — deployment logs</span>
+				<span class="ml-3 text-xs font-mono text-slate-400 flex-1" id="logsModalTitle">nk-panel — {{ t('servers.deployment_logs') }}</span>
 				<div class="flex items-center gap-2">
 					<label class="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer select-none">
 						<input type="checkbox" id="logsAutoScroll" checked class="rounded border-slate-600 bg-slate-800 text-cyan-500 focus:ring-cyan-500/20">
-						Auto-scroll
+						{{ t('common.auto_scroll') }}
 					</label>
-					<button onclick="refreshLogs()" class="text-[10px] text-slate-400 hover:text-cyan-400 transition-colors px-2 py-1 rounded border border-slate-700 hover:border-cyan-500/40" title="Refresh logs">
-						<i class="fas fa-redo-alt mr-1"></i>Refresh
+					<button onclick="refreshLogs()" class="text-[10px] text-slate-400 hover:text-cyan-400 transition-colors px-2 py-1 rounded border border-slate-700 hover:border-cyan-500/40" title="{{ t('common.refresh') }}">
+						<i class="fas fa-redo-alt mr-1"></i>{{ t('common.refresh') }}
 					</button>
 				</div>
 			</div>
 			<!-- Log body -->
 			<div id="logsBody" class="flex-1 overflow-y-auto bg-[#13131f] font-mono text-xs leading-relaxed px-4 py-3" style="min-height:350px;">
-				<p class="text-slate-500 italic">Loading logs…</p>
+				<p class="text-slate-500 italic">{{ t('common.loading_logs') }}</p>
 			</div>
 			<!-- Footer -->
 			<div class="flex items-center justify-between px-4 py-2 bg-[#1e1e2e] border-t border-slate-700/50 flex-shrink-0">
-				<span class="text-[10px] text-slate-500" id="logsCount">0 entries</span>
-				<button onclick="closeLogsModal()" class="text-[10px] px-3 py-1.5 rounded border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition-all">Close</button>
+				<span class="text-xs font-mono text-slate-500" id="logsCount">0 {{ t('servers.log_entries') }}</span>
+				<button onclick="closeLogsModal()" class="text-[10px] px-3 py-1.5 rounded border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition-all">{{ t('common.close') }}</button>
 			</div>
 		</div>
 	</div>
@@ -388,31 +388,37 @@ const labels = {
     restore: "{{ t('common.restore') }}",
     delete: "{{ t('common.delete') }}",
     confirmDelete: "{{ t('common.confirm_delete') }}",
-    revoked: "{{ t('common.revoked') }}",
+    revoked: "{{ t('revoked') }}",
     edit: "{{ t('common.edit') }}",
     selected: "{{ t('common.selected_count', [], '%s items selected') }}",
     traffic: "{{ t('common.traffic') }}",
     lastSeenLabel: "{{ t('common.last_seen') }}",
     provisioning: "{{ t('status.provisioning')|default('Provisioning...') }}",
     error: "{{ t('status.error') }}",
-    deleting: "{{ t('status.deleting')|default('Deleting...') }}"
+    deleting: "{{ t('status.deleting')|default('Deleting...') }}",
+    noLogs: "{{ t('servers.no_logs') }}",
+    logEntries: "{{ t('servers.log_entries') }}",
+    logsFailed: "{{ t('servers.logs_failed') }}"
 };
 
 let transitionPoll = null;
 
-function performSearch() {
+function performSearch(isAutoRefresh = false) {
     const query = searchInput.value.trim();
     const serverId = {{ server.id }};
     const status = statusFilter.value;
     const traffic = trafficFilter.value;
     const sort = sortFilter.value;
     
+    // Save selected checkboxes
+    const selectedIds = Array.from(document.querySelectorAll('.client-checkbox:checked')).map(cb => cb.value);
+    
     clearTimeout(transitionPoll);
     
     const url = `/api/search-clients?q=${encodeURIComponent(query)}&server_id=${serverId}&status=${status}&traffic=${traffic}&sort=${sort}`;
     
-    // Only show spinner if container is empty
-    if (resultsContainer.innerHTML.trim() === '') {
+    // Only show spinner if container is empty and it's NOT an auto-refresh
+    if (resultsContainer.innerHTML.trim() === '' && !isAutoRefresh) {
         resultsContainer.innerHTML = `
             <div class="flex items-center justify-center h-64">
                 <div class="text-center">
@@ -430,19 +436,38 @@ function performSearch() {
         .then(data => {
             if (data.error) throw new Error(data.error);
             renderResults(data.results);
+            
+            // Restore selected checkboxes
+            document.querySelectorAll('.client-checkbox').forEach(cb => {
+                if (selectedIds.includes(cb.value)) cb.checked = true;
+            });
             updateBatchBar();
 
-            // If any client is in transition, poll again in 5s
-            const hasTransition = data.results.some(c => 
-                ['provisioning', 'verifying', 'deleting'].includes(c.db_status)
-            );
-            
-            if (hasTransition) {
-                transitionPoll = setTimeout(performSearch, 5000);
+            // Update Summary Stats
+            if (data.summary) {
+                const s = data.summary;
+                document.getElementById('summary-total').innerText = s.total;
+                document.getElementById('summary-online').innerText = s.online;
+                document.getElementById('summary-inbound').innerText = (s.traffic.received / 1073741824).toFixed(2);
+                document.getElementById('summary-outbound').innerText = (s.traffic.sent / 1073741824).toFixed(2);
             }
+
+            // Schedule next refresh (every 10s if tab is active)
+            const refreshDelay = 10000;
+            transitionPoll = setTimeout(() => {
+                // Only auto-refresh if user isn't searching or if it's the server view
+                if (document.visibilityState === 'visible') {
+                    performSearch(true);
+                } else {
+                    // If tab hidden, wait longer
+                    transitionPoll = setTimeout(() => performSearch(true), refreshDelay);
+                }
+            }, refreshDelay);
         })
         .catch(err => {
-            resultsContainer.innerHTML = `<div class="p-10 text-center text-red-500">Error: ${err.message}</div>`;
+            if (!isAutoRefresh) {
+                resultsContainer.innerHTML = `<div class="p-10 text-center text-red-500">Error: ${err.message}</div>`;
+            }
         });
 }
 
@@ -571,7 +596,8 @@ function renderResults(results) {
                     <td class="px-5 py-4 text-right">
                         <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onclick="clientAction(${client.id}, 'sync-stats', this)" class="p-1.5 text-muted hover:text-cyan-400" title="${labels.sync}">
-                                <i class="fas fa-sync-alt text-xs"></i>
+                                <i class="fa-solid fa-rotate text-[10px]"></i>
+                                {{ t('common.refresh') }}
                             </button>
                             <button onclick="clientAction(${client.id}, '${isDisabled ? 'restore' : 'revoke'}', this)" class="p-1.5 ${isDisabled ? 'text-green-500 hover:text-green-400' : 'text-muted hover:text-orange-400'}" title="${isDisabled ? labels.restore : labels.revoke}">
                                 <i class="fas ${isDisabled ? 'fa-user-check' : 'fa-user-slash'} text-xs"></i>
@@ -826,7 +852,7 @@ function fetchLogs() {
 	})
 	.catch(err => {
 		document.getElementById('logsBody').innerHTML =
-			`<p class="text-red-400">Failed to load logs: ${err.message}</p>`;
+			`<p class="text-red-400">${labels.logsFailed}: ${err.message}</p>`;
 		// Retry after 8s on error
 		if (document.getElementById('logsModal') &&
 			!document.getElementById('logsModal').classList.contains('hidden')) {
@@ -840,12 +866,12 @@ function renderLogs(logs) {
 	const countEl = document.getElementById('logsCount');
 
 	if (!logs || logs.length === 0) {
-		body.innerHTML = '<p class="text-slate-500 italic">No log entries found for this server yet.</p>';
-		countEl.textContent = '0 entries';
+		body.innerHTML = `<p class="text-slate-500 italic">${labels.noLogs}</p>`;
+		countEl.textContent = `0 ${labels.logEntries}`;
 		return;
 	}
 
-	countEl.textContent = logs.length + ' entries';
+	countEl.textContent = logs.length + ' ' + labels.logEntries;
 
 	const lines = logs.map(entry => {
 		const level   = (entry.level_name || 'INFO').toUpperCase();

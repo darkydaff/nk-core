@@ -31,10 +31,10 @@
 					</div>
 				</div>
 				<div class="flex items-end gap-2">
-					<div class="text-3xl font-bold text-primary">{{ summary.total_clients|default(0) }}</div>
+					<div class="text-3xl font-bold text-primary" id="summary-total">{{ summary.total_clients|default(0) }}</div>
 					<div class="text-xs text-accent opacity-80/80 mb-1.5">
 						<span class="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400 mr-1 animate-pulse"></span>
-						{{ summary.active_clients }}
+						<span id="summary-online">{{ summary.active_clients }}</span>
 						{{ t('status.online')|default('Online')|lower }}
 					</div>
 				</div>
@@ -48,7 +48,7 @@
 					</div>
 				</div>
 				<div class="text-2xl font-bold text-primary font-mono">
-					{{ (summary.total_download / 1024 / 1024 / 1024)|number_format(2) }}
+					<span id="summary-download">{{ (summary.total_download / 1024 / 1024 / 1024)|number_format(2) }}</span>
 					<span class="text-xs font-normal text-muted uppercase">{{ t('common.gb') }}</span>
 				</div>
 			</div>
@@ -61,7 +61,7 @@
 					</div>
 				</div>
 				<div class="text-2xl font-bold text-primary font-mono">
-					{{ (summary.total_upload / 1024 / 1024 / 1024)|number_format(2) }}
+					<span id="summary-upload">{{ (summary.total_upload / 1024 / 1024 / 1024)|number_format(2) }}</span>
 					<span class="text-xs font-normal text-muted uppercase">{{ t('common.gb') }}</span>
 				</div>
 			</div>
@@ -228,37 +228,72 @@ const labels = {
     edit: "{{ t('common.edit') }}",
     selected: "{{ t('common.selected_count', [], '%s items selected') }}",
     traffic: "{{ t('common.traffic') }}",
-    lastSeenLabel: "{{ t('common.last_seen') }}"
+    lastSeenLabel: "{{ t('common.last_seen') }}",
+    deleting: "{{ t('status.deleting')|default('Deleting...') }}"
 };
 
-function performSearch() {
+function performSearch(isAutoRefresh = false) {
     const query = searchInput.value.trim();
     const status = statusFilter.value;
     const traffic = trafficFilter.value;
     const sort = sortFilter.value;
     
+    // Save selected checkboxes
+    const selectedIds = Array.from(document.querySelectorAll('.client-checkbox:checked')).map(cb => cb.value);
+    
+    clearTimeout(searchTimeout);
+    
     const url = `/api/search-clients?q=${encodeURIComponent(query)}&status=${status}&traffic=${traffic}&sort=${sort}`;
     
-    resultsContainer.innerHTML = `
-        <div class="flex items-center justify-center h-64">
-            <div class="text-center">
-                <div class="animate-spin text-primary text-2xl mb-3">
-                    <i class="fas fa-circle-notch"></i>
+    // Only show spinner if container is empty and NOT an auto-refresh
+    if (resultsContainer.innerHTML.trim() === '' && !isAutoRefresh) {
+        resultsContainer.innerHTML = `
+            <div class="flex items-center justify-center h-64">
+                <div class="text-center">
+                    <div class="animate-spin text-primary text-2xl mb-3">
+                        <i class="fas fa-circle-notch"></i>
+                    </div>
+                    <p class="text-sm text-muted">${labels.searching}</p>
                 </div>
-                <p class="text-sm text-muted">${labels.searching}</p>
             </div>
-        </div>
-    `;
+        `;
+    }
 
     fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(response => response.json())
         .then(data => {
             if (data.error) throw new Error(data.error);
             renderResults(data.results);
+
+            // Restore selected checkboxes
+            document.querySelectorAll('.client-checkbox').forEach(cb => {
+                if (selectedIds.includes(cb.value)) cb.checked = true;
+            });
             updateBatchBar();
+
+            // Update Summary Stats
+            if (data.summary) {
+                const s = data.summary;
+                document.getElementById('summary-total').innerText = s.total;
+                document.getElementById('summary-online').innerText = s.online;
+                document.getElementById('summary-download').innerText = (s.traffic.received / 1073741824).toFixed(2);
+                document.getElementById('summary-upload').innerText = (s.traffic.sent / 1073741824).toFixed(2);
+            }
+
+            // Schedule next refresh (every 10s if tab is active)
+            const refreshDelay = 10000;
+            searchTimeout = setTimeout(() => {
+                if (document.visibilityState === 'visible') {
+                    performSearch(true);
+                } else {
+                    searchTimeout = setTimeout(() => performSearch(true), refreshDelay);
+                }
+            }, refreshDelay);
         })
         .catch(err => {
-            resultsContainer.innerHTML = `<div class="p-10 text-center text-red-500">Error: ${err.message}</div>`;
+            if (!isAutoRefresh) {
+                resultsContainer.innerHTML = `<div class="p-10 text-center text-red-500">Error: ${err.message}</div>`;
+            }
         });
 }
 

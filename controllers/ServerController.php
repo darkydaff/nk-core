@@ -311,44 +311,12 @@ class ServerController
 
             $clients = VpnClient::listByServer($serverId);
 
-            // Calculate summary stats for the "Mini Dashboard"
-            $totalClients = count($clients);
-            $onlineClients = 0;
-            
-            // Online count — 300s threshold (consistent with metrics and getData())
-            foreach ($clients as $c) {
-                if (!empty($c['last_handshake'])) {
-                    $diff = time() - strtotime($c['last_handshake']);
-                    if ($diff < 300) $onlineClients++;
-                }
-            }
-
-            // Traffic stats include historical data (even from deleted clients)
-            $pdo = DB::conn();
-            $trafficStmt = $pdo->prepare("SELECT SUM(bytes_sent) as sent, SUM(bytes_received) as received FROM vpn_clients WHERE server_id = ?");
-            $trafficStmt->execute([$serverId]);
-            $vpnTraffic = $trafficStmt->fetch();
-
-            // Also include proxy traffic for this server
-            $proxyTrafficStmt = $pdo->prepare("SELECT SUM(bytes_sent) as sent, SUM(bytes_received) as received FROM http_proxies WHERE server_id = ?");
-            $proxyTrafficStmt->execute([$serverId]);
-            $proxyTraffic = $proxyTrafficStmt->fetch();
-            
-            $totalSent = (float)($vpnTraffic['sent'] ?? 0) + (float)($proxyTraffic['sent'] ?? 0);
-            $totalReceived = (float)($vpnTraffic['received'] ?? 0) + (float)($proxyTraffic['received'] ?? 0);
+            $summary = $this->getServerSummaryStats($serverId, $clients);
 
             View::render('servers/view.twig', [
                 'server' => $serverData,
                 'clients' => $clients,
-                'stats_summary' => [
-                    'total' => $totalClients,
-                    'online' => $onlineClients,
-                    'traffic' => [
-                        'sent' => $totalSent,
-                        'received' => $totalReceived,
-                        'total' => $totalSent + $totalReceived
-                    ]
-                ],
+                'stats_summary' => $summary,
                 'beszel_config' => [
                     'url' => Config::get('BESZEL_URL')
                 ]
@@ -513,11 +481,8 @@ class ServerController
 
                 $r['db_status'] = $r['status']; // Active, Disabled, etc.
                 
-                // Format speeds
-                $up = (float)($r['speed_up_kbps'] ?? 0);
-                $down = (float)($r['speed_down_kbps'] ?? 0);
-                $r['speed_up'] = $up >= 1000 ? number_format($up / 1000, 1) . ' Mbps' : number_format($up, 0) . ' Kbps';
-                $r['speed_down'] = $down >= 1000 ? number_format($down / 1000, 1) . ' Mbps' : number_format($down, 0) . ' Kbps';
+                $r['speed_up'] = VpnClient::formatSpeed((float)($r['speed_up_kbps'] ?? 0));
+                $r['speed_down'] = VpnClient::formatSpeed((float)($r['speed_down_kbps'] ?? 0));
 
                 $r['connection_status'] = 'offline';
                 if (!empty($r['last_handshake'])) {
@@ -541,7 +506,31 @@ class ServerController
                 $r['flag'] = View::getFlag($r['ip_country_code'] ?? '');
             }
 
-            echo json_encode(['results' => $results, 'truncated' => $truncated ?? false]);
+            $response = ['results' => $results, 'truncated' => $truncated ?? false];
+            
+            // Return summary stats for AJAX update
+            if ($serverId > 0) {
+                $response['summary'] = $this->getServerSummaryStats($serverId, $results);
+            } else {
+                // Global summary for dashboard
+                $pdo = DB::conn();
+                $vpnStmt = $pdo->query("SELECT COUNT(CASE WHEN deleted_at IS NULL THEN 1 END) as total_clients, SUM(bytes_sent) as vpn_upload, SUM(bytes_received) as vpn_download, SUM(CASE WHEN last_handshake > DATE_SUB(NOW(), INTERVAL 5 MINUTE) AND deleted_at IS NULL THEN 1 ELSE 0 END) as active_clients FROM vpn_clients");
+                $vpnStats = $vpnStmt->fetch(PDO::FETCH_ASSOC);
+
+                $proxyStmt = $pdo->query("SELECT SUM(bytes_sent) as proxy_upload, SUM(bytes_received) as proxy_download FROM http_proxies");
+                $proxyStats = $proxyStmt->fetch(PDO::FETCH_ASSOC);
+
+                $response['summary'] = [
+                    'total' => $vpnStats['total_clients'],
+                    'online' => $vpnStats['active_clients'],
+                    'traffic' => [
+                        'sent' => ($vpnStats['vpn_upload'] ?? 0) + ($proxyStats['proxy_upload'] ?? 0),
+                        'received' => ($vpnStats['vpn_download'] ?? 0) + ($proxyStats['proxy_download'] ?? 0)
+                    ]
+                ];
+            }
+
+            echo json_encode($response);
         } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(['error' => $e->getMessage(), 'results' => []]);
@@ -710,5 +699,43 @@ class ServerController
             http_response_code(500);
             echo json_encode(['error' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * Helper to calculate summary stats for a server
+     */
+    private function getServerSummaryStats(int $serverId, array $clients): array
+    {
+        $onlineClients = 0;
+        
+        foreach ($clients as $c) {
+            if (!empty($c['last_handshake'])) {
+                $lastHandshake = is_string($c['last_handshake']) ? strtotime($c['last_handshake']) : $c['last_handshake'];
+                $diff = time() - $lastHandshake;
+                if ($diff < 300) $onlineClients++;
+            }
+        }
+
+        $pdo = DB::conn();
+        $trafficStmt = $pdo->prepare("SELECT SUM(bytes_sent) as sent, SUM(bytes_received) as received FROM vpn_clients WHERE server_id = ?");
+        $trafficStmt->execute([$serverId]);
+        $vpnTraffic = $trafficStmt->fetch();
+
+        $proxyTrafficStmt = $pdo->prepare("SELECT SUM(bytes_sent) as sent, SUM(bytes_received) as received FROM http_proxies WHERE server_id = ?");
+        $proxyTrafficStmt->execute([$serverId]);
+        $proxyTraffic = $proxyTrafficStmt->fetch();
+        
+        $totalSent = (float)($vpnTraffic['sent'] ?? 0) + (float)($proxyTraffic['sent'] ?? 0);
+        $totalReceived = (float)($vpnTraffic['received'] ?? 0) + (float)($proxyTraffic['received'] ?? 0);
+
+        return [
+            'total' => count($clients),
+            'online' => $onlineClients,
+            'traffic' => [
+                'sent' => $totalSent,
+                'received' => $totalReceived,
+                'total' => $totalSent + $totalReceived
+            ]
+        ];
     }
 }

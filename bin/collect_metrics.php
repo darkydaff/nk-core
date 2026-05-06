@@ -15,6 +15,10 @@ require_once __DIR__ . '/../inc/Enums.php';
 require_once __DIR__ . '/../inc/VpnServer.php';
 require_once __DIR__ . '/../inc/VpnClient.php';
 require_once __DIR__ . '/../inc/ServerMonitoring.php';
+require_once __DIR__ . '/../inc/Logger.php';
+
+// Load environment configuration
+Config::load(__DIR__ . '/../.env');
 
 // Set timezone
 date_default_timezone_set('Europe/Moscow');
@@ -63,12 +67,16 @@ while (true) {
                 // Collect client metrics
                 $clientMetrics = $monitoring->collectClientMetrics();
                 
-                if (!empty($clientMetrics)) {
-                    foreach ($clientMetrics as $cm) {
+                $dbCount = $clientMetrics['db_client_count'] ?? 0;
+                $activeCount = $clientMetrics['active_peer_count'] ?? 0;
+
+                if (!empty($clientMetrics['results']) && is_array($clientMetrics['results'])) {
+                    foreach ($clientMetrics['results'] as $cm) {
+                        if (!isset($cm['client_id'])) continue;
                         echo "  Client #{$cm['client_id']} ({$cm['client_name']}): UP={$cm['speed_up_kbps']}Kbps DOWN={$cm['speed_down_kbps']}Kbps\n";
                     }
                 } else {
-                    echo "  No active clients\n";
+                    echo "  No active traffic (DB Clients: {$dbCount}, Active Peers: {$activeCount})\n";
                 }
                 
             } catch (Exception $e) {

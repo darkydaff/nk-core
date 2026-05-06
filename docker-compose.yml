@@ -42,12 +42,13 @@ services:
       DB_DATABASE: ${DB_DATABASE:-amnezia_panel}
       DB_USERNAME: ${DB_USERNAME:-amnezia}
       DB_PASSWORD: ${DB_PASSWORD:-amnezia}
+    ports:
+      - "8084:443"
     volumes:
-      - ./:/var/www/html
+      - /var/www/html/node_modules
       - /var/www/html/vendor
       - twig_cache:/var/www/html/storage/cache/twig
-    ports:
-      - "8084:80"
+      - ./certs:/certs:ro
 
   beanstalkd:
     image: schickling/beanstalkd
@@ -80,7 +81,6 @@ services:
       QUEUE_HOST: beanstalkd
       QUEUE_PORT: 11300
     volumes:
-      - ./:/var/www/html
       - /var/www/html/vendor
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/amnezia:/opt/amnezia

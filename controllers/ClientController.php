@@ -165,15 +165,18 @@ class ClientController {
             $client = new VpnClient($clientId);
             $clientData = $client->getData();
             
+            $up = (float)($clientData['speed_up_kbps'] ?? 0);
+            $down = (float)($clientData['speed_down_kbps'] ?? 0);
+
             return $this->respond(true, "Status fetched", [
                 'db_status' => $clientData['status'],
                 'connection_status' => $clientData['connection_status'] ?? 'offline',
                 'is_active' => $clientData['status'] === ClientStatus::ACTIVE->value,
                 'traffic' => [
-                    'sent' => number_format($clientData['bytes_sent'] / 1024 / 1024, 2),
-                    'received' => number_format($clientData['bytes_received'] / 1024 / 1024, 2),
-                    'speed_up' => $clientData['speed_up'] ?? '0 B/s',
-                    'speed_down' => $clientData['speed_down'] ?? '0 B/s'
+                    'sent' => number_format((float)($clientData['bytes_sent'] ?? 0) / 1024 / 1024, 2),
+                    'received' => number_format((float)($clientData['bytes_received'] ?? 0) / 1024 / 1024, 2),
+                    'speed_up' => VpnClient::formatSpeed((float)($clientData['speed_up_kbps'] ?? 0)),
+                    'speed_down' => VpnClient::formatSpeed((float)($clientData['speed_down_kbps'] ?? 0))
                 ]
             ]);
         } catch (Exception $e) {

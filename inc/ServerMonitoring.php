@@ -27,20 +27,31 @@ class ServerMonitoring
     {
         $clients = VpnClient::listByServer($this->serverData['id']);
         if (empty($clients)) {
-            return [];
+            return ['results' => [], 'peer_stats' => []];
         }
 
         // Single SSH call to get ALL peer stats at once
         $containerName = $this->serverData['container_name'];
-        $cmd = "docker exec {$containerName} /usr/local/bin/awg show all dump";
+        // Added -i flag for more consistent output streaming across different SSH/Docker environments
+        $cmd = "docker exec -i {$containerName} /usr/local/bin/awg show all dump";
         $dumpOutput = $this->execSSH($cmd);
 
-        if (!$dumpOutput) {
-            return [];
+        if (!$dumpOutput || trim($dumpOutput) === "") {
+            return ['results' => [], 'peer_stats' => []];
         }
 
         // Parse the full dump into a map of publicKey => stats
         $peerStats = $this->parseDump($dumpOutput);
+        
+        // Safety fallback: if 'all' failed or returned nothing but we expect clients, 
+        // try specifically for wg0 which is the most common interface name
+        if (empty($peerStats)) {
+            $cmd = "docker exec -i {$containerName} /usr/local/bin/awg show wg0 dump";
+            $dumpOutput = $this->execSSH($cmd);
+            if ($dumpOutput) {
+                $peerStats = $this->parseDump($dumpOutput);
+            }
+        }
 
         $db = DB::conn();
         $results = [];
@@ -50,40 +61,60 @@ class ServerMonitoring
 
         try {
             foreach ($clients as $client) {
-                if ($client['status'] !== ClientStatus::ACTIVE->value) continue;
+                // Support both string and Enum status
+                $status = $client['status'];
+                if ($status instanceof ClientStatus) {
+                    $status = $status->value;
+                }
+                
+                if ($status !== ClientStatus::ACTIVE->value) continue;
 
                 $publicKey = $client['public_key'];
                 if (!isset($peerStats[$publicKey])) continue;
 
                 $peer = $peerStats[$publicKey];
-                $stats = $this->calculateSpeed($client, $peer);
+                
+                // Safety check for handshake activity
+                $handshake = $peer['last_handshake'] ?? 0;
+                // Consider active if handshake in last 3 minutes
+                // Use absolute difference to handle slight clock skews or future timestamps
+                if ($handshake > 0 && abs(time() - $handshake) < 180) {
+                    $stats = $this->calculateSpeed($client, $peer);
 
-                if ($stats) {
-                    $this->saveClientMetrics($client['id'], $stats);
-                    $results[] = [
-                        'client_id' => $client['id'],
-                        'client_name' => $client['name'],
-                        'speed_up_kbps' => $stats['speed_up_kbps'],
-                        'speed_down_kbps' => $stats['speed_down_kbps'],
-                    ];
+                    if ($stats) {
+                        $this->saveClientMetrics($client['id'], $stats);
+                        $results[] = [
+                            'client_id' => $client['id'],
+                            'client_name' => $client['name'],
+                            'speed_up_kbps' => $stats['speed_up_kbps'],
+                            'speed_down_kbps' => $stats['speed_down_kbps'],
+                        ];
+                    }
                 }
             }
 
             $db->commit();
         } catch (Exception $e) {
-            $db->rollBack();
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
             throw $e;
         }
 
-        return $results;
+        return [
+            'results' => $results,
+            'peer_stats' => $peerStats,
+            'db_client_count' => count($clients),
+            'active_peer_count' => count($results)
+        ];
     }
 
     /**
      * Parse `awg show all dump` output into a map of publicKey => peer data.
      * 
      * Dump format per line (tab-separated):
-     * Server line:  privateKey  publicKey  listenPort  fwmark
-     * Peer line:    publicKey  presharedKey  endpoint  allowedIPs  latestHandshake  transferRx  transferTx  persistentKeepalive
+     * Server line:  [iface] privateKey  publicKey  listenPort  fwmark
+     * Peer line:    [iface] publicKey  presharedKey  endpoint  allowedIPs  latestHandshake  transferRx  transferTx  persistentKeepalive
      */
     private function parseDump(string $output): array
     {
@@ -91,38 +122,40 @@ class ServerMonitoring
         $lines = explode("\n", trim($output));
 
         foreach ($lines as $line) {
-            if (empty(trim($line))) continue;
+            $line = trim($line);
+            if (empty($line)) continue;
 
-            $parts = preg_split('/\t+/', trim($line));
-            if (count($parts) < 8) continue;
+            // Split by any whitespace (tabs or spaces) to be more resilient
+            $parts = preg_split('/\s+/', $line);
+            $count = count($parts);
+            
+            // WireGuard dump format:
+            // Peer line:    [iface] publicKey  presharedKey  endpoint  allowedIPs  latestHandshake  transferRx  transferTx  persistentKeepalive
+            // Interface line: [iface] privateKey publicKey listenPort fwmark (many more in AmneziaWG)
 
-            // Find the public key (usually the first or second column)
-            // If the first column is an interface name like 'wg0', the key is the second.
-            $keyIndex = (strpos($parts[0], 'wg') === 0 && strlen($parts[0]) <= 5) ? 1 : 0;
-            $publicKey = $parts[$keyIndex];
+            $isKey0 = (strlen($parts[0]) === 44 && str_ends_with($parts[0], '='));
+            $isKey1 = (strlen($parts[1]) === 44 && str_ends_with($parts[1], '='));
 
-            // DYNAMICALLY find the traffic columns:
-            // Latest handshake is always a large timestamp (e.g. 1714746033)
-            // Transfer RX/TX are the two columns immediately following the handshake.
-            $handshakeIndex = -1;
-            foreach ($parts as $i => $val) {
-                $val = (int)$val;
-                if ($val > 1600000000 && $val < 2000000000) { // Valid timestamp range
-                    $handshakeIndex = $i;
-                    break;
-                }
+            if ($count === 8 && $isKey0) {
+                // Peer line, no interface prefix
+                $offset = 0;
+            } elseif ($count === 9 && $isKey1) {
+                // Peer line, with interface prefix
+                $offset = 1;
+            } else {
+                continue; // Interface line or unrecognized format
             }
 
-            if ($handshakeIndex !== -1 && isset($parts[$handshakeIndex + 2])) {
-                $peers[$publicKey] = [
-                    'last_handshake' => (int)$parts[$handshakeIndex],
-                    'bytes_sent'     => (int)$parts[$handshakeIndex + 1], // RX (Client Upload)
-                    'bytes_received' => (int)$parts[$handshakeIndex + 2], // TX (Client Download)
-                    'endpoint'       => $parts[$handshakeIndex - 2] ?? '(none)',
-                ];
-            }
+            $publicKey = $parts[0 + $offset];
+            
+            $peers[$publicKey] = [
+                'endpoint'   => $parts[2 + $offset],
+                'allowed_ips'=> $parts[3 + $offset],
+                'last_handshake' => (int)$parts[4 + $offset],
+                'bytes_sent' => (float)$parts[5 + $offset], // rx = client sent
+                'bytes_received' => (float)$parts[6 + $offset], // tx = client received
+            ];
         }
-
         return $peers;
     }
 
@@ -224,10 +257,15 @@ class ServerMonitoring
         WHERE id = :id
     ");
 
-    // Clean endpoint IP (strip port)
-    $externalIp = $stats['endpoint'];
-    if (strpos($externalIp, ':') !== false) {
-        $externalIp = explode(':', $externalIp)[0];
+    // Clean endpoint IP (strip port, handle IPv6)
+    $endpoint = $stats['endpoint'] ?? '(none)';
+    $externalIp = $endpoint;
+    if ($endpoint !== '(none)' && !empty($endpoint)) {
+        if (strpos($endpoint, ']:') !== false) { // IPv6 [addr]:port
+            $externalIp = substr($endpoint, 1, strpos($endpoint, ']:') - 1);
+        } elseif (strpos($endpoint, ':') !== false) { // IPv4 addr:port
+            $externalIp = explode(':', $endpoint)[0];
+        }
     }
 
     $stmt->execute([

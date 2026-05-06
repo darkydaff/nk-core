@@ -4,3 +4,6 @@ scratch/
 vendor/
 *.log
 .DS_Store
+public/css/output.css
+node_modules/
+.antigravity/
