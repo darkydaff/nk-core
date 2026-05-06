@@ -196,18 +196,7 @@
 
 {% block scripts %}
 	<script>
-		document.addEventListener('DOMContentLoaded', function () {
-const searchInput = document.getElementById('clientSearch');
-const resultsContainer = document.getElementById('searchResults');
-const statusFilter = document.getElementById('statusFilter');
-const trafficFilter = document.getElementById('trafficFilter');
-const sortFilter = document.getElementById('sortFilter');
-const batchActionBar = document.getElementById('batchActionBar');
-const selectedCountText = document.getElementById('selectedCountText');
-
-let searchTimeout = null;
-
-// Multi-language labels from PHP/Twig
+		// Multi-language labels from PHP/Twig
 const labels = {
     clientServer: "{{ t('clients.list', [], 'Client') }}/   {{ t('servers.list', [], 'Server') }}",
     statusIp: "{{ t('common.status', [], 'Status') }}/ IP",
@@ -231,6 +220,17 @@ const labels = {
     lastSeenLabel: "{{ t('common.last_seen') }}",
     deleting: "{{ t('status.deleting')|default('Deleting...') }}"
 };
+
+document.addEventListener('DOMContentLoaded', function () {
+const searchInput = document.getElementById('clientSearch');
+const resultsContainer = document.getElementById('searchResults');
+const statusFilter = document.getElementById('statusFilter');
+const trafficFilter = document.getElementById('trafficFilter');
+const sortFilter = document.getElementById('sortFilter');
+const batchActionBar = document.getElementById('batchActionBar');
+const selectedCountText = document.getElementById('selectedCountText');
+
+let searchTimeout = null;
 
 function performSearch(isAutoRefresh = false) {
     const query = searchInput.value.trim();

@@ -361,17 +361,6 @@
 			handleAjaxAction(`/servers/${serverId}/sync-stats`);
 		}
 
-document.addEventListener('DOMContentLoaded', function () {
-const searchInput = document.getElementById('clientSearch');
-const resultsContainer = document.getElementById('searchResults');
-const statusFilter = document.getElementById('statusFilter');
-const trafficFilter = document.getElementById('trafficFilter');
-const sortFilter = document.getElementById('sortFilter');
-const batchActionBar = document.getElementById('batchActionBar');
-const selectedCountText = document.getElementById('selectedCountText');
-
-let searchTimeout = null;
-
 // Multi-language labels from PHP/Twig
 const labels = {
     clientServer: "{{ t('clients.list', [], 'Client') }}",
@@ -400,6 +389,17 @@ const labels = {
     logEntries: "{{ t('servers.log_entries') }}",
     logsFailed: "{{ t('servers.logs_failed') }}"
 };
+
+document.addEventListener('DOMContentLoaded', function () {
+const searchInput = document.getElementById('clientSearch');
+const resultsContainer = document.getElementById('searchResults');
+const statusFilter = document.getElementById('statusFilter');
+const trafficFilter = document.getElementById('trafficFilter');
+const sortFilter = document.getElementById('sortFilter');
+const batchActionBar = document.getElementById('batchActionBar');
+const selectedCountText = document.getElementById('selectedCountText');
+
+let searchTimeout = null;
 
 let transitionPoll = null;
 
