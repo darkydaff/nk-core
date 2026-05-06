@@ -57,16 +57,15 @@ class VpnServer
     private function buildSshOptions(): array
     {
         $opts = [
-            '-o UserKnownHostsFile=/dev/null',
+            '-o ConnectTimeout=15',
+            '-o ServerAliveInterval=5',
+            '-o ServerAliveCountMax=3',
             '-o StrictHostKeyChecking=no',
-            '-o ServerAliveInterval=30',
-            '-o ServerAliveCountMax=20',
-            '-o LogLevel=ERROR',
-            '-q',
-            '-o AddressFamily=inet',
-            '-o Compression=no',
-            '-o Ciphers=aes128-ctr,aes128-gcm@openssh.com,chacha20-poly1305@openssh.com',
-            sprintf('-p %d', $this->data['port']),
+            '-o UserKnownHostsFile=/dev/null',
+            '-o Ciphers=aes128-ctr,aes128-gcm@openssh.com,chacha20-poly1305@openssh.com,chacha20-poly1305@openssh.com',
+            '-o MACs=hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,umac-128-etm@openssh.com',
+            '-o HostKeyAlgorithms=ssh-ed25519-cert-v01@openssh.com,ssh-ed25519,ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp256,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,rsa-sha2-512,rsa-sha2-256',
+            '-o KexAlgorithms=curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group-exchange-sha256,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512,diffie-hellman-group14-sha256'
         ];
 
         return $opts;
@@ -78,25 +77,40 @@ class VpnServer
      */
     private function buildSshAuth(): array
     {
-        // Prefer SSH key if available
+        $prefix = '';
+        $extra = ['-o LogLevel=ERROR'];
+        $keyPath = null;
+
+        // 1. Prepare SSH Key if available
         if (!empty($this->data['ssh_private_key'])) {
             $keyPath = tempnam(sys_get_temp_dir(), 'nk_ssh_');
             file_put_contents($keyPath, $this->data['ssh_private_key']);
             chmod($keyPath, 0600);
-            // Key file will be cleaned up after command; caller must handle.
-            return ['', ['-i ' . escapeshellarg($keyPath), '-o PubkeyAuthentication=yes'], $keyPath];
+            $extra[] = '-i ' . escapeshellarg($keyPath);
+            $extra[] = '-o PubkeyAuthentication=yes';
+        } else {
+            $extra[] = '-o PubkeyAuthentication=no';
         }
 
-        // Fallback to password via sshpass
-        $prefix = sprintf(
-            "SSHPASS='%s' sshpass -e",
-            str_replace("'", "'\\''", $this->data['password'])
-        );
-        $extra = [
-            '-o PreferredAuthentications=password',
-            '-o PubkeyAuthentication=no',
-        ];
-        return [$prefix, $extra, null];
+        // 2. Prepare Password (sshpass) if available
+        if (!empty($this->data['password'])) {
+            $prefix = sprintf(
+                "SSHPASS='%s' sshpass -e",
+                str_replace("'", "'\\''", $this->data['password'])
+            );
+            $extra[] = '-o BatchMode=no';
+            
+            if (!empty($this->data['ssh_private_key'])) {
+                $extra[] = '-o PreferredAuthentications=publickey,password';
+            } else {
+                $extra[] = '-o PreferredAuthentications=password';
+            }
+        } else {
+            $extra[] = '-o BatchMode=yes';
+            $extra[] = '-o PreferredAuthentications=publickey';
+        }
+
+        return [$prefix, $extra, $keyPath];
     }
 
     /**
@@ -106,7 +120,29 @@ class VpnServer
     private function ensureMux(): void
     {
         if ($this->muxSocket && file_exists($this->muxSocket)) {
-            return; // Already open
+            // Check if the master is actually alive and responsive
+            $checkCmd = sprintf(
+                'ssh -o ControlPath=%s -O check dummy 2>&1',
+                escapeshellarg($this->muxSocket)
+            );
+            $checkOut = shell_exec($checkCmd);
+            if (stripos((string)$checkOut, 'Master running') !== false) {
+                return; // Already open and alive
+            }
+            
+            // If we get here, the socket exists but the master is dead or unresponsive
+            Logger::warning("Stale SSH Mux socket found, cleaning up", ['socket' => $this->muxSocket]);
+            
+            // Try to kill the master process officially
+            $killCmd = sprintf(
+                'ssh -o ControlPath=%s -O exit dummy 2>&1',
+                escapeshellarg($this->muxSocket)
+            );
+            shell_exec($killCmd);
+            
+            @unlink($this->muxSocket);
+            $this->muxSocket = null;
+            $this->muxOwner = false;
         }
 
         $muxDir = '/tmp/ssh_mux';
@@ -133,17 +169,23 @@ class VpnServer
             escapeshellarg($this->data['host'])
         ));
 
-        shell_exec($cmd . ' 2>&1');
-
+        $muxOut = shell_exec($cmd . ' 2>&1');
+        
         // Clean up temp key file
         if ($keyFile && file_exists($keyFile)) {
             unlink($keyFile);
         }
-
+        
         // Give the master a moment to establish
-        usleep(300000); // 300ms
+        usleep(500000); // 500ms
 
         if (!file_exists($this->muxSocket)) {
+            if ($muxOut && trim($muxOut)) {
+                Logger::warning("SSH Mux establishment failed", [
+                    'host' => $this->data['host'],
+                    'output' => trim($muxOut)
+                ]);
+            }
             $this->muxSocket = null;
             // Don't throw — fall back to per-command connections
         } else {
@@ -180,10 +222,11 @@ class VpnServer
         $pdo = DB::conn();
         $stmt = $pdo->prepare('SELECT * FROM vpn_servers WHERE id = ? AND deleted_at IS NULL');
         $stmt->execute([$this->serverId]);
-        $this->data = $stmt->fetch();
-        if (!$this->data) {
+        $data = $stmt->fetch();
+        if (!$data) {
             throw new Exception('Server not found or has been deleted');
         }
+        $this->data = $data;
 
         // Map status to Enum
         $this->data['status'] = ServerStatus::tryFrom((string)($this->data['status'] ?? '')) ?? ServerStatus::ERROR;
@@ -258,6 +301,9 @@ class VpnServer
                 throw new Exception('SSH connection failed');
             }
 
+            // Prepare system (sudo, curl, etc)
+            $this->prepareSystem();
+
             // Install Docker if needed
             $this->installDocker();
 
@@ -265,7 +311,7 @@ class VpnServer
             $this->installKernelModule();
 
             // Create directories
-            $this->executeCommand('mkdir -p /opt/amnezia/nk-awg-v2', true);
+            $this->executeCommand('mkdir -p /opt/amnezia/nk-awg-v2', true, true);
 
             // Use existing VPN port if available, otherwise find a free one
             $vpnPort = (int) ($this->data['vpn_port'] ?? 0);
@@ -331,16 +377,23 @@ class VpnServer
             // Update status to error
             $errorMsg = mb_convert_encoding($e->getMessage(), 'UTF-8', 'UTF-8');
             $errorMsg = preg_replace('/[^\x20-\x7E\n]/', '', $errorMsg);
+            
+            // Clean up potentially long output from exceptions to keep DB column clean
+            if (strlen($errorMsg) > 2000) {
+                $errorMsg = substr($errorMsg, 0, 1000) . "..." . substr($errorMsg, -500);
+            }
+
             $pdo->prepare('UPDATE vpn_servers SET status = ?, error_message = ? WHERE id = ?')
-                ->execute([ServerStatus::ERROR->value, substr($errorMsg, 0, 1000), $this->serverId]);
+                ->execute([ServerStatus::ERROR->value, $errorMsg, $this->serverId]);
             $this->data['status'] = ServerStatus::ERROR;
+            $this->data['error_message'] = $errorMsg;
 
             throw $e;
         }
     }
 
     /**
-     * Test SSH connection to server
+     * Test SSH connection to server. Throws exception with details on failure.
      */
     private function testConnection(): bool
     {
@@ -351,17 +404,18 @@ class VpnServer
                 return true;
             }
         } catch (Exception $e) {
-            // Fall through to legacy test
+            // If ensureMux throws, use that error
+            throw new Exception("SSH Connection failed: " . $e->getMessage());
         }
 
-        // Fallback: simple connectivity test
+        // Fallback: simple connectivity test if Mux didn't work but didn't throw
         [$authPrefix, $authOpts, $keyFile] = $this->buildSshAuth();
         $sshOpts = array_merge($this->buildSshOptions(), $authOpts, [
             '-o ConnectTimeout=10',
         ]);
 
         $testCommand = sprintf(
-            "%s ssh %s %s@%s 'echo test' 2>/dev/null",
+            "%s ssh %s %s@%s 'echo test' 2>&1",
             $authPrefix,
             implode(' ', $sshOpts),
             escapeshellarg($this->data['username']),
@@ -374,7 +428,12 @@ class VpnServer
             unlink($keyFile);
         }
 
-        return trim($result) === 'test';
+        $out = trim((string)$result);
+        if ($out !== 'test') {
+            throw new Exception("SSH test failed. Output: " . substr($out, 0, 200));
+        }
+
+        return true;
     }
 
     /**
@@ -382,15 +441,23 @@ class VpnServer
      * Uses SSH multiplexing when available for near-zero latency.
      * Throws an exception if the command exits non-zero.
      */
-    public function executeCommand(string $command, bool $sudo = false, bool $checkExit = false): string
+    public function executeCommand(string $command, bool $sudo = false, bool $checkExit = false, bool $silent = false): string
     {
-        if ($sudo && strtolower($this->data['username']) !== 'root') {
+        if ($sudo && strtolower($this->data['username'] ?? '') !== 'root') {
             $command = sprintf(
                 "echo %s | sudo -S sh -c %s",
-                escapeshellarg($this->data['password']),
+                escapeshellarg($this->data['password'] ?? ''),
                 escapeshellarg($command)
             );
         }
+
+        // Create a scrubbed version of the command for logging
+        $loggedCommand = $command;
+        if (isset($this->data['password'])) {
+            $loggedCommand = str_replace($this->data['password'], '********', $loggedCommand);
+        }
+        // Scrub common sensitive patterns (private keys, etc)
+        $loggedCommand = preg_replace('/echo [\'"].*[\'"] \| base64 -d/', 'echo [REDACTED_BASE64] | base64 -d', $loggedCommand);
 
         // Capture both stdout and exit code
         $wrappedCommand = $command . '; echo "__EXIT_CODE__:$?"';
@@ -400,17 +467,15 @@ class VpnServer
         $this->ensureMux();
 
         if ($this->muxSocket && file_exists($this->muxSocket)) {
-            // Use the existing master connection — no new SSH handshake
             $sshCommand = sprintf(
                 'ssh -o ControlPath=%s %s %s@%s %s 2>&1',
                 escapeshellarg($this->muxSocket),
                 implode(' ', $this->buildSshOptions()),
-                escapeshellarg($this->data['username']),
-                escapeshellarg($this->data['host']),
-                $escapedCommand
+                escapeshellarg($this->data['username'] ?? 'root'),
+                escapeshellarg($this->data['host'] ?? ''),
+                "timeout 60s sh -c " . escapeshellarg($escapedCommand)
             );
         } else {
-            // Fallback: standalone connection (no mux available)
             [$authPrefix, $authOpts, $keyFile] = $this->buildSshAuth();
             $sshOpts = array_merge($this->buildSshOptions(), $authOpts);
 
@@ -418,40 +483,39 @@ class VpnServer
                 '%s ssh %s %s@%s %s 2>&1',
                 $authPrefix,
                 implode(' ', $sshOpts),
-                escapeshellarg($this->data['username']),
-                escapeshellarg($this->data['host']),
-                $escapedCommand
+                escapeshellarg($this->data['username'] ?? 'root'),
+                escapeshellarg($this->data['host'] ?? ''),
+                "timeout 60s sh -c " . escapeshellarg($escapedCommand)
             );
         }
 
-        if (class_exists('Logger')) {
+        if (!$silent && class_exists('Logger')) {
             Logger::channel('ssh')->info('Executing command', [
                 'server_id' => $this->serverId ?? null,
                 'host' => $this->data['host'] ?? null,
-                'command' => $command
+                'command' => $loggedCommand
             ]);
         }
 
         $rawOutput = shell_exec($sshCommand) ?? '';
 
-        // Clean up temp key file if used in fallback
         if (isset($keyFile) && $keyFile && file_exists($keyFile)) {
             unlink($keyFile);
         }
 
-        // Split exit code marker
         if (preg_match('/^(.*?)__EXIT_CODE__:(\d+)\s*$/s', $rawOutput, $m)) {
             $output = $m[1];
             $exitCode = (int) $m[2];
         } else {
             $output = $rawOutput;
-            $exitCode = 0;
+            $exitCode = 255; 
         }
 
-        if (class_exists('Logger')) {
+        if (!$silent && class_exists('Logger')) {
             Logger::channel('ssh')->info('Command result', [
+                'server_id' => $this->serverId ?? null,
                 'exit_code' => $exitCode,
-                'output' => substr(trim($output), 0, 1000) // limit output size in logs
+                'output' => substr(trim($output), 0, 1000)
             ]);
         }
 
@@ -460,6 +524,33 @@ class VpnServer
         }
 
         return $output;
+    }
+
+    /**
+     * Prepare system with basic dependencies (sudo, curl, etc)
+     */
+    private function prepareSystem(): void
+    {
+        // Check for apt-get (Debian/Ubuntu)
+        $hasApt = $this->executeCommand('which apt-get');
+        if (empty(trim($hasApt))) {
+            return;
+        }
+
+        // Fix potential dpkg interruption
+        $this->executeCommand('dpkg --configure -a', true);
+
+        // Install sudo if missing (only if we are root, otherwise we can't install it)
+        $hasSudo = $this->executeCommand('which sudo');
+        if (empty(trim($hasSudo)) && strtolower($this->data['username'] ?? '') === 'root') {
+            $this->executeCommand('apt-get update && apt-get install -y sudo', false);
+        }
+
+        // Install curl if missing (needed for Docker installation)
+        $hasCurl = $this->executeCommand('which curl');
+        if (empty(trim($hasCurl))) {
+            $this->executeCommand('apt-get update && apt-get install -y curl ca-certificates', true);
+        }
     }
 
     /**
@@ -479,8 +570,6 @@ class VpnServer
             return; // Not a debian-based system, skip kernel module (will fallback to userspace)
         }
 
-        // Install common dependencies
-        $this->executeCommand('apt-get update', true);
         $this->executeCommand('apt-get install -y gnupg2 ca-certificates dkms', true);
 
         // Handle XanMod headers
@@ -526,8 +615,8 @@ class VpnServer
             return; // Docker already installed
         }
 
-        $this->executeCommand('curl -fsSL https://get.docker.com | sh', true);
-        $this->executeCommand('systemctl enable --now docker', true);
+        $this->executeCommand('curl -fsSL https://get.docker.com | sh', true, true);
+        $this->executeCommand('systemctl enable --now docker', true, true);
     }
 
     /**
@@ -598,7 +687,7 @@ ENTRYPOINT [ "dumb-init", "/opt/amnezia/start.sh" ]
 DOCKERFILE;
 
         $base64 = base64_encode(trim($dockerfile));
-        $this->executeCommand("echo \"{$base64}\" | base64 -d > /opt/amnezia/nk-awg-v2/Dockerfile", true);
+        $this->executeCommand("echo \"{$base64}\" | base64 -d > /opt/amnezia/nk-awg-v2/Dockerfile", true, true);
     }
 
     /**
@@ -666,7 +755,7 @@ tail -f /dev/null
 BASH;
 
         $base64 = base64_encode(trim($script));
-        $this->executeCommand("echo '{$base64}' | base64 -d > /opt/amnezia/nk-awg-v2/start.sh && chmod +x /opt/amnezia/nk-awg-v2/start.sh", true);
+        $this->executeCommand("echo '{$base64}' | base64 -d > /opt/amnezia/nk-awg-v2/start.sh && chmod +x /opt/amnezia/nk-awg-v2/start.sh", true, true);
     }
 
     /**
@@ -769,7 +858,7 @@ BASH;
         }
 
         // Create directory inside container
-        $this->executeCommand("docker exec -i {$containerName} mkdir -p /opt/amnezia/awg", true);
+        $this->executeCommand("docker exec -i {$containerName} mkdir -p /opt/amnezia/awg", true, true);
 
         if ($privKey && $pubKey && $psk) {
             // Restore existing keys to container
@@ -781,7 +870,7 @@ BASH;
                 escapeshellarg(base64_encode($pubKey)),
                 escapeshellarg(base64_encode($psk))
             );
-            $this->executeCommand("docker exec -i {$containerName} sh -c " . escapeshellarg($restoreCmd), true);
+            $this->executeCommand("docker exec -i {$containerName} sh -c " . escapeshellarg($restoreCmd), true, true);
         } else {
             // Generate NEW keys
             $this->executeCommand("docker exec -i {$containerName} sh -c 'cd /opt/amnezia/awg && umask 077 && /usr/local/bin/awg genkey | tee server_private.key | /usr/local/bin/awg pubkey > wireguard_server_public_key.key'", true, true);
@@ -843,11 +932,11 @@ BASH;
         $wgConfig .= "\n";
 
         $base64 = base64_encode($wgConfig);
-        $this->executeCommand("echo \"{$base64}\" | docker exec -i {$containerName} sh -c 'base64 -d > /opt/amnezia/awg/wg0.conf'", true);
-        $this->executeCommand("docker exec -i {$containerName} chmod 600 /opt/amnezia/awg/wg0.conf", true);
+        $this->executeCommand("echo \"{$base64}\" | docker exec -i {$containerName} sh -c 'base64 -d > /opt/amnezia/awg/wg0.conf'", true, true);
+        $this->executeCommand("docker exec -i {$containerName} chmod 600 /opt/amnezia/awg/wg0.conf", true, true);
 
         // Create clientsTable
-        $this->executeCommand("docker exec -i {$containerName} sh -c 'echo \"[]\" > /opt/amnezia/awg/clientsTable'", true);
+        $this->executeCommand("docker exec -i {$containerName} sh -c 'echo \"[]\" > /opt/amnezia/awg/clientsTable'", true, true);
 
         // The start.sh script in the container is already looping and waiting for wg0.conf.
         // Wait for wg0 and fail deployment if interface never appears.
@@ -1023,7 +1112,7 @@ BASH;
         $port = $this->data['port'] ?? 22;
         
         $latency = null;
-        $newStatus = 'stopped';
+        $newStatus = ServerStatus::STOPPED; // Must be enum from the start for === comparisons and ->value access
         
         // 1. Try standard system ping (ICMP)
         $pingCmd = "ping -c 1 -W 2 " . escapeshellarg($host) . " 2>&1";
@@ -1061,7 +1150,7 @@ BASH;
         
         // Don't override 'deploying' or 'error' status automatically unless it's now 'active'
         $currentStatus = $this->data['status'];
-        if ($newStatus === ServerStatus::ACTIVE || ($currentStatus !== ServerStatus::DEPLOYING && $currentStatus !== ServerStatus::ERROR)) {
+        if ($newStatus === ServerStatus::ACTIVE || ($currentStatus !== ServerStatus::DEPLOYING->value && $currentStatus !== ServerStatus::ERROR->value)) {
             $pdo = DB::conn();
             $stmt = $pdo->prepare('UPDATE vpn_servers SET status = ?, last_ping_ms = ?, last_check_at = NOW() WHERE id = ?');
             $stmt->execute([$newStatus->value, $latency, $this->serverId]);
@@ -1069,7 +1158,7 @@ BASH;
             $this->data['last_ping_ms'] = $latency;
         }
         
-        return $this->data['status'] === ServerStatus::ACTIVE;
+        return ($this->data['status'] ?? '') === ServerStatus::ACTIVE->value;
     }
 
     /**
@@ -1113,6 +1202,33 @@ BASH;
      */
     public function delete(): bool
     {
+        if (!$this->serverId) return false;
+
+        $pdo = DB::conn();
+        
+        // 1. Mark as deleting in DB
+        $stmt = $pdo->prepare('UPDATE vpn_servers SET status = ? WHERE id = ?');
+        $stmt->execute([ServerStatus::DELETING->value, $this->serverId]);
+
+        // 2. Queue for remote cleanup
+        require_once __DIR__ . '/Queue.php';
+        Queue::push('deployments', [
+            'type' => 'delete_server',
+            'server_id' => $this->serverId
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Perform actual remote resource cleanup (called by worker)
+     */
+    public function cleanupRemoteResources(): void
+    {
+        if (!$this->data) return;
+        
+        $pdo = DB::conn();
+
         // Stop and remove container
         try {
             $containerName = $this->data['container_name'] ?? 'nk-awg-v2';
@@ -1126,22 +1242,21 @@ BASH;
                 $this->executeCommand("iptables -D INPUT -p udp --dport {$port} -j ACCEPT 2>/dev/null || true", true);
             }
         } catch (Exception $e) {
-            // Ignore errors during cleanup
+            // Ignore errors during cleanup but log them
+            Logger::error("Cleanup failed for server {$this->serverId}: " . $e->getMessage());
         }
 
         // Mark as deleted in database instead of deleting row
-        $pdo = DB::conn();
-        
         // Also soft-delete all clients of this server to ensure consistency
         $stmtClients = $pdo->prepare('UPDATE vpn_clients SET deleted_at = NOW(), status = ? WHERE server_id = ? AND deleted_at IS NULL');
-        $stmtClients->execute([ClientStatus::DELETED->value, $this->serverId]);
+        $stmtClients->execute([ClientStatus::DISABLED->value, $this->serverId]);
 
         // Also soft-delete all proxies of this server
         $stmtProxies = $pdo->prepare('UPDATE http_proxies SET deleted_at = NOW(), status = ? WHERE server_id = ? AND deleted_at IS NULL');
         $stmtProxies->execute(['deleted', $this->serverId]);
 
-        $stmt = $pdo->prepare('UPDATE vpn_servers SET deleted_at = NOW(), status = ? WHERE id = ?');
-        return $stmt->execute([ServerStatus::DELETED->value, $this->serverId]);
+        $stmtServer = $pdo->prepare('UPDATE vpn_servers SET deleted_at = NOW(), status = ? WHERE id = ?');
+        $stmtServer->execute([ServerStatus::STOPPED->value, $this->serverId]);
     }
 
     /**
@@ -1154,6 +1269,7 @@ BASH;
         if ($data['status'] instanceof ServerStatus) {
             $data['status'] = $data['status']->value;
         }
+        $data['container_name'] = $data['container_name'] ?? 'nk-awg-v2';
         return $data;
     }
 
@@ -1186,7 +1302,7 @@ BASH;
                 SELECT id, name, client_ip, public_key, private_key, preshared_key, 
                        config, status, expires_at, created_at
                 FROM vpn_clients 
-                WHERE server_id = ?
+                WHERE server_id = ? AND deleted_at IS NULL
             ');
             $stmt->execute([$this->serverId]);
             $clients = $stmt->fetchAll();
@@ -1356,7 +1472,7 @@ BASH;
                     $clientData['private_key'],
                     $clientData['preshared_key'],
                     $clientData['config'],
-                    'disabled', // Restore as disabled for safety
+                    ServerStatus::ACTIVE->value, // Restore as active since we're adding it to the server
                     $clientData['expires_at']
                 ]);
 
@@ -1504,7 +1620,7 @@ BASH;
         // 4. Push and Apply
         $containerName = $this->data['container_name'];
         $base64 = base64_encode($wgConfig);
-        $this->executeCommand("echo \"{$base64}\" | docker exec -i {$containerName} sh -c 'base64 -d > /opt/amnezia/awg/wg0.conf'", true);
+        $this->executeCommand("echo \"{$base64}\" | docker exec -i {$containerName} sh -c 'base64 -d > /opt/amnezia/awg/wg0.conf && chmod 600 /opt/amnezia/awg/wg0.conf'", true);
         $this->executeCommand("echo \"{$clientsTableBase64}\" | docker exec -i {$containerName} sh -c 'base64 -d > /opt/amnezia/awg/clientsTable'", true);
         $this->executeCommand("docker exec -i {$containerName} bash -c '/usr/local/bin/awg syncconf wg0 <(/usr/local/bin/awg-quick strip /opt/amnezia/awg/wg0.conf)'", true);
     }

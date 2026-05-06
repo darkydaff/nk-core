@@ -69,11 +69,40 @@ function deploy() {
     .then(d => {
         if (d.success) {
             log.innerHTML += '<div class="text-primary font-bold mt-4 p-2 bg-primary/10 border border-primary/30 rounded">{{ t('message.deployed')|e('js') }}</div>';
-            log.innerHTML += '<div class="text-secondary mt-2">{{ t('servers.vpn_port')|e('js') }}: ' + d.vpn_port + '</div>';
-            btnText.textContent = '{{ t('servers.redirecting')|e('js') }}...';
-            btnSpinner.classList.add('hidden');
+            log.innerHTML += '<div class="text-secondary mt-2">{{ t('servers.deploy_queued')|e('js')|default('Deployment queued — waiting for worker…') }}</div>';
+            btnText.textContent = '{{ t('servers.deploying')|e('js') }}…';
+            btnSpinner.classList.remove('hidden');
             log.scrollTop = log.scrollHeight;
-            setTimeout(() => window.location.href = '/servers/{{ server.id }}', 2500);
+            // Smart polling: redirect as soon as the worker finishes
+            let pollAttempts = 0;
+            const maxPollAttempts = 240; // 240 × 2.5s = 10 minutes max
+            const pollTimer = setInterval(() => {
+                if (++pollAttempts > maxPollAttempts) {
+                    clearInterval(pollTimer);
+                    log.innerHTML += '<div class="text-yellow-400 mt-2">Polling timed out. <a href="/servers/{{ server.id }}" class="underline">Click here</a> to check status.</div>';
+                    log.scrollTop = log.scrollHeight;
+                    btn.disabled = false;
+                    btnText.textContent = '{{ t('servers.retry_deploy')|e('js') }}';
+                    btnSpinner.classList.add('hidden');
+                    if (btnIcon) btnIcon.classList.remove('hidden');
+                    return;
+                }
+                // GET request — no CSRF token required
+                fetch('/servers/{{ server.id }}/status', {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status && data.status !== 'deploying') {
+                        clearInterval(pollTimer);
+                        log.innerHTML += `<div class="text-green-400 font-bold mt-2">Status: ${data.status} — redirecting…</div>`;
+                        log.scrollTop = log.scrollHeight;
+                        localStorage.removeItem('globalScrollPos');
+                        setTimeout(() => window.location.href = '/servers/{{ server.id }}', 800);
+                    }
+                })
+                .catch(() => { /* keep polling on transient network error */ });
+            }, 2500);
         } else {
             log.innerHTML += '<div class="text-red-400 font-bold mt-4 p-2 bg-red-500/10 border border-red-500/30 rounded">{{ t('message.error')|e('js') }}: ' + (d.error || '{{ t('message.unknown_error')|e('js') }}') + '</div>';
             btn.disabled = false;

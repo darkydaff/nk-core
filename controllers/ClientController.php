@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 
 class ClientController {
-    private function respond($success, $message, $error = null, $redirect = null) {
+    private function respond($success, $message, $data = null, $redirect = null) {
         $isAjax = (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') || 
                   (isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false);
 
@@ -12,7 +12,8 @@ class ClientController {
             echo json_encode([
                 'success' => $success,
                 'message' => $message,
-                'error' => $error,
+                'data' => $success ? $data : null,
+                'error' => !$success ? $data : null,
                 'redirect' => $redirect
             ]);
             exit;
@@ -26,7 +27,7 @@ class ClientController {
         if ($success) {
             $_SESSION['success_message'] = $message;
         } else {
-            $_SESSION['error_message'] = $error ?: $message;
+            $_SESSION['error_message'] = (is_string($data) ? $data : $message);
         }
         
         $back = $_SERVER['HTTP_REFERER'] ?? '/servers';
@@ -154,6 +155,29 @@ class ClientController {
             return $this->respond(true, "Client updated successfully");
         } catch (Exception $e) {
             return $this->respond(false, "Update failed", $e->getMessage());
+        }
+    }
+
+    public function status($params) {
+        requireAuth();
+        $clientId = (int)$params['id'];
+        try {
+            $client = new VpnClient($clientId);
+            $clientData = $client->getData();
+            
+            return $this->respond(true, "Status fetched", [
+                'db_status' => $clientData['status'],
+                'connection_status' => $clientData['connection_status'] ?? 'offline',
+                'is_active' => $clientData['status'] === ClientStatus::ACTIVE->value,
+                'traffic' => [
+                    'sent' => number_format($clientData['bytes_sent'] / 1024 / 1024, 2),
+                    'received' => number_format($clientData['bytes_received'] / 1024 / 1024, 2),
+                    'speed_up' => $clientData['speed_up'] ?? '0 B/s',
+                    'speed_down' => $clientData['speed_down'] ?? '0 B/s'
+                ]
+            ]);
+        } catch (Exception $e) {
+            return $this->respond(false, $e->getMessage());
         }
     }
 

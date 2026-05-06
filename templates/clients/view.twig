@@ -24,7 +24,11 @@
                 <div class="flex items-center px-2 py-1 rounded {% if client.status == 'disabled' %}bg-orange-500/10 border-orange-500/20 text-orange-500{% elseif client.connection_status == 'online' %}bg-sky-500/10 border-sky-500/20 text-sky-500{% elseif client.connection_status == 'never' %}bg-muted/10 border-muted/20 text-muted{% else %}bg-red-500/10 border-red-500/20 text-red-500{% endif %} border h-5">
                     <span class="w-1 h-1 rounded-full {% if client.status == 'disabled' %}bg-orange-500{% elseif client.connection_status == 'online' %}bg-sky-500 animate-pulse{% elseif client.connection_status == 'never' %}bg-muted{% else %}bg-red-500{% endif %} mr-1.5"></span>
                     <span class="text-[9px] uppercase tracking-wider font-bold leading-none">
-                        {% if client.status == 'disabled' %}
+                        {% if client.status == 'provisioning' %}
+                            {{ t('status.provisioning')|default('PROVISIONING') }}
+                        {% elseif client.status == 'error' %}
+                            {{ t('status.error')|default('ERROR') }}
+                        {% elseif client.status == 'disabled' %}
                             {{ t('common.revoked')|default('REVOKED') }}
                         {% elseif client.connection_status == 'online' %}
                             {{ t('status.online') }}
@@ -54,14 +58,20 @@
                 <span class="text-xs font-medium text-muted uppercase tracking-wide">{{ t('common.uploaded') }}</span>
                 <i class="fas fa-arrow-up text-primary text-sm"></i>
             </div>
-            <div class="text-2xl font-bold text-primary font-mono">{{ (client.bytes_sent / 1024 / 1024)|number_format(2) }} <span class="text-xs text-muted">{{ t('common.mb') }}</span></div>
+            <div class="text-2xl font-bold text-primary font-mono"><span id="sent_val">{{ (client.bytes_sent / 1024 / 1024)|number_format(2) }}</span> <span class="text-xs text-muted">{{ t('common.mb') }}</span></div>
+            <div class="text-[10px] text-cyan-500 font-bold mt-1 flex items-center">
+                <i class="fas fa-arrow-up mr-1 opacity-70"></i><span id="speed_up_val">{{ client.speed_up|default('0 B/s') }}</span>
+            </div>
         </div>
         <div class="panel p-5">
             <div class="flex items-center justify-between mb-2">
                 <span class="text-xs font-medium text-muted uppercase tracking-wide">{{ t('common.downloaded') }}</span>
                 <i class="fas fa-arrow-down text-blue-400 text-sm"></i>
             </div>
-            <div class="text-2xl font-bold text-primary font-mono">{{ (client.bytes_received / 1024 / 1024)|number_format(2) }} <span class="text-xs text-muted">{{ t('common.mb') }}</span></div>
+            <div class="text-2xl font-bold text-primary font-mono"><span id="received_val">{{ (client.bytes_received / 1024 / 1024)|number_format(2) }}</span> <span class="text-xs text-muted">{{ t('common.mb') }}</span></div>
+            <div class="text-[10px] text-blue-400 font-bold mt-1 flex items-center">
+                <i class="fas fa-arrow-down mr-1 opacity-70"></i><span id="speed_down_val">{{ client.speed_down|default('0 B/s') }}</span>
+            </div>
         </div>
         <div class="panel p-5">
             <div class="flex items-center justify-between mb-2">
@@ -109,12 +119,14 @@
         </div>
     </div>
     {% endif %}
-        <div class="panel p-5">
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 panel p-5">
             <h3 class="text-base font-semibold mb-4 text-primary flex items-center">
                 <i class="fas fa-edit text-primary mr-2"></i>{{ t('clients.settings') }}
             </h3>
             
-            <form onsubmit="handleAjaxForm(event, '/clients/{{ client.id }}/update')" class="mb-4">
+            <form onsubmit="handleAjaxForm(event, '/clients/{{ client.id }}/update')" class="mb-6">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <label class="block text-xs font-medium text-muted uppercase tracking-wide mb-2">{{ t('clients.name') }}</label>
                 <div class="flex gap-2">
@@ -127,6 +139,7 @@
 
             <div class="border-t border-default pt-4">
                 <label class="block text-xs font-medium text-muted uppercase tracking-wide mb-2">{{ t('clients.configuration') }}</label>
+                {% if client.status == 'active' %}
                 <div class="flex flex-wrap gap-2">
                     <a href="/clients/{{ client.id }}/download" class="btn-secondary px-4 py-2.5 text-sm flex-1 text-center">
                         <i class="fas fa-download mr-2"></i>{{ t('clients.download_config') }}
@@ -135,6 +148,12 @@
                         <i class="fas fa-copy mr-2"></i>{{ t('clients.copy_config') }}
                     </button>
                 </div>
+                {% else %}
+                <div class="bg-panel/50 p-4 rounded-lg border border-default/50 text-center">
+                    <i class="fas fa-circle-notch fa-spin text-primary mb-2"></i>
+                    <p class="text-xs text-muted">{{ t('clients.config_ready_soon')|default('Configuration will be available once provisioning is complete.') }}</p>
+                </div>
+                {% endif %}
             </div>
             <pre id="configData" class="hidden">{{ client.config }}</pre>
         </div>
@@ -164,19 +183,20 @@
 
 <script>
 function copyConfig() {
-    const config = document.getElementById('configData').textContent;
+    const text = document.getElementById('configData').innerText;
     const btn = document.getElementById('copyBtn');
     const originalHtml = btn.innerHTML;
-    
-    const doFeedback = () => {
-        btn.innerHTML = '<i class="fas fa-check mr-2"></i>{{ t('clients.copied')|e('js') }}';
-        setTimeout(() => btn.innerHTML = originalHtml, 2000);
-    };
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(config).then(doFeedback).catch(() => fallbackCopy(config, doFeedback));
+        navigator.clipboard.writeText(text).then(() => {
+            btn.innerHTML = '<i class="fas fa-check mr-2"></i>{{ t('common.copied')|e('js') }}';
+            setTimeout(() => btn.innerHTML = originalHtml, 2000);
+        });
     } else {
-        fallbackCopy(config, doFeedback);
+        fallbackCopy(text, () => {
+            btn.innerHTML = '<i class="fas fa-check mr-2"></i>{{ t('common.copied')|e('js') }}';
+            setTimeout(() => btn.innerHTML = originalHtml, 2000);
+        });
     }
 }
 
@@ -192,5 +212,61 @@ function fallbackCopy(text, callback) {
     document.body.removeChild(textArea);
 }
 
+// Live Status & Traffic Polling
+(function() {
+    const clientId = {{ client.id }};
+    const initialStatus = '{{ client.status }}';
+    
+    function checkStatus() {
+        fetch(window.location.pathname + '/status', {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success && data.data) {
+                const status = data.data.db_status;
+                
+                // Update Traffic & Speed Live
+                if (data.data.traffic) {
+                    const sentEl = document.getElementById('sent_val');
+                    const recvEl = document.getElementById('received_val');
+                    const upEl = document.getElementById('speed_up_val');
+                    const downEl = document.getElementById('speed_down_val');
+                    
+                    if (sentEl) sentEl.innerText = data.data.traffic.sent;
+                    if (recvEl) recvEl.innerText = data.data.traffic.received;
+                    if (upEl) upEl.innerText = data.data.traffic.speed_up;
+                    if (downEl) downEl.innerText = data.data.traffic.speed_down;
+                }
+
+                // If status changed from transition to terminal, reload once
+                const isTransition = (s) => ['provisioning', 'verifying', 'deleting'].includes(s);
+                if (isTransition(initialStatus) && !isTransition(status)) {
+                    window.location.reload();
+                    return;
+                }
+
+                // Continue polling: 5s for active, 2s for transitions
+                let nextPoll = (status === 'active') ? 5000 : 2000;
+                if (status !== 'error' && status !== 'disabled') {
+                    setTimeout(checkStatus, nextPoll);
+                }
+            }
+        })
+        .catch(err => {
+            console.error('Status poll failed:', err);
+            // Retry after 10s on network error
+            setTimeout(checkStatus, 10000);
+        });
+    }
+
+    // Start polling if not in a permanent error/disabled state
+    if (['active', 'provisioning', 'verifying', 'deleting'].includes(initialStatus)) {
+        setTimeout(checkStatus, initialStatus === 'active' ? 5000 : 1000);
+    }
+})();
 </script>
 {% endblock %}

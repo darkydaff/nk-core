@@ -13,6 +13,7 @@ class ServerController
             echo json_encode([
                 'success' => $success,
                 'message' => $message,
+                'data' => $success ? null : null,
                 'error' => $error,
                 'redirect' => $redirect
             ]);
@@ -392,51 +393,39 @@ class ServerController
     {
         requireAuth();
         $user = Auth::user();
-        if (isJsonRequest()) {
-            header('Content-Type: application/json');
-        }
-
-        unlockSession();
 
         try {
-            $servers = Auth::isAdmin()
-                ? VpnServer::listAll()
-                : VpnServer::listByUser($user['id']);
-
-            $count = 0;
-            foreach ($servers as $serverData) {
-                $server = new VpnServer((int) $serverData['id']);
-                $server->updatePingAndStatus();
-                // Also sync stats while we are at it
-                try {
-                    VpnClient::syncAllStatsForServer((int) $serverData['id']);
-                } catch (Exception $e) {
-                    // Log error but continue with other servers
-                    \Logger::error("Failed to sync stats for server {$serverData['id']}: " . $e->getMessage());
-                }
-
-                // Sync HTTP Proxy stats
-                try {
-                    $proxyServer = new ProxyServer((int) $serverData['id']);
-                    $proxyServer->updateTrafficStats();
-                } catch (Exception $e) {
-                    // It's possible the server doesn't have 3proxy yet or connection failed
-                    \Logger::error("Failed to sync proxy stats for server {$serverData['id']}: " . $e->getMessage());
-                }
-                $count++;
+            // Push to queue for async processing
+            require_once __DIR__ . '/../inc/Queue.php';
+            
+            // Optional: Cooldown check to prevent spamming
+            $lastSync = $_SESSION['last_sync_all'] ?? 0;
+            if (time() - $lastSync < 60) {
+                throw new Exception("Please wait 60 seconds between global syncs.");
             }
+            $_SESSION['last_sync_all'] = time();
+
+            Queue::push('deployments', [
+                'type' => 'sync_all_servers',
+                'requested_by' => $user['id']
+            ]);
 
             if (isJsonRequest() || (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest')) {
-                echo json_encode(['success' => true, 'count' => $count]);
-            } else {
-                return $this->respond(true, "Synced status for $count servers");
+                echo json_encode(['success' => true, 'message' => 'Synchronization started in background']);
+                exit;
             }
+
+            $_SESSION['flash_success'] = 'Synchronization started in background.';
+            header('Location: /servers');
+            exit;
+
         } catch (Exception $e) {
             if (isJsonRequest() || (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest')) {
                 http_response_code(500);
                 echo json_encode(['error' => $e->getMessage()]);
             } else {
-                return $this->respond(false, "Sync failed", $e->getMessage());
+                $_SESSION['flash_error'] = "Sync failed: " . $e->getMessage();
+                header('Location: /servers');
             }
         }
     }
@@ -556,6 +545,170 @@ class ServerController
         } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(['error' => $e->getMessage(), 'results' => []]);
+        }
+    }
+
+    /**
+     * GET /servers/{id}/status
+     * Ultra-fast single-column query: returns only {status} for smart polling.
+     */
+    public function getStatus($params)
+    {
+        requireAuth();
+        header('Content-Type: application/json');
+
+        $serverId = (int) $params['id'];
+
+        // Release session lock immediately — this endpoint is polled every 2.5s
+        // and must not block concurrent browser tabs waiting for the same lock.
+        $user = Auth::user();
+        unlockSession();
+
+        try {
+            $pdo  = DB::conn();
+
+            $stmt = $pdo->prepare("SELECT status, user_id FROM vpn_servers WHERE id = ? LIMIT 1");
+            $stmt->execute([$serverId]);
+            $row  = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$row) {
+                http_response_code(404);
+                echo json_encode(['error' => 'Server not found']);
+                return;
+            }
+
+            if ($row['user_id'] != $user['id'] && !Auth::isAdmin()) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Forbidden']);
+                return;
+            }
+
+            echo json_encode(['status' => $row['status']]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * GET /servers/{id}/logs
+     * Reads the latest rotated Monolog JSON log files (ssh + deployments) and
+     * returns only entries whose context contains server_id == $serverId.
+     * Sensitive fields (password, private_key) are stripped before output.
+     */
+    public function getLogs($params)
+    {
+        requireAuth();
+        header('Content-Type: application/json');
+
+        $serverId = (int) $params['id'];
+
+        // Release session lock immediately — log reading can be slow on large files.
+        $user = Auth::user();
+        unlockSession();
+
+        try {
+            $pdo  = DB::conn();
+
+            // Ownership check (only user_id needed, cheap query)
+            $stmt = $pdo->prepare("SELECT user_id FROM vpn_servers WHERE id = ? LIMIT 1");
+            $stmt->execute([$serverId]);
+            $row  = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$row) {
+                http_response_code(404);
+                echo json_encode(['error' => 'Server not found']);
+                return;
+            }
+
+            if ($row['user_id'] != $user['id'] && !Auth::isAdmin()) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Forbidden']);
+                return;
+            }
+
+            $logDir   = '/var/log/nk-panel';
+            $channels = ['deployments', 'ssh'];
+            $entries  = [];
+
+            // Sensitive context keys to scrub before sending to browser
+            $sensitiveKeys = ['password', 'passwd', 'private_key', 'secret', 'token'];
+
+            foreach ($channels as $channel) {
+                // Monolog RotatingFileHandler rotates as: {base}-YYYY-MM-DD.log
+                // e.g. ssh.log → ssh-2026-05-06.log (dash before date, same extension)
+                // The current active file keeps the plain name: ssh.log
+                $pattern = $logDir . '/' . preg_replace('/\.log$/', '', $channel . '.log') . '-*.log';
+                $files   = glob($pattern) ?: []; // glob() returns false on error; coerce to array
+
+                // The plain file is the current day's active write target — always include it
+                $plain = $logDir . '/' . $channel . '.log';
+                if (is_file($plain)) {
+                    $files[] = $plain;
+                }
+
+                if (empty($files)) {
+                    continue;
+                }
+
+                // Read all files for this channel (current + rotated) to find relevant entries
+                foreach ($files as $file) {
+                    if (!is_readable($file)) {
+                        continue;
+                    }
+
+                    $handle = fopen($file, 'r');
+                    if (!$handle) {
+                        continue;
+                    }
+
+                    while (($line = fgets($handle)) !== false) {
+                        $line = trim($line);
+                        if ($line === '') {
+                            continue;
+                        }
+
+                        $decoded = json_decode($line, true);
+                        if (!is_array($decoded)) {
+                            continue;
+                        }
+
+                        // Filter by server_id in context
+                        $ctx = $decoded['context'] ?? [];
+                        $ctxServerId = (int) ($ctx['server_id'] ?? -1);
+
+                        if ($ctxServerId !== $serverId) {
+                            continue;
+                        }
+
+                        // Scrub sensitive context fields
+                        foreach ($sensitiveKeys as $sk) {
+                            if (isset($ctx[$sk])) {
+                                $ctx[$sk] = '[REDACTED]';
+                            }
+                        }
+                        $decoded['context'] = $ctx;
+                        $decoded['channel_source'] = $channel;
+
+                        $entries[] = $decoded;
+                    }
+
+                    fclose($handle);
+                }
+            }
+
+            // Sort all entries by datetime ascending
+            usort($entries, fn($a, $b) => strcmp($a['datetime'] ?? '', $b['datetime'] ?? ''));
+
+            // Cap output to last 500 entries to avoid huge payloads
+            if (count($entries) > 500) {
+                $entries = array_slice($entries, -500);
+            }
+
+            echo json_encode(['logs' => $entries, 'server_id' => $serverId]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
         }
     }
 }

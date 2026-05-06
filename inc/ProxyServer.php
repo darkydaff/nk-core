@@ -9,190 +9,18 @@ class ProxyServer
 {
     private $serverId;
     private $data;
-    private ?string $muxSocket = null;
-    private bool $muxOwner = false;
+    private VpnServer $server;
 
     public function __construct(int $serverId)
     {
         $this->serverId = $serverId;
-        $this->load();
-    }
-
-    public function __destruct()
-    {
-        $this->closeMux();
-    }
-
-    public function closeMux(): void
-    {
-        if ($this->muxSocket && $this->muxOwner && file_exists($this->muxSocket)) {
-            $exitCmd = sprintf(
-                'ssh -o ControlPath=%s -O exit dummy 2>/dev/null',
-                escapeshellarg($this->muxSocket)
-            );
-            @shell_exec($exitCmd);
-            @unlink($this->muxSocket);
-            $this->muxSocket = null;
-            $this->muxOwner = false;
-        }
-    }
-
-    private function load(): void
-    {
-        $pdo = DB::conn();
-        $stmt = $pdo->prepare('SELECT * FROM vpn_servers WHERE id = ?');
-        $stmt->execute([$this->serverId]);
-        $this->data = $stmt->fetch();
-        if (!$this->data) {
-            throw new Exception('Server not found');
-        }
-    }
-
-    private function buildSshOptions(): array
-    {
-        return [
-            '-o UserKnownHostsFile=/dev/null',
-            '-o StrictHostKeyChecking=no',
-            '-o ServerAliveInterval=30',
-            '-o ServerAliveCountMax=20',
-            '-o LogLevel=ERROR',
-            '-q',
-            sprintf('-p %d', $this->data['port']),
-        ];
-    }
-
-    private function buildSshAuth(): array
-    {
-        if (!empty($this->data['ssh_private_key'])) {
-            $keyPath = tempnam(sys_get_temp_dir(), 'nk_ssh_');
-            file_put_contents($keyPath, $this->data['ssh_private_key']);
-            chmod($keyPath, 0600);
-            return ['', ['-i ' . escapeshellarg($keyPath), '-o PubkeyAuthentication=yes'], $keyPath];
-        }
-
-        $prefix = sprintf(
-            "SSHPASS='%s' sshpass -e",
-            str_replace("'", "'\\''", $this->data['password'])
-        );
-        $extra = [
-            '-o PreferredAuthentications=password',
-            '-o PubkeyAuthentication=no',
-        ];
-        return [$prefix, $extra, null];
-    }
-
-    private function ensureMux(): void
-    {
-        if ($this->muxSocket && file_exists($this->muxSocket)) {
-            return;
-        }
-
-        $muxDir = '/tmp/ssh_mux';
-        if (!is_dir($muxDir)) {
-            @mkdir($muxDir, 0700, true);
-        }
-
-        $this->muxSocket = $muxDir . '/nk_proxy_' . md5($this->data['host'] . ':' . $this->data['port']) . '_' . getmypid();
-
-        [$authPrefix, $authOpts, $keyFile] = $this->buildSshAuth();
-        $sshOpts = array_merge($this->buildSshOptions(), $authOpts, [
-            '-o ControlMaster=yes',
-            '-o ControlPersist=300',
-            sprintf('-o ControlPath=%s', escapeshellarg($this->muxSocket)),
-            '-N', '-f',
-        ]);
-
-        $cmd = trim(sprintf(
-            '%s ssh %s %s@%s',
-            $authPrefix,
-            implode(' ', $sshOpts),
-            escapeshellarg($this->data['username']),
-            escapeshellarg($this->data['host'])
-        ));
-
-        shell_exec($cmd . ' 2>&1');
-
-        if ($keyFile && file_exists($keyFile)) {
-            unlink($keyFile);
-        }
-
-        usleep(300000);
-
-        if (file_exists($this->muxSocket)) {
-            $this->muxOwner = true;
-        } else {
-            $this->muxSocket = null;
-        }
+        $this->server = new VpnServer($serverId);
+        $this->data = $this->server->getData();
     }
 
     public function executeCommand(string $command, bool $sudo = false, bool $checkExit = false): string
     {
-        if ($sudo && strtolower($this->data['username']) !== 'root') {
-            $command = "echo '{$this->data['password']}' | sudo -S " . $command;
-        }
-
-        $wrappedCommand = $command . '; echo "__EXIT_CODE__:$?"';
-        $escapedCommand = escapeshellarg($wrappedCommand);
-
-        $this->ensureMux();
-
-        if ($this->muxSocket && file_exists($this->muxSocket)) {
-            $sshCommand = sprintf(
-                'ssh -o ControlPath=%s %s %s@%s %s 2>&1',
-                escapeshellarg($this->muxSocket),
-                implode(' ', $this->buildSshOptions()),
-                escapeshellarg($this->data['username']),
-                escapeshellarg($this->data['host']),
-                $escapedCommand
-            );
-        } else {
-            [$authPrefix, $authOpts, $keyFile] = $this->buildSshAuth();
-            $sshOpts = array_merge($this->buildSshOptions(), $authOpts);
-
-            $sshCommand = sprintf(
-                '%s ssh %s %s@%s %s 2>&1',
-                $authPrefix,
-                implode(' ', $sshOpts),
-                escapeshellarg($this->data['username']),
-                escapeshellarg($this->data['host']),
-                $escapedCommand
-            );
-        }
-
-        if (class_exists('Logger')) {
-            Logger::channel('ssh')->info('Executing command', [
-                'server_id' => $this->serverId ?? null,
-                'host' => $this->data['host'] ?? null,
-                'command' => $command
-            ]);
-        }
-
-        $rawOutput = shell_exec($sshCommand) ?? '';
-
-        if (isset($keyFile) && $keyFile && file_exists($keyFile)) {
-            unlink($keyFile);
-        }
-
-        if (preg_match('/^(.*?)__EXIT_CODE__:(\d+)\s*$/s', $rawOutput, $m)) {
-            $output = $m[1];
-            $exitCode = (int) $m[2];
-        } else {
-            $output = $rawOutput;
-            $exitCode = 0;
-        }
-
-        if (class_exists('Logger')) {
-            Logger::channel('ssh')->info('Command result', [
-                'exit_code' => $exitCode,
-                'output' => substr(trim($output), 0, 1000) // limit output size in logs
-            ]);
-        }
-
-        if ($checkExit && $exitCode !== 0) {
-            throw new Exception("Remote command failed (exit {$exitCode}): " . trim(substr($output, -500)));
-        }
-
-        return $output;
+        return $this->server->executeCommand($command, $sudo, $checkExit);
     }
 
     /**
@@ -205,31 +33,31 @@ class ProxyServer
 
         if ($hasDocker) {
             // Pull official image
-            $this->executeCommand('docker pull 3proxy/3proxy:latest', true);
-            $this->executeCommand('mkdir -p /etc/3proxy /var/log/3proxy', true);
+            $this->executeCommand('docker pull 3proxy/3proxy:latest', true, true);
+            $this->executeCommand('mkdir -p /etc/3proxy /var/log/3proxy', true, true);
             return;
         }
 
         // 2. Fallback to native installation if Docker is not present
         $check = $this->executeCommand('which 3proxy');
         if (empty(trim($check))) {
-            $this->executeCommand('apt-get update', true);
-            $this->executeCommand('apt-get install -y 3proxy', true);
+            $this->executeCommand('apt-get update', true, true);
+            $this->executeCommand('apt-get install -y 3proxy', true, true);
         }
 
-        $this->executeCommand('mkdir -p /var/log/3proxy /etc/3proxy', true);
-        $this->executeCommand('chown proxy:proxy /var/log/3proxy', true);
+        $this->executeCommand('mkdir -p /var/log/3proxy /etc/3proxy', true, true);
+        $this->executeCommand('chown proxy:proxy /var/log/3proxy', true, true);
 
         // Check if systemd service exists, if not create it
         $serviceCheck = $this->executeCommand('systemctl list-unit-files | grep 3proxy.service');
         if (empty(trim($serviceCheck))) {
             $serviceFile = "[Unit]\nDescription=3proxy Proxy Server\nAfter=network.target\n\n[Service]\nType=simple\nExecStart=/usr/bin/3proxy /etc/3proxy/3proxy.cfg\nRestart=always\nUser=root\n\n[Install]\nWantedBy=multi-user.target";
             $base64 = base64_encode($serviceFile);
-            $this->executeCommand("echo '{$base64}' | base64 -d | sudo tee /etc/systemd/system/3proxy.service", true);
-            $this->executeCommand('systemctl daemon-reload', true);
+            $this->executeCommand("echo '{$base64}' | base64 -d | tee /etc/systemd/system/3proxy.service", true, true);
+            $this->executeCommand('systemctl daemon-reload', true, true);
         }
 
-        $this->executeCommand('systemctl enable 3proxy', true);
+        $this->executeCommand('systemctl enable 3proxy', true, true);
     }
 
     /**
@@ -288,15 +116,15 @@ class ProxyServer
                 $this->executeCommand("iptables -C OUTPUT -p tcp --sport {$proxy['port']} -j ACCEPT 2>/dev/null || iptables -A OUTPUT -p tcp --sport {$proxy['port']} -j ACCEPT", true);
                 
                 // Open port in UFW if present
-                $this->executeCommand("which ufw > /dev/null && sudo ufw allow {$proxy['port']}/tcp || true", true);
+                $this->executeCommand("which ufw > /dev/null && ufw allow {$proxy['port']}/tcp || true", true);
             }
         }
 
         $base64 = base64_encode($config);
-        $this->executeCommand("echo '{$base64}' | base64 -d | sudo tee /etc/3proxy/3proxy.cfg", true);
+        $this->executeCommand("echo '{$base64}' | base64 -d | tee /etc/3proxy/3proxy.cfg", true, true);
         
         // Final fallback for native: also write to /etc/3proxy.cfg
-        $this->executeCommand("sudo cp /etc/3proxy/3proxy.cfg /etc/3proxy.cfg 2>/dev/null || true", true);
+        $this->executeCommand("cp /etc/3proxy/3proxy.cfg /etc/3proxy.cfg 2>/dev/null || true", true);
 
         // Restart logic
         $hasDocker = !empty(trim($this->executeCommand('which docker')));
@@ -310,7 +138,7 @@ class ProxyServer
             DeploymentService::deployDockerContainer($this, $containerName, '3proxy/3proxy:latest', $runOptions);
         } else {
             // Use systemd fallback
-            $this->executeCommand('systemctl restart 3proxy', true);
+            $this->executeCommand('systemctl restart 3proxy', true, true);
         }
     }
 

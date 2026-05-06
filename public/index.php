@@ -208,6 +208,8 @@ Router::post('/servers/create', ['ServerController', 'store']);
 Router::post('/servers/{id}/delete', ['ServerController', 'delete']);
 Router::get('/servers/{id}/deploy', ['ServerController', 'showDeploy']);
 Router::post('/servers/{id}/deploy', ['ServerController', 'deploy']);
+Router::get('/servers/{id}/status', ['ServerController', 'getStatus']);
+Router::get('/servers/{id}/logs', ['ServerController', 'getLogs']);
 Router::get('/servers/{id}', ['ServerController', 'view']);
 Router::post('/servers/{id}/sync-stats', ['ServerController', 'syncStats']);
 Router::post('/servers/sync-all', ['ServerController', 'syncAll']);
@@ -216,6 +218,7 @@ Router::get('/api/search-clients', ['ServerController', 'searchClients']);
 // Client Routes
 Router::post('/servers/{id}/clients/create', ['ClientController', 'create']);
 Router::get('/clients/{id}', ['ClientController', 'view']);
+Router::get('/clients/{id}/status', ['ClientController', 'status']);
 Router::post('/clients/{id}/update', ['ClientController', 'update']);
 Router::get('/clients/{id}/download', ['ClientController', 'downloadConfig']);
 Router::post('/clients/{id}/revoke', ['ClientController', 'revoke']);

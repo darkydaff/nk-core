@@ -352,12 +352,17 @@ class BackupManager {
 
         $isGzipped = str_ends_with($filePath, '.gz');
         $catCmd = $isGzipped ? 'zcat' : 'cat';
+        
+        // Filter out generated columns and all variations of DEFINER statements (including versioned comments)
+        // to prevent ERROR 3105/1419 during restore.
+        $sedCmd = "sed -E 's/\\/\\*!5001[37] DEFINER=[^*]+\\*\\///g; s/DEFINER=[^ ]+ //g; s/GENERATED ALWAYS AS .* VIRTUAL/DEFAULT NULL/gi'";
 
         // Added --skip-ssl for internal container connections
         $command = sprintf(
-            '%s %s | mysql --skip-ssl -h %s -u %s -p%s %s 2>&1',
+            '%s %s | %s | mysql --skip-ssl -h %s -u %s -p%s %s 2>&1',
             $catCmd,
             escapeshellarg($filePath),
+            $sedCmd,
             escapeshellarg($dbHost),
             escapeshellarg($dbUser),
             escapeshellarg($dbPass),
@@ -368,6 +373,43 @@ class BackupManager {
 
         if ($returnCode !== 0) {
             throw new Exception("Database import failed with code $returnCode: " . implode("\n", $output));
+        }
+
+        // Apply triggers to ensure active_client_ip is updated for restored old backups
+        try {
+            require_once __DIR__ . '/DB.php';
+            $pdo = DB::conn();
+            $pdo->exec("DROP TRIGGER IF EXISTS vpn_clients_before_insert;");
+            $pdo->exec("
+                CREATE TRIGGER vpn_clients_before_insert
+                BEFORE INSERT ON vpn_clients
+                FOR EACH ROW
+                BEGIN
+                    IF NEW.deleted_at IS NULL THEN
+                        SET NEW.active_client_ip = NEW.client_ip;
+                    ELSE
+                        SET NEW.active_client_ip = NULL;
+                    END IF;
+                END;
+            ");
+            $pdo->exec("DROP TRIGGER IF EXISTS vpn_clients_before_update;");
+            $pdo->exec("
+                CREATE TRIGGER vpn_clients_before_update
+                BEFORE UPDATE ON vpn_clients
+                FOR EACH ROW
+                BEGIN
+                    IF NEW.deleted_at IS NULL THEN
+                        SET NEW.active_client_ip = NEW.client_ip;
+                    ELSE
+                        SET NEW.active_client_ip = NULL;
+                    END IF;
+                END;
+            ");
+            
+            // Fix any inconsistent active_client_ip data
+            $pdo->exec("UPDATE vpn_clients SET active_client_ip = IF(deleted_at IS NULL, client_ip, NULL)");
+        } catch (\Throwable $e) {
+            // Ignore trigger creation errors
         }
 
         return true;

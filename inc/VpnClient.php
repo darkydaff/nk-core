@@ -46,19 +46,15 @@ class VpnClient {
      */
     public static function create(int $serverId, int $userId, string $name, ?int $expiresInDays = null): int {
         $pdo = DB::conn();
-        $pdo->beginTransaction();
-        
-        try {
         
         // Sanitize and validate client name
         $name = trim($name);
         if (!preg_match('/^[a-zA-Z0-9._-]+$/', $name)) {
-            // If it contains "forbidden" chars, fallback to a safe version but keep it recognizable
             $name = preg_replace('/[^a-zA-Z0-9._-]/', '_', $name);
         }
         if (empty($name)) $name = 'client_' . time();
         
-        // Get server data
+        // Get server data to validate
         $server = new VpnServer($serverId);
         $serverData = $server->getData();
         
@@ -66,77 +62,130 @@ class VpnClient {
             throw new Exception('Server is not active');
         }
         
-        // Generate client keys
-        $containerName = $serverData['container_name'];
-        $keys = self::generateClientKeys($serverData, $name);
+        // Generate keys locally if possible or via fixed path inside container
+        // To fix the security risk, we use fixed temp files instead of dynamic ones
+        $keys = self::generateClientKeys($serverData, 'tmp_provision');
         
         // Get next available IP
         $clientIP = self::getNextClientIP($serverData);
-
-        // Final safety check for IP collision within transaction
-        $checkStmt = $pdo->prepare('SELECT id FROM vpn_clients WHERE server_id = ? AND client_ip = ? AND deleted_at IS NULL FOR UPDATE');
-        $checkStmt->execute([$serverId, $clientIP]);
-        if ($checkStmt->fetch()) {
-             throw new Exception("IP collision detected for {$clientIP}. Please try again.");
-        }
-        
-        // Get AWG parameters from server
-        $awgParams = $serverData['awg_params'] ?? [];
-        if (is_string($awgParams)) {
-            $awgParams = json_decode($awgParams, true) ?: [];
-        }
-        
-        // Build client configuration
-        $config = self::buildClientConfig(
-            $keys['private'],
-            $clientIP,
-            $serverData['server_public_key'],
-            $serverData['preshared_key'],
-            $serverData['host'],
-            $serverData['vpn_port'],
-            $awgParams,
-            $serverData['name'],
-            $name
-        );
-        
-        // Add client to server
-        self::addClientToServer($serverData, $keys['public'], $clientIP);
         
         // Calculate expiration date
         $expiresAt = $expiresInDays ? date('Y-m-d H:i:s', strtotime("+{$expiresInDays} days")) : null;
         
-        // Insert into database
-        $stmt = $pdo->prepare('
-            INSERT INTO vpn_clients 
-            (server_id, user_id, name, client_ip, public_key, private_key, preshared_key, config, status, expires_at, last_handshake, last_sync_at) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
-        ');
-        
-        $stmt->execute([
-            $serverId,
-            $userId,
-            $name,
-            $clientIP,
-            $keys['public'],
-            $keys['private'],
-            $serverData['preshared_key'],
-            $config,
-            ClientStatus::ACTIVE->value,
-            $expiresAt
-        ]);
-        
-        $clientId = (int)$pdo->lastInsertId();
-        $pdo->commit();
-        
-        return $clientId;
-        
-    } catch (Exception $e) {
-        if ($pdo->inTransaction()) {
-            $pdo->rollBack();
+        $pdo->beginTransaction();
+        try {
+            // Check for existing client with same name on this server
+            $checkNameStmt = $pdo->prepare('SELECT id FROM vpn_clients WHERE server_id = ? AND name = ? AND deleted_at IS NULL');
+            $checkNameStmt->execute([$serverId, $name]);
+            if ($checkNameStmt->fetch()) {
+                throw new Exception("A client with name '{$name}' already exists on this server.");
+            }
+
+            // Final safety check for IP collision within transaction
+            $checkStmt = $pdo->prepare('SELECT id FROM vpn_clients WHERE server_id = ? AND client_ip = ? AND deleted_at IS NULL FOR UPDATE');
+            $checkStmt->execute([$serverId, $clientIP]);
+            if ($checkStmt->fetch()) {
+                 throw new Exception("IP collision detected for {$clientIP}. Please try again.");
+            }
+
+            // Insert into database with PROVISIONING status
+            $stmt = $pdo->prepare('
+                INSERT INTO vpn_clients 
+                (server_id, user_id, name, client_ip, public_key, private_key, preshared_key, config, status, expires_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ');
+            
+            $stmt->execute([
+                $serverId,
+                $userId,
+                $name,
+                $clientIP,
+                $keys['public'],
+                $keys['private'],
+                $serverData['preshared_key'],
+                '', // Config will be built after sync
+                ClientStatus::PROVISIONING->value,
+                $expiresAt
+            ]);
+            
+            $clientId = (int)$pdo->lastInsertId();
+            $pdo->commit();
+            
+            // Queue the infrastructure sync
+            require_once __DIR__ . '/Queue.php';
+            Queue::push('deployments', [
+                'type' => 'provision_client',
+                'client_id' => $clientId,
+                'server_id' => $serverId
+            ]);
+
+            return $clientId;
+            
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $e;
         }
-        throw $e;
     }
-}
+
+    /**
+     * Synchronize client to remote server (Idempotent)
+     */
+    public function syncToRemote(): bool
+    {
+        if (!$this->data) return false;
+        
+        $server = new VpnServer($this->data['server_id']);
+        $serverData = $server->getData();
+        
+        try {
+            // Build client configuration
+            $awgParams = $serverData['awg_params'] ?? [];
+            if (is_string($awgParams)) {
+                $awgParams = json_decode($awgParams, true) ?: [];
+            }
+
+            $config = self::buildClientConfig(
+                $this->data['private_key'],
+                $this->data['client_ip'],
+                $serverData['server_public_key'],
+                $serverData['preshared_key'],
+                $serverData['host'],
+                $serverData['vpn_port'],
+                $awgParams,
+                $serverData['name'],
+                $this->data['name']
+            );
+
+            // Add to WireGuard
+            self::addClientToServer($serverData, $this->data['public_key'], $this->data['client_ip']);
+            
+            // Set status to VERIFYING
+            $pdo = DB::conn();
+            $pdo->prepare('UPDATE vpn_clients SET status = ? WHERE id = ?')
+                ->execute([ClientStatus::VERIFYING->value, $this->clientId]);
+
+            // VERIFICATION: Check if peer is actually in the running interface
+            $verified = self::verifyPeerInRuntime($serverData, $this->data['public_key'], true, $this->data['client_ip']);
+            if (!$verified) {
+                throw new Exception("Infrastructure verification failed: Peer {$this->data['public_key']} not active or misconfigured in kernel interface after 5 attempts.");
+            }
+
+            // Update DB to ACTIVE
+            $pdo = DB::conn();
+            $stmt = $pdo->prepare('UPDATE vpn_clients SET status = ?, config = ? WHERE id = ?');
+            $stmt->execute([ClientStatus::ACTIVE->value, $config, $this->clientId]);
+            
+            $this->data['status'] = ClientStatus::ACTIVE;
+            return true;
+        } catch (Exception $e) {
+            $pdo = DB::conn();
+            $pdo->prepare('UPDATE vpn_clients SET status = ? WHERE id = ?')
+                ->execute([ClientStatus::ERROR->value, $this->clientId]);
+            throw $e;
+        }
+    }
     
     /**
      * Generate client keys on remote server
@@ -144,24 +193,24 @@ class VpnClient {
     private static function generateClientKeys(array $serverData, string $clientName): array {
         $containerName = $serverData['container_name'];
         
+        // SECURITY: Use fixed filenames for the temporary keys to prevent shell injection 
+        // through the clientName, even if it has been regex-filtered.
+        $privFile = "/tmp/nk_provision_priv.key";
+        $pubFile = "/tmp/nk_provision_pub.key";
+
         $cmd = sprintf(
-            "docker exec -i %s sh -c \"umask 077; /usr/local/bin/awg genkey | tee /tmp/%s_priv.key | /usr/local/bin/awg pubkey > /tmp/%s_pub.key; cat /tmp/%s_priv.key; echo '---'; cat /tmp/%s_pub.key; rm -f /tmp/%s_priv.key /tmp/%s_pub.key\"",
+            "docker exec -i %s sh -c \"umask 077; /usr/local/bin/awg genkey | tee %s | /usr/local/bin/awg pubkey > %s; cat %s; echo '---'; cat %s; rm -f %s %s\"",
             $containerName,
-            $clientName, $clientName, $clientName, $clientName, $clientName, $clientName
+            $privFile, $pubFile, $privFile, $pubFile, $privFile, $pubFile
         );
         
         $server = new VpnServer((int)$serverData['id']);
-        
-        try {
-            $out = $server->executeCommand($cmd, true);
-        } catch (Exception $e) {
-            throw new Exception("Failed to generate client keys: " . $e->getMessage());
-        }
+        $out = $server->executeCommand($cmd, true);
         
         $parts = explode("---", trim($out));
         
         if (count($parts) < 2) {
-            throw new Exception("Failed to generate client keys: Unexpected output from server: " . $out);
+            throw new Exception("Invalid key generation output: " . $out);
         }
         
         return [
@@ -220,6 +269,7 @@ class VpnClient {
         $config = "[Interface]\n";
         if ($clientName) {
             $config .= "# Name = {$clientName}\n";
+            $config .= "# Remark: {$clientName}\n";
         }
         $config .= "PrivateKey = {$privateKey}\n";
         $config .= "Address = {$clientIP}/32\n";
@@ -264,21 +314,36 @@ class VpnClient {
     public static function addClientToServer(array $serverData, string $publicKey, string $clientIP): void {
         $containerName = $serverData['container_name'];
         
-        // Build peer block
-        $peerBlock = "\n[Peer]\n";
-        $peerBlock .= "PublicKey = {$publicKey}\n";
-        $peerBlock .= "PresharedKey = {$serverData['preshared_key']}\n";
-        $peerBlock .= "AllowedIPs = {$clientIP}/32\n";
+        // 1. Get current config
+        $readCmd = "docker exec -i {$containerName} cat /opt/amnezia/awg/wg0.conf";
+        $currentConfig = self::executeServerCommand($serverData, $readCmd, true);
         
-        $base64 = base64_encode($peerBlock);
-        // Build and apply configuration in a single SSH call for speed
-        $cmd = sprintf(
-            "docker exec -i %s sh -c 'echo \"%s\" | base64 -d | tee -a /opt/amnezia/awg/wg0.conf > /dev/null && " .
-            "/usr/local/bin/awg syncconf wg0 <(/usr/local/bin/awg-quick strip /opt/amnezia/awg/wg0.conf)'",
-            $containerName,
-            $base64
+        // 2. Check if peer already exists (IDEMPOTENCY)
+        if (strpos($currentConfig, $publicKey) !== false) {
+            return; 
+        }
+
+        // 3. Build full new config
+        $newPeer = "\n[Peer]\n";
+        $newPeer .= "PublicKey = {$publicKey}\n";
+        $newPeer .= "PresharedKey = {$serverData['preshared_key']}\n";
+        $newPeer .= "AllowedIPs = {$clientIP}/32\n";
+        
+        $fullConfig = rtrim($currentConfig) . $newPeer;
+        $base64 = base64_encode($fullConfig);
+        
+        // 4. ATOMIC WRITE: Write to temp, then move
+        $writeCmd = sprintf(
+            "docker exec -i %s bash -c " . escapeshellarg(
+                "echo " . escapeshellarg($base64) . " | base64 -d > /opt/amnezia/awg/wg0.conf.tmp && " .
+                "mv /opt/amnezia/awg/wg0.conf.tmp /opt/amnezia/awg/wg0.conf && " .
+                "chmod 600 /opt/amnezia/awg/wg0.conf && " .
+                "/usr/local/bin/awg syncconf wg0 <(/usr/local/bin/awg-quick strip /opt/amnezia/awg/wg0.conf)"
+            ),
+            $containerName
         );
-        self::executeServerCommand($serverData, $cmd, true);
+        
+        self::executeServerCommand($serverData, $writeCmd, true);
         
         // Update clientsTable
         self::updateClientsTable($serverData, $publicKey, $clientIP);
@@ -317,74 +382,12 @@ class VpnClient {
     
     /**
      * Execute command on server.
-     * Tries to reuse an existing SSH ControlMaster socket if one exists
-     * (e.g. from a VpnServer instance), otherwise falls back to sshpass.
+     * Delegates to VpnServer::executeCommand for hardened logic and error handling.
      */
     private static function executeServerCommand(array $serverData, string $command, bool $sudo = false): string {
-        if ($sudo && strtolower($serverData['username']) !== 'root') {
-            $command = sprintf(
-                "echo %s | sudo -S sh -c %s",
-                escapeshellarg($serverData['password']),
-                escapeshellarg($command)
-            );
-        }
-        
-        $escapedCommand = escapeshellarg($command);
-
-        // Check for an existing ControlMaster socket from VpnServer
-        $muxDir = '/tmp/ssh_mux';
-        $muxSocket = $muxDir . '/nk_' . md5($serverData['host'] . ':' . $serverData['port']) . '_' . getmypid();
-
-        $commonOpts = sprintf(
-            '-p %d -q -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no ' .
-            '-o ServerAliveInterval=30 -o ServerAliveCountMax=20 -o AddressFamily=inet -o Compression=no ' .
-            '-o Ciphers=aes128-ctr,aes128-gcm@openssh.com,chacha20-poly1305@openssh.com',
-            $serverData['port']
-        );
-
-        if (file_exists($muxSocket)) {
-            // Reuse multiplexed connection
-            $sshCommand = sprintf(
-                'ssh -o ControlPath=%s %s %s@%s %s 2>&1',
-                escapeshellarg($muxSocket),
-                $commonOpts,
-                escapeshellarg($serverData['username']),
-                escapeshellarg($serverData['host']),
-                $escapedCommand
-            );
-        } elseif (!empty($serverData['ssh_private_key'])) {
-            // SSH key auth
-            $keyPath = tempnam(sys_get_temp_dir(), 'nk_ssh_');
-            file_put_contents($keyPath, $serverData['ssh_private_key']);
-            chmod($keyPath, 0600);
-            $sshCommand = sprintf(
-                'ssh -i %s -o PubkeyAuthentication=yes %s %s@%s %s 2>&1',
-                escapeshellarg($keyPath),
-                $commonOpts,
-                escapeshellarg($serverData['username']),
-                escapeshellarg($serverData['host']),
-                $escapedCommand
-            );
-        } else {
-            // Fallback: password via sshpass
-            $sshCommand = sprintf(
-                "SSHPASS='%s' sshpass -e ssh %s -o PreferredAuthentications=password -o PubkeyAuthentication=no %s@%s %s 2>&1",
-                str_replace("'", "'\\''", $serverData['password']),
-                $commonOpts,
-                escapeshellarg($serverData['username']),
-                escapeshellarg($serverData['host']),
-                $escapedCommand
-            );
-        }
-        
-        $result = shell_exec($sshCommand) ?? '';
-
-        // Clean up temp key file
-        if (isset($keyPath) && file_exists($keyPath)) {
-            unlink($keyPath);
-        }
-
-        return $result;
+        $server = new VpnServer((int)$serverData['id']);
+        // Use true for checkExit to ensure failures throw exceptions
+        return $server->executeCommand($command, $sudo, true);
     }
     
 
@@ -433,21 +436,17 @@ class VpnClient {
     /**
      */
     public function revoke(): bool {
-        $server = new VpnServer($this->data['server_id']);
-        $serverData = $server->getData();
-
-        if ($serverData && $serverData['status'] === ServerStatus::ACTIVE->value) {
-            try {
-                self::removeClientFromServer($serverData, $this->data['public_key']);
-            } catch (Exception $e) {
-                // Log the failure but still mark as disabled in DB — admin can manually clean server
-                \Logger::error('[WARN] revoke(): peer removal from server failed for client #' . $this->data['id']
-                    . ' (key: ' . substr($this->data['public_key'], 0, 12) . '…): ' . $e->getMessage());
-            }
-        }
-
-        // Mark as disabled using setStatus with validation
-        return $this->setStatus(ClientStatus::DISABLED);
+        $this->setStatus(ClientStatus::DISABLED);
+        
+        // Queue the infrastructure removal
+        require_once __DIR__ . '/Queue.php';
+        Queue::push('deployments', [
+            'type' => 'revoke_client',
+            'client_id' => $this->clientId,
+            'server_id' => $this->data['server_id']
+        ]);
+        
+        return true;
     }
     
     /**
@@ -458,20 +457,17 @@ class VpnClient {
             throw new Exception('Client not loaded');
         }
         
-        // Re-add to server
-        $server = new VpnServer($this->data['server_id']);
-        $serverData = $server->getData();
+        $this->setStatus(ClientStatus::PROVISIONING);
         
-        if ($serverData && $serverData['status'] === ServerStatus::ACTIVE->value) {
-            try {
-                self::addClientToServer($serverData, $this->data['public_key'], $this->data['client_ip']);
-            } catch (Exception $e) {
-                throw new Exception('Failed to restore client on server: ' . $e->getMessage());
-            }
-        }
+        // Re-queue the provisioning
+        require_once __DIR__ . '/Queue.php';
+        Queue::push('deployments', [
+            'type' => 'provision_client',
+            'client_id' => $this->clientId,
+            'server_id' => $this->data['server_id']
+        ]);
         
-        // Mark as active using setStatus with validation
-        return $this->setStatus(ClientStatus::ACTIVE);
+        return true;
     }
     
     /**
@@ -482,57 +478,58 @@ class VpnClient {
             throw new Exception('Client not loaded');
         }
         
-        // First revoke to remove from server
-        if ($this->data['status'] === ClientStatus::ACTIVE) {
-            $this->revoke();
-        }
-        
-        // Mark as deleted in database instead of deleting row
+        // Set to DELETING status first
         $pdo = DB::conn();
-        $stmt = $pdo->prepare('UPDATE vpn_clients SET deleted_at = NOW(), status = ? WHERE id = ?');
-        return $stmt->execute([ClientStatus::DELETED->value, $this->clientId]);
+        $pdo->prepare('UPDATE vpn_clients SET status = ? WHERE id = ?')
+            ->execute([ClientStatus::DELETING->value, $this->clientId]);
+            
+        // Queue the infrastructure removal + DB cleanup
+        require_once __DIR__ . '/Queue.php';
+        Queue::push('deployments', [
+            'type' => 'delete_client',
+            'client_id' => $this->clientId,
+            'server_id' => $this->data['server_id']
+        ]);
+        
+        return true;
     }
     
     /**
      * Remove client from server WireGuard configuration
      */
-    private static function removeClientFromServer(array $serverData, string $publicKey): void {
+    public static function removeClientFromServer(array $serverData, string $publicKey): void {
         $containerName = $serverData['container_name'];
         
-        // First, remove using awg command (live removal)
-        $removeCmd = sprintf(
-            "docker exec -i %s /usr/local/bin/awg set wg0 peer %s remove",
-            $containerName,
-            escapeshellarg($publicKey)
-        );
-        
-        self::executeServerCommand($serverData, $removeCmd, true);
-        
-        // Then remove from wg0.conf file to make it persistent
-        // Use a more reliable method: read, filter, write
+        // 1. UPDATE CONFIG (Desired State)
         $readCmd = sprintf("docker exec -i %s cat /opt/amnezia/awg/wg0.conf", $containerName);
         $config = self::executeServerCommand($serverData, $readCmd, true);
-        
-        // Parse and remove the peer section
         $newConfig = self::removePeerFromConfig($config, $publicKey);
         
-        // Write back to file using base64 to avoid escaping issues
-    $base64Config = base64_encode($newConfig);
-    $writeCmd = sprintf(
-        "echo '%s' | base64 -d | docker exec -i %s sh -c 'cat > /opt/amnezia/awg/wg0.conf'",
-        $base64Config,
-        $containerName
-    );
-    self::executeServerCommand($serverData, $writeCmd, true);
-        
-        // Apply via awg syncconf for surgical synchronization without drops
+        $base64Config = base64_encode($newConfig);
+        $writeCmd = sprintf(
+            "docker exec -i %s sh -c " . escapeshellarg(
+                "echo " . escapeshellarg($base64Config) . " | base64 -d > /opt/amnezia/awg/wg0.conf.tmp && " .
+                "mv /opt/amnezia/awg/wg0.conf.tmp /opt/amnezia/awg/wg0.conf && " .
+                "chmod 600 /opt/amnezia/awg/wg0.conf"
+            ),
+            $containerName
+        );
+        self::executeServerCommand($serverData, $writeCmd, true);
+
+        // 2. APPLY (syncconf)
         $syncCmd = sprintf(
             "docker exec -i %s bash -c '/usr/local/bin/awg syncconf wg0 <(/usr/local/bin/awg-quick strip /opt/amnezia/awg/wg0.conf)'",
             $containerName
         );
         self::executeServerCommand($serverData, $syncCmd, true);
         
-        // Remove from clientsTable
+        // 3. VERIFICATION (Retry loop)
+        $verified = self::verifyPeerInRuntime($serverData, $publicKey, false);
+        if (!$verified) {
+            throw new Exception("Runtime removal failed: Peer {$publicKey} still exists in kernel memory after 5 attempts.");
+        }
+
+        // 4. METADATA REMOVAL
         self::removeFromClientsTable($serverData, $publicKey);
     }
     
@@ -540,45 +537,57 @@ class VpnClient {
      * Remove peer section from WireGuard config
      */
     private static function removePeerFromConfig(string $config, string $publicKey): string {
-        $lines = explode("\n", $config);
+        $lines = explode("\n", rtrim($config));
         $newLines = [];
-        $inPeerBlock = false;
-        $skipBlock = false;
-        
+        $currentBlock = [];
+        $isPeerBlock = false;
+        $shouldSkipBlock = false;
+
         foreach ($lines as $line) {
             $trimmed = trim($line);
-            
-            // Start of new section
+
+            // New section starts
             if (strpos($trimmed, '[') === 0) {
-                $inPeerBlock = ($trimmed === '[Peer]');
-                $skipBlock = false;
-            }
-            
-            // Check if this peer block should be skipped
-            if ($inPeerBlock && strpos($trimmed, 'PublicKey') === 0) {
-                $parts = explode('=', $line, 2);
-                if (count($parts) === 2 && trim($parts[1]) === $publicKey) {
-                    $skipBlock = true;
-                    // Remove the [Peer] line that was already added
-                    array_pop($newLines);
-                    continue;
+                // Process previous block before starting new one
+                if (!empty($currentBlock)) {
+                    if (!$shouldSkipBlock) {
+                        foreach ($currentBlock as $blockLine) {
+                            $newLines[] = $blockLine;
+                        }
+                    }
+                    $currentBlock = [];
                 }
-            }
-            
-            // Skip lines in the block to be removed
-            if ($skipBlock && $inPeerBlock) {
-                // Empty line ends the peer block
-                if (empty($trimmed)) {
-                    $skipBlock = false;
-                    $inPeerBlock = false;
-                }
+                
+                $isPeerBlock = ($trimmed === '[Peer]');
+                $shouldSkipBlock = false;
+                $currentBlock[] = $line;
                 continue;
             }
-            
-            $newLines[] = $line;
+
+            // If we are in a peer block, check for the public key
+            if ($isPeerBlock && strpos($trimmed, 'PublicKey') === 0) {
+                $parts = explode('=', $line, 2);
+                if (count($parts) === 2 && trim($parts[1]) === $publicKey) {
+                    $shouldSkipBlock = true;
+                }
+            }
+
+            // If we are not in a section, we might be in global config or inside a section
+            if (!empty($currentBlock)) {
+                $currentBlock[] = $line;
+            } else {
+                $newLines[] = $line;
+            }
         }
-        
-        return implode("\n", $newLines);
+
+        // Process the final block
+        if (!empty($currentBlock) && !$shouldSkipBlock) {
+            foreach ($currentBlock as $blockLine) {
+                $newLines[] = $blockLine;
+            }
+        }
+
+        return implode("\n", $newLines) . "\n";
     }
     
     /**
@@ -587,9 +596,9 @@ class VpnClient {
     private static function removeFromClientsTable(array $serverData, string $publicKey): void {
         $containerName = $serverData['container_name'];
         
-        // Read current table
+        // Read current table - ignore failure if table doesn't exist
         $cmd = sprintf("docker exec -i %s cat /opt/amnezia/awg/clientsTable 2>/dev/null", $containerName);
-        $tableJson = self::executeServerCommand($serverData, $cmd, true);
+        $tableJson = self::executeServerCommand($serverData, $cmd, false);
         $table = json_decode(trim($tableJson), true);
         
         if (!is_array($table)) {
@@ -670,11 +679,11 @@ class VpnClient {
      */
     public function getConfig(): string {
         $config = $this->data['config'] ?? '';
-        // If config is old or doesn't have the new naming metadata, regenerate it once
-        if ($config && strpos($config, '# Remark:') === false) {
+        // If config is missing or old, regenerate it
+        if (!$config || strpos($config, '# Remark:') === false) {
             try {
                 $this->regenerateConfig();
-                return $this->data['config'];
+                return $this->data['config'] ?? '';
             } catch (Exception $e) {
                 // Fallback to existing config if regeneration fails
             }
@@ -742,7 +751,16 @@ class VpnClient {
             throw new Exception('Server is not active (status: ' . $serverData['status'] . ')');
         }
 
-        // Get ALL peer stats in one SSH call and find ours
+        // 1. Sync traffic via ServerMonitoring to prevent counter resets and double counting
+        try {
+            require_once __DIR__ . '/ServerMonitoring.php';
+            $monitoring = new ServerMonitoring($this->data['server_id']);
+            $monitoring->collectClientMetrics();
+        } catch (Exception $e) {
+            \Logger::error('syncStats(): ServerMonitoring failed for client #' . $this->data['id'] . ': ' . $e->getMessage());
+        }
+
+        // 2. Get ALL peer stats to check IP endpoint
         $allStats = self::getAllPeerStatsFromServer($serverData);
         $publicKey = $this->data['public_key'];
 
@@ -763,21 +781,17 @@ class VpnClient {
         }
 
         $pdo = DB::conn();
-        $lastHandshake = $stats['last_handshake'] > 0
-            ? date('Y-m-d H:i:s', $stats['last_handshake'])
-            : null;
 
         if ($geo) {
             $stmt = $pdo->prepare('
                 UPDATE vpn_clients
-                SET bytes_sent = ?, bytes_received = ?, last_handshake = ?, external_ip = ?,
+                SET external_ip = ?,
                     ip_country = ?, ip_country_code = ?, ip_city = ?, ip_isp = ?, ip_org = ?,
-                    ip_lat = ?, ip_lon = ?,
-                    last_sync_at = NOW()
+                    ip_lat = ?, ip_lon = ?
                 WHERE id = ?
             ');
             return $stmt->execute([
-                $stats['bytes_sent'], $stats['bytes_received'], $lastHandshake, $newExternalIp,
+                $newExternalIp,
                 $geo['country'], $geo['countryCode'], $geo['city'], $geo['isp'], $geo['org'],
                 $geo['lat'] ?? null, $geo['lon'] ?? null,
                 $this->clientId
@@ -785,11 +799,10 @@ class VpnClient {
         } else {
             $stmt = $pdo->prepare('
                 UPDATE vpn_clients
-                SET bytes_sent = ?, bytes_received = ?, last_handshake = ?, external_ip = ?, last_sync_at = NOW()
+                SET external_ip = ?
                 WHERE id = ?
             ');
             return $stmt->execute([
-                $stats['bytes_sent'], $stats['bytes_received'], $lastHandshake,
                 $newExternalIp, $this->clientId
             ]);
         }
@@ -882,25 +895,38 @@ class VpnClient {
             return 0;
         }
 
-        // Get all active clients from DB (include current geo data to check for IP changes)
+        // 1. Sync traffic via ServerMonitoring to prevent counter resets and double counting
+        try {
+            require_once __DIR__ . '/ServerMonitoring.php';
+            $monitoring = new ServerMonitoring($serverId);
+            $monitoring->collectClientMetrics();
+        } catch (Exception $e) {
+            \Logger::error('syncAllStatsForServer(): ServerMonitoring failed for server #' . $serverId . ': ' . $e->getMessage());
+        }
+
+        // 2. Sync Geo Data and IP
         $stmt = $pdo->prepare('SELECT id, public_key, external_ip, ip_country, ip_country_code, ip_city, ip_isp, ip_org, ip_lat, ip_lon FROM vpn_clients WHERE server_id = ? AND status = ?');
         $stmt->execute([$serverId, ClientStatus::ACTIVE->value]);
         $clients = $stmt->fetchAll();
 
         if (empty($clients)) {
+            // Even if no active clients in DB, we should still reconcile to clean orphans
+            self::reconcilePeers($serverId);
             return 0;
         }
 
-        // Single SSH call to get all peer stats
+        // Full reconciliation: prune orphans and restore missing peers
+        self::reconcilePeers($serverId);
+
+        // Single SSH call to get all peer stats (we need this for the IP endpoint)
         $allStats = self::getAllPeerStatsFromServer($serverData);
 
         $synced = 0;
         $updateStmt = $pdo->prepare('
             UPDATE vpn_clients
-            SET bytes_sent = ?, bytes_received = ?, last_handshake = ?, external_ip = ?,
+            SET external_ip = ?,
                 ip_country = ?, ip_country_code = ?, ip_city = ?, ip_isp = ?, ip_org = ?,
-                ip_lat = ?, ip_lon = ?,
-                last_sync_at = NOW()
+                ip_lat = ?, ip_lon = ?
             WHERE id = ?
         ');
 
@@ -915,9 +941,6 @@ class VpnClient {
 
                 $stats = $allStats[$publicKey];
                 $newIp = $stats['endpoint'];
-                $lastHandshake = $stats['last_handshake'] > 0
-                    ? date('Y-m-d H:i:s', $stats['last_handshake'])
-                    : null;
 
                 // Default to existing geo values
                 $geo = [
@@ -947,9 +970,6 @@ class VpnClient {
                 }
 
                 $updateStmt->execute([
-                    $stats['bytes_sent'],
-                    $stats['bytes_received'],
-                    $lastHandshake,
                     $newIp,
                     $geo['country'],
                     $geo['countryCode'],
@@ -1261,5 +1281,106 @@ public static function getClientsOverLimit(): array {
         }
         
         return null;
+    }
+
+    /**
+     * Reconcile runtime peers with DB state.
+     * Prunes orphans and restores missing active peers.
+     */
+    public static function reconcilePeers(int $serverId): array {
+        $server = new VpnServer($serverId);
+        $serverData = $server->getData();
+        if (!$serverData || $serverData['status'] !== ServerStatus::ACTIVE->value) return [];
+
+        $runtimePeers = self::getAllPeerStatsFromServer($serverData);
+        $runtimeKeys = array_keys($runtimePeers);
+
+        $pdo = DB::conn();
+        $stmt = $pdo->prepare('SELECT public_key FROM vpn_clients WHERE server_id = ? AND deleted_at IS NULL AND status IN ("active", "disabled", "provisioning", "verifying")');
+        $stmt->execute([$serverId]);
+        $dbKeys = $stmt->fetchAll(PDO::FETCH_COLUMN);
+
+        // 1. Find Orphans: In runtime but NOT in DB (or status deleted/error)
+        $orphans = array_diff($runtimeKeys, $dbKeys);
+        foreach ($orphans as $orphanKey) {
+            \Logger::channel('deployments')->warning("Found orphan peer on server #$serverId, removing", ['publicKey' => $orphanKey]);
+            try {
+                self::removeClientFromServer($serverData, $orphanKey);
+            } catch (Exception $e) {
+                \Logger::error("Failed to remove orphan #$orphanKey: " . $e->getMessage());
+            }
+        }
+
+        // 2. Find Missing: In DB (ACTIVE) but NOT in runtime
+        $stmt = $pdo->prepare('SELECT id, public_key FROM vpn_clients WHERE server_id = ? AND status = ? AND deleted_at IS NULL');
+        $stmt->execute([$serverId, ClientStatus::ACTIVE->value]);
+        $activeClients = $stmt->fetchAll();
+        
+        $readded = 0;
+        foreach ($activeClients as $row) {
+            if (!in_array($row['public_key'], $runtimeKeys)) {
+                \Logger::channel('deployments')->info("Active client #{$row['id']} missing from runtime, re-adding", ['publicKey' => $row['public_key']]);
+                try {
+                    $client = new VpnClient((int)$row['id']);
+                    $client->syncToRemote();
+                    $readded++;
+                } catch (Exception $e) {
+                    \Logger::error("Failed to re-add missing client #{$row['id']}: " . $e->getMessage());
+                }
+            }
+        }
+        
+        return [
+            'removed_orphans' => count($orphans),
+            'readded_missing' => $readded
+        ];
+    }
+
+    /**
+     * Deep runtime verification with retries.
+     * Checks if peer exists (or doesn't) and optionally validates AllowedIPs.
+     */
+    private static function verifyPeerInRuntime(array $serverData, string $publicKey, bool $shouldExist, ?string $expectedIP = null): bool {
+        $containerName = $serverData['container_name'];
+        $verifyCmd = "docker exec -i {$containerName} /usr/local/bin/awg show wg0";
+        
+        for ($i = 0; $i < 5; $i++) {
+            try {
+                $output = self::executeServerCommand($serverData, $verifyCmd, false);
+                $lines = explode("\n", (string)$output);
+                
+                $found = false;
+                $ipMatch = false;
+                $inPeerBlock = false;
+                
+                foreach ($lines as $line) {
+                    $trimmed = trim($line);
+                    if (strpos($trimmed, 'peer: ' . $publicKey) === 0) {
+                        $found = true;
+                        $inPeerBlock = true;
+                        continue;
+                    }
+                    if ($inPeerBlock && strpos($trimmed, 'peer: ') === 0) {
+                        $inPeerBlock = false;
+                    }
+                    
+                    if ($inPeerBlock && $expectedIP && strpos($trimmed, 'allowed ips: ' . $expectedIP) === 0) {
+                        $ipMatch = true;
+                    }
+                }
+                
+                if ($shouldExist) {
+                    if ($found && (!$expectedIP || $ipMatch)) return true;
+                } else {
+                    if (!$found) return true;
+                }
+            } catch (Exception $e) {
+                // Ignore SSH/exec errors during verification retries
+            }
+            
+            usleep(500000); // 500ms between retries
+        }
+        
+        return false;
     }
 }

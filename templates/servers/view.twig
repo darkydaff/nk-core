@@ -20,12 +20,26 @@
 							<span class="w-1.5 h-1.5 rounded-full bg-cyan-400 mr-1.5"></span>
 							{{ t('status.active') }}
 						</span>
+					{% elseif server.status == 'deploying' %}
+						<span class="text-xs px-2 py-1 rounded-md flex items-center bg-amber-500/15 border border-amber-500/30 text-amber-400">
+							<i class="fas fa-spinner fa-spin text-[8px] mr-1.5"></i>
+							{{ t('status.deploying')|default('Deploying…') }}
+						</span>
 					{% else %}
 						<div class="flex items-center gap-2">
 							<span class="badge-error text-xs px-2 py-1 rounded-md flex items-center">
 								<span class="w-1.5 h-1.5 rounded-full bg-red-400 mr-1.5"></span>
 								{{ t('status.' ~ server.status)|default(server.status) }}
 							</span>
+							{% if server.error_message %}
+								<div class="group relative inline-block">
+									<i class="fas fa-exclamation-triangle text-amber-500 text-xs cursor-help animate-pulse"></i>
+									<div class="absolute left-0 bottom-full mb-2 w-72 p-3 bg-slate-900 border border-red-500/30 rounded-lg text-[10px] text-red-200 shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[100] font-mono leading-relaxed backdrop-blur-md">
+										<div class="text-red-400 font-bold mb-1 uppercase tracking-tighter border-b border-red-500/20 pb-1">Last Deployment Error:</div>
+										{{ server.error_message }}
+									</div>
+								</div>
+							{% endif %}
 							<button onclick="syncStats({{ server.id }})" class="w-6 h-6 rounded-full bg-surface-hover flex items-center justify-center text-muted hover:text-primary transition-all border border-surface-border/50" title="{{ t('common.recheck')|default('Recheck Connectivity') }}">
 								<i class="fas fa-redo-alt text-[10px]"></i>
 							</button>
@@ -39,10 +53,14 @@
 					{% endif %}
 				</div>
 			</div>
-			<div class="flex gap-2 items-center">
+			<div class="flex gap-2 items-center flex-wrap">
 				<button onclick="syncStats({{ server.id }})" id="syncBtn" class="btn-secondary px-4 py-2 text-sm flex items-center">
 					<i class="fas fa-sync-alt mr-2" id="syncIcon"></i>
 					{{ t('servers.sync_stats') }}
+				</button>
+				<button onclick="openLogsModal({{ server.id }})" id="viewLogsBtn" class="px-4 py-2 rounded-lg bg-slate-500/10 hover:bg-slate-500/20 text-slate-300 border border-slate-500/30 transition-colors text-sm flex items-center">
+					<i class="fas fa-terminal mr-2"></i>
+					{{ t('servers.view_logs')|default('View Logs') }}
 				</button>
 				<button onclick="handleDeleteServer({{ server.id }}, '{{ server.name|e('js') }}')" class="px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-colors text-sm">
 					<i class="fas fa-trash-alt mr-2"></i>
@@ -291,6 +309,42 @@
 		</div>
 	</div>
 
+	<!-- ===== Terminal Log Modal ===== -->
+	<div id="logsModal" class="fixed inset-0 z-[200] flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true" aria-labelledby="logsModalTitle">
+		<!-- Backdrop -->
+		<div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeLogsModal()"></div>
+		<!-- Panel -->
+		<div class="relative w-full max-w-4xl flex flex-col rounded-xl overflow-hidden shadow-2xl border border-slate-700/60" style="max-height:85vh;">
+			<!-- Terminal chrome -->
+			<div class="flex items-center gap-2 px-4 py-3 bg-[#1e1e2e] border-b border-slate-700/50 flex-shrink-0">
+				<div class="flex gap-1.5">
+					<button onclick="closeLogsModal()" class="w-3 h-3 rounded-full bg-red-500 hover:bg-red-400 transition-colors" title="Close"></button>
+					<span class="w-3 h-3 rounded-full bg-yellow-500"></span>
+					<span class="w-3 h-3 rounded-full bg-green-500"></span>
+				</div>
+				<span class="ml-3 text-xs font-mono text-slate-400 flex-1" id="logsModalTitle">nk-panel — deployment logs</span>
+				<div class="flex items-center gap-2">
+					<label class="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer select-none">
+						<input type="checkbox" id="logsAutoScroll" checked class="rounded border-slate-600 bg-slate-800 text-cyan-500 focus:ring-cyan-500/20">
+						Auto-scroll
+					</label>
+					<button onclick="refreshLogs()" class="text-[10px] text-slate-400 hover:text-cyan-400 transition-colors px-2 py-1 rounded border border-slate-700 hover:border-cyan-500/40" title="Refresh logs">
+						<i class="fas fa-redo-alt mr-1"></i>Refresh
+					</button>
+				</div>
+			</div>
+			<!-- Log body -->
+			<div id="logsBody" class="flex-1 overflow-y-auto bg-[#13131f] font-mono text-xs leading-relaxed px-4 py-3" style="min-height:350px;">
+				<p class="text-slate-500 italic">Loading logs…</p>
+			</div>
+			<!-- Footer -->
+			<div class="flex items-center justify-between px-4 py-2 bg-[#1e1e2e] border-t border-slate-700/50 flex-shrink-0">
+				<span class="text-[10px] text-slate-500" id="logsCount">0 entries</span>
+				<button onclick="closeLogsModal()" class="text-[10px] px-3 py-1.5 rounded border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition-all">Close</button>
+			</div>
+		</div>
+	</div>
+
 	<script>
 		function handleDeleteServer(serverId, serverName) {
             const input = prompt (`To delete this server, please type its name exactly: "${serverName}"`);
@@ -338,8 +392,13 @@ const labels = {
     edit: "{{ t('common.edit') }}",
     selected: "{{ t('common.selected_count', [], '%s items selected') }}",
     traffic: "{{ t('common.traffic') }}",
-    lastSeenLabel: "{{ t('common.last_seen') }}"
+    lastSeenLabel: "{{ t('common.last_seen') }}",
+    provisioning: "{{ t('status.provisioning')|default('Provisioning...') }}",
+    error: "{{ t('status.error') }}",
+    deleting: "{{ t('status.deleting')|default('Deleting...') }}"
 };
+
+let transitionPoll = null;
 
 function performSearch() {
     const query = searchInput.value.trim();
@@ -348,18 +407,23 @@ function performSearch() {
     const traffic = trafficFilter.value;
     const sort = sortFilter.value;
     
+    clearTimeout(transitionPoll);
+    
     const url = `/api/search-clients?q=${encodeURIComponent(query)}&server_id=${serverId}&status=${status}&traffic=${traffic}&sort=${sort}`;
     
-    resultsContainer.innerHTML = `
-        <div class="flex items-center justify-center h-64">
-            <div class="text-center">
-                <div class="animate-spin text-primary text-2xl mb-3">
-                    <i class="fas fa-circle-notch"></i>
+    // Only show spinner if container is empty
+    if (resultsContainer.innerHTML.trim() === '') {
+        resultsContainer.innerHTML = `
+            <div class="flex items-center justify-center h-64">
+                <div class="text-center">
+                    <div class="animate-spin text-primary text-2xl mb-3">
+                        <i class="fas fa-circle-notch"></i>
+                    </div>
+                    <p class="text-sm text-muted">${labels.searching}</p>
                 </div>
-                <p class="text-sm text-muted">${labels.searching}</p>
             </div>
-        </div>
-    `;
+        `;
+    }
 
     fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(response => response.json())
@@ -367,6 +431,15 @@ function performSearch() {
             if (data.error) throw new Error(data.error);
             renderResults(data.results);
             updateBatchBar();
+
+            // If any client is in transition, poll again in 5s
+            const hasTransition = data.results.some(c => 
+                ['provisioning', 'verifying', 'deleting'].includes(c.db_status)
+            );
+            
+            if (hasTransition) {
+                transitionPoll = setTimeout(performSearch, 5000);
+            }
         })
         .catch(err => {
             resultsContainer.innerHTML = `<div class="p-10 text-center text-red-500">Error: ${err.message}</div>`;
@@ -402,9 +475,11 @@ function renderResults(results) {
                             </div>
                         </div>
                         <div class="flex items-center gap-1.5">
-                            <div class="flex items-center px-1.5 py-1 rounded ${isDisabled ? 'bg-orange-500/10' : (client.connection_status === 'online' ? 'bg-sky-500/10' : (client.connection_status === 'never' ? 'bg-slate-500/10' : 'bg-red-500/10'))} border ${isDisabled ? 'border-orange-500/20' : (client.connection_status === 'online' ? 'border-sky-500/20' : (client.connection_status === 'never' ? 'border-slate-500/20' : 'border-red-500/20'))}">
-                                <span class="w-1 h-1 rounded-full ${isDisabled ? 'bg-orange-500' : (client.connection_status === 'online' ? 'bg-sky-500 animate-pulse' : (client.connection_status === 'never' ? 'bg-slate-400' : 'bg-red-500'))} mr-1.5"></span>
-                                <span class="text-[8px] uppercase tracking-wider ${isDisabled ? 'text-orange-500' : (client.connection_status === 'online' ? 'text-sky-500' : (client.connection_status === 'never' ? 'text-slate-500' : 'text-red-500'))} font-bold">${isDisabled ? labels.revoked : (client.connection_status === 'online' ? labels.online : (client.connection_status === 'never' ? labels.never : labels.offline))}</span>
+                            <div class="flex items-center px-1.5 py-1 rounded ${isDisabled ? 'bg-orange-500/10' : (client.db_status === 'deleting' ? 'bg-red-500/10' : (client.db_status === 'provisioning' ? 'bg-amber-500/10' : (client.db_status === 'error' ? 'bg-red-500/10' : (client.connection_status === 'online' ? 'bg-sky-500/10' : (client.connection_status === 'never' ? 'bg-slate-500/10' : 'bg-red-500/10')))))} border ${isDisabled ? 'border-orange-500/20' : (client.db_status === 'deleting' ? 'border-red-500/20' : (client.db_status === 'provisioning' ? 'border-amber-500/20' : (client.db_status === 'error' ? 'border-red-500/20' : (client.connection_status === 'online' ? 'border-sky-500/20' : (client.connection_status === 'never' ? 'border-slate-500/20' : 'border-red-500/20')))))}">
+                                <span class="w-1 h-1 rounded-full ${isDisabled ? 'bg-orange-500' : (client.db_status === 'deleting' ? 'bg-red-600 animate-pulse' : (client.db_status === 'provisioning' ? 'bg-amber-500 animate-pulse' : (client.db_status === 'error' ? 'bg-red-600' : (client.connection_status === 'online' ? 'bg-sky-500 animate-pulse' : (client.connection_status === 'never' ? 'bg-slate-400' : 'bg-red-500')))))} mr-1.5"></span>
+                                <span class="text-[8px] uppercase tracking-wider ${isDisabled ? 'text-orange-500' : (client.db_status === 'deleting' ? 'text-red-500' : (client.db_status === 'provisioning' ? 'text-amber-500' : (client.db_status === 'error' ? 'text-red-500' : (client.connection_status === 'online' ? 'text-sky-500' : (client.connection_status === 'never' ? 'text-slate-500' : 'text-red-500')))))} font-bold">
+                                    ${isDisabled ? labels.revoked : (client.db_status === 'deleting' ? labels.deleting : (client.db_status === 'provisioning' ? labels.provisioning : (client.db_status === 'error' ? labels.error : (client.connection_status === 'online' ? labels.online : (client.connection_status === 'never' ? labels.never : labels.offline)))))}
+                                </span>
                             </div>
                         </div>
                     </div>
@@ -473,10 +548,10 @@ function renderResults(results) {
                     <td class="px-5 py-4">
                         <div class="flex flex-col">
                             <div class="flex items-center gap-1.5 mb-1">
-                                <div class="flex items-center px-1.5 py-1 rounded ${isDisabled ? 'bg-orange-500/10' : (client.connection_status === 'online' ? 'bg-sky-500/10' : (client.connection_status === 'never' ? 'bg-slate-500/10' : 'bg-red-500/10'))} border ${isDisabled ? 'border-orange-500/20' : (client.connection_status === 'online' ? 'border-sky-500/20' : (client.connection_status === 'never' ? 'border-slate-500/20' : 'border-red-500/20'))} h-5">
-                                    <span class="w-1 h-1 rounded-full ${isDisabled ? 'bg-orange-500' : (client.connection_status === 'online' ? 'bg-sky-500 animate-pulse' : (client.connection_status === 'never' ? 'bg-slate-400' : 'bg-red-500'))} mr-1.5"></span>
-                                    <span class="text-[9px] uppercase tracking-wider ${isDisabled ? 'text-orange-500' : (client.connection_status === 'online' ? 'text-sky-500' : (client.connection_status === 'never' ? 'text-slate-500' : 'text-red-500'))} font-bold leading-none">
-                                        ${isDisabled ? labels.revoked : (client.connection_status === 'online' ? labels.online : (client.connection_status === 'never' ? labels.never : labels.offline))}
+                                <div class="flex items-center px-1.5 py-1 rounded ${isDisabled ? 'bg-orange-500/10' : (client.db_status === 'deleting' ? 'bg-red-500/10' : (client.db_status === 'provisioning' ? 'bg-amber-500/10' : (client.db_status === 'error' ? 'bg-red-500/10' : (client.connection_status === 'online' ? 'bg-sky-500/10' : (client.connection_status === 'never' ? 'bg-slate-500/10' : 'bg-red-500/10')))))} border ${isDisabled ? 'border-orange-500/20' : (client.db_status === 'deleting' ? 'border-red-500/20' : (client.db_status === 'provisioning' ? 'border-amber-500/20' : (client.db_status === 'error' ? 'border-red-500/20' : (client.connection_status === 'online' ? 'border-sky-500/20' : (client.connection_status === 'never' ? 'border-slate-500/20' : 'border-red-500/20')))))} h-5">
+                                    <span class="w-1 h-1 rounded-full ${isDisabled ? 'bg-orange-500' : (client.db_status === 'deleting' ? 'bg-red-600 animate-pulse' : (client.db_status === 'provisioning' ? 'bg-amber-500 animate-pulse' : (client.db_status === 'error' ? 'bg-red-600' : (client.connection_status === 'online' ? 'bg-sky-500 animate-pulse' : (client.connection_status === 'never' ? 'bg-slate-400' : 'bg-red-500')))))} mr-1.5"></span>
+                                    <span class="text-[9px] uppercase tracking-wider ${isDisabled ? 'text-orange-500' : (client.db_status === 'deleting' ? 'text-red-500' : (client.db_status === 'provisioning' ? 'text-amber-500' : (client.db_status === 'error' ? 'text-red-500' : (client.connection_status === 'online' ? 'text-sky-500' : (client.connection_status === 'never' ? 'text-slate-500' : 'text-red-500')))))} font-bold leading-none">
+                                        ${isDisabled ? labels.revoked : (client.db_status === 'deleting' ? labels.deleting : (client.db_status === 'provisioning' ? labels.provisioning : (client.db_status === 'error' ? labels.error : (client.connection_status === 'online' ? labels.online : (client.connection_status === 'never' ? labels.never : labels.offline)))))}
                                     </span>
                                 </div>
                             </div>
@@ -671,6 +746,178 @@ document.addEventListener('DOMContentLoaded', function () {
 initBeszel('{{ server.host }}');
 // Refresh every 15 seconds to match Beszel agent
 setInterval(() => initBeszel('{{ server.host }}'), 15000);
+});
+
+// ===== Smart Polling (deploying state) =====
+(function () {
+	const currentStatus = '{{ server.status }}';
+	if (currentStatus !== 'deploying') return;
+
+	const serverId = {{ server.id }};
+	let pollTimer = null;
+
+	function pollStatus() {
+		fetch(`/servers/${serverId}/status`, {
+			headers: { 'X-Requested-With': 'XMLHttpRequest' }
+		})
+		.then(r => r.json())
+		.then(data => {
+			if (data.status && data.status !== 'deploying') {
+				// Server finished — clear saved scroll so reload starts at top
+				localStorage.removeItem('globalScrollPos');
+				clearInterval(pollTimer);
+				window.location.reload();
+			}
+		})
+		.catch(() => { /* ignore transient errors, keep polling */ });
+	}
+
+	// Start polling every 2.5 seconds
+	pollTimer = setInterval(pollStatus, 2500);
+})();
+
+// ===== Log Modal =====
+let _logsServerId = null;
+let _logsRefreshTimer = null;
+
+window.openLogsModal = function (serverId) {
+	_logsServerId = serverId;
+	// Clear any stale timer from a previous open (prevents double-interval accumulation)
+	if (_logsRefreshTimer !== null) {
+		clearTimeout(_logsRefreshTimer);
+		_logsRefreshTimer = null;
+	}
+	document.getElementById('logsModal').classList.remove('hidden');
+	document.body.style.overflow = 'hidden';
+	fetchLogs();
+};
+
+window.closeLogsModal = function () {
+	document.getElementById('logsModal').classList.add('hidden');
+	document.body.style.overflow = '';
+	if (_logsRefreshTimer !== null) {
+		clearTimeout(_logsRefreshTimer);
+		_logsRefreshTimer = null;
+	}
+};
+
+window.refreshLogs = function () {
+	// Cancel any pending auto-refresh before manual refresh
+	if (_logsRefreshTimer !== null) {
+		clearTimeout(_logsRefreshTimer);
+		_logsRefreshTimer = null;
+	}
+	fetchLogs();
+};
+
+function fetchLogs() {
+	if (!_logsServerId) return;
+	fetch(`/servers/${_logsServerId}/logs`, {
+		headers: { 'X-Requested-With': 'XMLHttpRequest' }
+	})
+	.then(r => r.json())
+	.then(data => {
+		renderLogs(data.logs || []);
+		// Schedule next refresh AFTER this one completes (eliminates overlapping fetches)
+		if (document.getElementById('logsModal') &&
+			!document.getElementById('logsModal').classList.contains('hidden')) {
+			_logsRefreshTimer = setTimeout(fetchLogs, 5000);
+		}
+	})
+	.catch(err => {
+		document.getElementById('logsBody').innerHTML =
+			`<p class="text-red-400">Failed to load logs: ${err.message}</p>`;
+		// Retry after 8s on error
+		if (document.getElementById('logsModal') &&
+			!document.getElementById('logsModal').classList.contains('hidden')) {
+			_logsRefreshTimer = setTimeout(fetchLogs, 8000);
+		}
+	});
+}
+
+function renderLogs(logs) {
+	const body    = document.getElementById('logsBody');
+	const countEl = document.getElementById('logsCount');
+
+	if (!logs || logs.length === 0) {
+		body.innerHTML = '<p class="text-slate-500 italic">No log entries found for this server yet.</p>';
+		countEl.textContent = '0 entries';
+		return;
+	}
+
+	countEl.textContent = logs.length + ' entries';
+
+	const lines = logs.map(entry => {
+		const level   = (entry.level_name || 'INFO').toUpperCase();
+		const channel = entry.channel_source || entry.channel || '';
+		const msg     = entry.message || '';
+		const ctx     = entry.context || {};
+
+		// Timestamp — keep only HH:MM:SS portion
+		const rawDt  = entry.datetime || '';
+		const dtPart = rawDt.includes('T')
+			? rawDt.split('T')[1]?.split('+')[0]?.split('-')[0]?.substring(0,8)
+			: rawDt.substring(11,19);
+
+		// Color-code by level
+		let levelClass = 'text-slate-400';
+		if (['ERROR','CRITICAL','ALERT','EMERGENCY'].includes(level)) {
+			levelClass = 'text-red-400 font-bold';
+		} else if (level === 'WARNING') {
+			levelClass = 'text-yellow-400';
+		} else if (level === 'INFO') {
+			levelClass = (channel === 'ssh' || ctx.command) ? 'text-blue-400' : 'text-cyan-400';
+		} else if (level === 'DEBUG') {
+			levelClass = 'text-slate-500';
+		}
+
+		// Build context snippet (skip server_id — always the same)
+		const ctxFiltered = Object.fromEntries(
+			Object.entries(ctx).filter(([k]) => k !== 'server_id')
+		);
+		const ctxStr = Object.keys(ctxFiltered).length
+			? ' <span class="text-slate-600">' + escapeHtml(JSON.stringify(ctxFiltered)) + '</span>'
+			: '';
+
+		// Override color for SSH command results
+		let finalClass = levelClass;
+		if (ctx.exit_code === 0 || (ctx.output && ctx.exit_code === undefined)) {
+			finalClass = 'text-green-400';
+		} else if (ctx.exit_code !== undefined && ctx.exit_code !== 0) {
+			finalClass = 'text-red-400 font-bold';
+		}
+
+		const channelBadge = `<span class="text-[9px] px-1 py-0.5 rounded bg-slate-800 text-slate-500 mr-1.5 uppercase tracking-wider">${escapeHtml(channel)}</span>`;
+
+		return `<div class="py-0.5 flex flex-wrap gap-1 items-baseline border-b border-slate-800/40">`
+			+ `<span class="text-slate-600 flex-shrink-0 mr-1">${escapeHtml(dtPart || '??:??:??')}</span>`
+			+ channelBadge
+			+ `<span class="${finalClass} flex-shrink-0">[${level}]</span> `
+			+ `<span class="text-slate-200 break-all">${escapeHtml(msg)}</span>`
+			+ ctxStr
+			+ `</div>`;
+	});
+
+	body.innerHTML = lines.join('');
+
+	// Auto-scroll to bottom if checkbox is checked
+	if (document.getElementById('logsAutoScroll')?.checked) {
+		body.scrollTop = body.scrollHeight;
+	}
+}
+
+function escapeHtml(str) {
+	if (typeof str !== 'string') str = JSON.stringify(str);
+	return str
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;');
+}
+
+// Close modal on Escape key
+document.addEventListener('keydown', e => {
+	if (e.key === 'Escape') closeLogsModal();
 });
 	</script>
 {% endblock %}

@@ -118,6 +118,7 @@ class ServerMonitoring
                     'last_handshake' => (int)$parts[$handshakeIndex],
                     'bytes_sent'     => (int)$parts[$handshakeIndex + 1], // RX (Client Upload)
                     'bytes_received' => (int)$parts[$handshakeIndex + 2], // TX (Client Download)
+                    'endpoint'       => $parts[$handshakeIndex - 2] ?? '(none)',
                 ];
             }
         }
@@ -180,6 +181,7 @@ class ServerMonitoring
             'speed_up_kbps' => $speedUp,
             'speed_down_kbps' => $speedDown,
             'last_handshake' => $peer['last_handshake'],
+            'endpoint' => $peer['endpoint'],
         ];
     }
     
@@ -216,19 +218,29 @@ class ServerMonitoring
                 bytes_received = bytes_received + :br, 
                 speed_up_kbps = :sup,
                 speed_down_kbps = :sdn,
-                last_handshake = :lh, 
-                last_sync_at = NOW()
-            WHERE id = :id
-        ");
+            last_handshake = :lh, 
+            external_ip = CASE WHEN :ext1 != '(none)' AND :ext2 != '' THEN :ext3 ELSE external_ip END,
+            last_sync_at = NOW()
+        WHERE id = :id
+    ");
 
-        $stmt->execute([
-            'bs'  => $stats['diff_sent'],
-            'br'  => $stats['diff_received'],
-            'sup' => (float)$stats['speed_up_kbps'],
-            'sdn' => (float)$stats['speed_down_kbps'],
-            'lh'  => $lastHandshake,
-            'id'  => $clientId
-        ]);
+    // Clean endpoint IP (strip port)
+    $externalIp = $stats['endpoint'];
+    if (strpos($externalIp, ':') !== false) {
+        $externalIp = explode(':', $externalIp)[0];
+    }
+
+    $stmt->execute([
+        'bs'   => $stats['diff_sent'],
+        'br'   => $stats['diff_received'],
+        'sup'  => (float)$stats['speed_up_kbps'],
+        'sdn'  => (float)$stats['speed_down_kbps'],
+        'lh'   => $lastHandshake,
+        'ext1' => $externalIp,
+        'ext2' => $externalIp,
+        'ext3' => $externalIp,
+        'id'   => $clientId
+    ]);
     }
     
     /**
@@ -286,65 +298,17 @@ class ServerMonitoring
     }
     
     /**
-     * Execute SSH command on server.
-     * Tries to reuse an existing ControlMaster socket, falls back to sshpass.
+     * Execute SSH command on server via VpnServer delegation.
      */
     private function execSSH(string $cmd): ?string
     {
-        $host = $this->serverData['host'];
-        $port = $this->serverData['port'];
-        $username = $this->serverData['username'];
-        $password = $this->serverData['password'];
-
-        // Check for an existing ControlMaster socket
-        $muxDir = '/tmp/ssh_mux';
-        $muxSocket = $muxDir . '/nk_' . md5($host . ':' . $port) . '_' . getmypid();
-
-        $commonOpts = sprintf(
-            '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -q -p %d',
-            $port
-        );
-
-        if (file_exists($muxSocket)) {
-            $sshCmd = sprintf(
-                'ssh -o ControlPath=%s %s %s@%s %s 2>/dev/null',
-                escapeshellarg($muxSocket),
-                $commonOpts,
-                escapeshellarg($username),
-                escapeshellarg($host),
-                escapeshellarg($cmd)
-            );
-        } elseif (!empty($this->serverData['ssh_private_key'])) {
-            $keyPath = tempnam(sys_get_temp_dir(), 'nk_ssh_');
-            file_put_contents($keyPath, $this->serverData['ssh_private_key']);
-            chmod($keyPath, 0600);
-            $sshCmd = sprintf(
-                'ssh -i %s -o PubkeyAuthentication=yes %s %s@%s %s 2>/dev/null',
-                escapeshellarg($keyPath),
-                $commonOpts,
-                escapeshellarg($username),
-                escapeshellarg($host),
-                escapeshellarg($cmd)
-            );
-        } else {
-            $sshCmd = sprintf(
-                'SSHPASS=%s sshpass -e ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no %s %s@%s %s 2>/dev/null',
-                escapeshellarg($password),
-                $commonOpts,
-                escapeshellarg($username),
-                escapeshellarg($host),
-                escapeshellarg($cmd)
-            );
+        try {
+            // Use silent=true for monitoring tasks to avoid log spam
+            return $this->server->executeCommand($cmd, true, false, true);
+        } catch (Exception $e) {
+            \Logger::error('ServerMonitoring::execSSH failed: ' . $e->getMessage());
+            return null;
         }
-        
-        $output = shell_exec($sshCmd);
-
-        // Clean up temp key file
-        if (isset($keyPath) && file_exists($keyPath)) {
-            unlink($keyPath);
-        }
-        
-        return $output ?: null;
     }
 }
 

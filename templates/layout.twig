@@ -605,6 +605,8 @@
                     showToast(result.message || 'Action completed successfully', 'success');
                     if (callback) {
                         callback(result);
+                    } else if (result.redirect) {
+                        setTimeout(() => window.location.href = result.redirect, 1000);
                     } else {
                         setTimeout(() => location.reload(), 1000);
                     }
@@ -652,7 +654,11 @@
                 const result = await response.json();
                 if (result.success) {
                     showToast(result.message || 'Action completed', 'success');
-                    setTimeout(() => location.reload(), 1000);
+                    if (result.redirect) {
+                        setTimeout(() => window.location.href = result.redirect, 1000);
+                    } else {
+                        setTimeout(() => location.reload(), 1000);
+                    }
                 } else {
                     showToast(result.error || 'Action failed', 'error');
                 }
