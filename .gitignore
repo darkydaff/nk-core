@@ -1,2 +1,6 @@
 .env
 docs/
+scratch/
+vendor/
+*.log
+.DS_Store
