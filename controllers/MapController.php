@@ -54,6 +54,7 @@ class MapController
             FROM vpn_clients c
             LEFT JOIN vpn_servers s ON c.server_id = s.id
             WHERE ($where)
+              AND c.deleted_at IS NULL
               AND c.ip_lat IS NOT NULL
               AND c.ip_lon IS NOT NULL
             ORDER BY computed_status ASC, c.name ASC

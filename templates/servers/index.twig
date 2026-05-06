@@ -2,11 +2,18 @@
 
 {% block title %}{{ t('servers.title') }}{% endblock %}
 
+{% block breadcrumbs %}
+    <li class="flex items-center">
+        <span>{{ t('servers.title') }}</span>
+    </li>
+{% endblock %}
+
+
 {% block content %}
 <div class="w-full">
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-            <h1 class="text-2xl font-bold text-primary flex items-center">
+            <h1 class="text-2xl font-bold flex items-center">
                 <div class="w-10 h-10 rounded-lg bg-surface-hover text-primary flex items-center justify-center mr-3">
                     <i class="fas fa-server"></i>
                 </div>
@@ -28,14 +35,14 @@
                         <i class="fas fa-server"></i>
                     </div>
                     <div>
-                        <h3 class="text-primary font-semibold">{{ server.name }}</h3>
+                        <h3 class="font-semibold">{{ server.name }}</h3>
                         <code class="text-xs text-secondary">{{ server.host }}</code>
                     </div>
                 </div>
                 {% if server.status == 'active' %}
                     <div class="flex flex-col items-end gap-1">
                         <span class="badge-active text-[10px] px-1.5 py-0.5 rounded-md flex items-center">
-                            <span class="w-1 h-1 rounded-full bg-cyan-400 mr-1"></span>
+                            <span class="w-1 h-1 rounded-full bg-status-active mr-1"></span>
                             {{ t('status.active') }}
                         </span>
                         {% if server.last_ping_ms is not null %}
@@ -67,11 +74,11 @@
             <div class="grid grid-cols-2 gap-2 mb-4 text-xs">
                 <div class="bg-panel/50 p-2 rounded">
                     <span class="text-muted block mb-0.5">{{ t('servers.vpn_port') }}</span>
-                    <span class="text-primary font-mono">{{ server.vpn_port }}</span>
+                    <span class="font-mono">{{ server.vpn_port }}</span>
                 </div>
                 <div class="bg-panel/50 p-2 rounded">
                     <span class="text-muted block mb-0.5">{{ t('servers.clients') }}</span>
-                    <span class="text-primary">{{ server.client_count|default(0) }}</span>
+                    <span>{{ server.client_count|default(0) }}</span>
                 </div>
             </div>
             

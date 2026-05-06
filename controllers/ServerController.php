@@ -521,11 +521,11 @@ class ServerController
                 $proxyStats = $proxyStmt->fetch(PDO::FETCH_ASSOC);
 
                 $response['summary'] = [
-                    'total' => $vpnStats['total_clients'],
-                    'online' => $vpnStats['active_clients'],
+                    'active_clients' => (int)($vpnStats['active_clients'] ?? 0),
+                    'total_clients' => (int)($vpnStats['total_clients'] ?? 0),
                     'traffic' => [
-                        'sent' => ($vpnStats['vpn_upload'] ?? 0) + ($proxyStats['proxy_upload'] ?? 0),
-                        'received' => ($vpnStats['vpn_download'] ?? 0) + ($proxyStats['proxy_download'] ?? 0)
+                        'sent' => (float)($vpnStats['vpn_upload'] ?? 0) + (float)($proxyStats['proxy_upload'] ?? 0),
+                        'received' => (float)($vpnStats['vpn_download'] ?? 0) + (float)($proxyStats['proxy_download'] ?? 0),
                     ]
                 ];
             }
@@ -737,5 +737,23 @@ class ServerController
                 'total' => $totalSent + $totalReceived
             ]
         ];
+    }
+
+    /**
+     * GET /api/monitoring/traffic-history
+     */
+    public function getTrafficHistory()
+    {
+        requireAuth();
+        header('Content-Type: application/json');
+        
+        try {
+            $minutes = isset($_GET['minutes']) ? (int)$_GET['minutes'] : 30;
+            $history = \ServerMonitoring::getGlobalTrafficHistory($minutes);
+            echo json_encode(['history' => $history]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
     }
 }

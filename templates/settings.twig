@@ -2,16 +2,22 @@
 
 {% block title %}{{ t('menu.settings') }} - {{ app_name }}{% endblock %}
 
+{% block breadcrumbs %}
+    <li class="flex items-center">
+        <span>{{ t('menu.settings') }}</span>
+    </li>
+{% endblock %}
+
 {% block content %}
 <div class="max-w-5xl mx-auto px-4 w-full">
-    <div class="mb-6">
-        <h1 class="text-2xl font-bold text-primary flex items-center">
-            <div class="w-10 h-10 rounded-lg bg-surface-hover text-primary flex items-center justify-center mr-3">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold flex items-center tracking-tight">
+            <div class="w-12 h-12 rounded-xl bg-surface-hover text-primary flex items-center justify-center mr-4">
                 <i class="fas fa-cog"></i>
             </div>
             {{ t('menu.settings') }}
         </h1>
-        <p class="mt-2 ml-13 text-sm text-secondary">{{ t('settings.description') }}</p>
+        <p class="mt-2 ml-16 text-secondary">{{ t('settings.description') }}</p>
     </div>
 
     {% if success %}
@@ -53,8 +59,8 @@
     <div id="content-profile">
         <div class="panel overflow-hidden">
             <div class="px-5 py-4 border-b border-default bg-panel/30">
-                <h2 class="text-base font-semibold text-primary flex items-center">
-                    <i class="fas fa-lock mr-2 text-primary"></i>{{ t('settings.change_password') }}
+                <h2 class="text-base font-semibold flex items-center">
+                    <i class="fas fa-lock mr-2 text-muted"></i>{{ t('settings.change_password') }}
                 </h2>
             </div>
             <div class="p-5">
@@ -62,16 +68,16 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <div class="space-y-4">
                         <div>
-                            <label class="block text-sm font-medium text-primary mb-2">{{ t('settings.current_password') }}</label>
+                            <label class="block text-sm font-medium mb-2">{{ t('settings.current_password') }}</label>
                             <input type="password" name="current_password" required class="input-field w-full px-4 py-2.5 font-mono">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-primary mb-2">{{ t('settings.new_password') }}</label>
+                            <label class="block text-sm font-medium mb-2">{{ t('settings.new_password') }}</label>
                             <input type="password" name="new_password" required minlength="6" class="input-field w-full px-4 py-2.5 font-mono">
                             <p class="mt-1 text-xs text-muted">{{ t('settings.min_6_chars') }}</p>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-primary mb-2">{{ t('settings.confirm_password') }}</label>
+                            <label class="block text-sm font-medium mb-2">{{ t('settings.confirm_password') }}</label>
                             <input type="password" name="confirm_password" required minlength="6" class="input-field w-full px-4 py-2.5 font-mono">
                         </div>
                         <div class="pt-2">
@@ -83,8 +89,8 @@
                 </form>
 
                 <div class="mt-8 pt-8 border-t border-default/50">
-                    <h2 class="text-base font-semibold text-primary mb-6 flex items-center">
-                        <i class="fas fa-users-cog mr-2 text-primary"></i>{{ t('settings.user_management') }}
+                    <h2 class="text-base font-semibold mb-6 flex items-center">
+                        <i class="fas fa-users-cog mr-2 text-muted"></i>{{ t('settings.user_management') }}
                     </h2>
 
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -145,8 +151,8 @@
     <div id="content-backups" class="hidden">
         <div class="panel overflow-hidden mb-6">
             <div class="px-5 py-4 border-b border-default bg-panel/30 flex justify-between items-center">
-                <h2 class="text-base font-semibold text-primary flex items-center">
-                    <i class="fas fa-cloud-upload-alt mr-2 text-primary"></i>{{ t('settings.s3_backups') }}
+                <h2 class="text-base font-semibold flex items-center">
+                    <i class="fas fa-cloud-upload-alt mr-2 text-muted"></i>{{ t('settings.s3_backups') }}
                 </h2>
                 <div class="flex items-center">
                     <span class="flex h-2 w-2 rounded-full bg-green-500 mr-2"></span>
@@ -158,7 +164,7 @@
                 <div class="mb-10 pb-8 border-b border-default/50">
                     <div class="flex items-center justify-between mb-6">
                         <div>
-                            <h3 class="text-sm font-semibold text-primary mb-1">{{ t('settings.backup_automation') }}</h3>
+                            <h3 class="text-sm font-semibold mb-1">{{ t('settings.backup_automation') }}</h3>
                             <p class="text-xs text-muted">{{ t('settings.backup_automation_desc') }}</p>
                         </div>
                         <div class="flex flex-col items-end">
@@ -187,7 +193,7 @@
                                 <input type="checkbox" name="backup_auto_enabled" value="true" {% if backup_auto_enabled == 'true' %}checked{% endif %} class="sr-only peer">
                                 <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
                             </label>
-                            <span class="text-xs font-medium text-primary">{{ t('settings.enable_auto_backup') }}</span>
+                            <span class="text-xs font-medium">{{ t('settings.enable_auto_backup') }}</span>
                         </div>
                         
                         <div>
@@ -205,7 +211,7 @@
 
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
                     <div>
-                        <h3 class="text-sm font-medium text-primary mb-1">{{ t('settings.manual_snapshot') }}</h3>
+                        <h3 class="text-sm font-medium mb-1">{{ t('settings.manual_snapshot') }}</h3>
                         <p class="text-xs text-muted">
                             {{ t('settings.manual_snapshot_desc') }}
                             {% if s3_configured %}
@@ -229,7 +235,7 @@
 
                 <div class="mt-8 pt-8 border-t border-default/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h3 class="text-sm font-medium text-primary mb-1">{{ t('settings.upload_restore') }}</h3>
+                        <h3 class="text-sm font-medium mb-1">{{ t('settings.upload_restore') }}</h3>
                         <p class="text-xs text-muted">{{ t('settings.upload_restore_desc') }}</p>
                     </div>
                     <form onsubmit="handleAjaxForm(event, '/settings/upload-restore', true)" enctype="multipart/form-data" class="flex flex-col md:flex-row gap-3">
@@ -251,7 +257,7 @@
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-12">
                     <!-- Local Backups -->
                     <div>
-                        <h3 class="text-sm font-medium text-primary mb-4 flex items-center">
+                        <h3 class="text-sm font-medium mb-4 flex items-center">
                             <i class="fas fa-hdd mr-2 text-muted"></i>{{ t('settings.local_snapshots') }}
                         </h3>
                         <div class="overflow-x-auto">
@@ -290,7 +296,7 @@
 
                     <!-- Cloud Backups -->
                     <div>
-                        <h3 class="text-sm font-medium text-primary mb-4 flex items-center">
+                        <h3 class="text-sm font-medium mb-4 flex items-center">
                             <i class="fas fa-cloud mr-2 text-muted"></i>{{ t('settings.cloud_snapshots') }}
                         </h3>
                         <div class="overflow-x-auto">
@@ -335,9 +341,9 @@
                                 <i class="fas fa-info-circle text-sm"></i>
                             </div>
                             <div>
-                                <h4 class="text-xs font-semibold text-primary uppercase tracking-wider mb-1">{{ t('settings.backup_info') }}</h4>
+                                <h4 class="text-xs font-semibold uppercase tracking-wider mb-1">{{ t('settings.backup_info') }}</h4>
                                 <p class="text-xs text-muted leading-relaxed">
-                                    {{ t('settings.backup_location_info') }}: <code class="bg-panel px-1 rounded text-primary">{{ s3_bucket }}</code><br>
+                                    {{ t('settings.backup_location_info') }}: <code class="bg-panel px-1 rounded">{{ s3_bucket }}</code><br>
                                     {{ t('settings.backup_path_info') }}: <code class="bg-panel px-1 rounded text-secondary">backups/nk_backup_YYYY-MM-DD.sql.gz</code>
                                 </p>
                             </div>
@@ -350,8 +356,8 @@
     <div id="content-telegram" class="hidden">
         <div class="panel overflow-hidden mb-6">
             <div class="px-5 py-4 border-b border-default bg-panel/30">
-                <h2 class="text-base font-semibold text-primary flex items-center">
-                    <i class="fab fa-telegram-plane mr-2 text-primary"></i>{{ t('settings.telegram_backups') }}
+                <h2 class="text-base font-semibold flex items-center">
+                    <i class="fab fa-telegram-plane mr-2 text-muted"></i>{{ t('settings.telegram_backups') }}
                 </h2>
             </div>
             <div class="p-5">
@@ -361,11 +367,11 @@
                         <div class="space-y-4">
                             <h3 class="text-xs font-bold text-muted uppercase tracking-widest mb-4">{{ t('settings.bot_settings') }}</h3>
                             <div>
-                                <label class="block text-sm font-medium text-primary mb-2">{{ t('settings.bot_token') }}</label>
+                                <label class="block text-sm font-medium mb-2">{{ t('settings.bot_token') }}</label>
                                 <input type="password" name="tg_bot_token" value="{{ tg_config.bot_token }}" placeholder="123456:ABC-DEF..." class="input-field w-full px-4 py-2.5 font-mono">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-primary mb-2">{{ t('settings.chat_id') }}</label>
+                                <label class="block text-sm font-medium mb-2">{{ t('settings.chat_id') }}</label>
                                 <input type="text" name="tg_chat_id" value="{{ tg_config.chat_id }}" placeholder="-100123456789" class="input-field w-full px-4 py-2.5 font-mono">
                             </div>
                         </div>
@@ -379,22 +385,22 @@
                                 </label>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-primary mb-2">{{ t('settings.proxy_url')|default('Proxy Connection String') }}</label>
+                                <label class="block text-sm font-medium mb-2">{{ t('settings.proxy_url')|default('Proxy Connection String') }}</label>
                                 <input type="text" name="tg_proxy_url" placeholder="http://user:pass@host:port" class="input-field w-full px-4 py-2.5 font-mono text-xs">
                                 <p class="mt-1 text-[10px] text-muted">Paste a full URL or fill separate details below (HTTP only).</p>
                             </div>
                             <div class="grid grid-cols-3 gap-3">
                                 <div class="col-span-2">
-                                    <label class="block text-sm font-medium text-primary mb-2">{{ t('settings.proxy_host') }}</label>
+                                    <label class="block text-sm font-medium mb-2">{{ t('settings.proxy_host') }}</label>
                                     <input type="text" name="tg_proxy_host" value="{{ tg_config.proxy_host }}" placeholder="1.2.3.4" class="input-field w-full px-4 py-2.5 font-mono text-xs">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-primary mb-2">{{ t('settings.proxy_port') }}</label>
+                                    <label class="block text-sm font-medium mb-2">{{ t('settings.proxy_port') }}</label>
                                     <input type="text" name="tg_proxy_port" value="{{ tg_config.proxy_port }}" placeholder="1080" class="input-field w-full px-4 py-2.5 font-mono text-xs">
                                 </div>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-primary mb-2">{{ t('settings.proxy_auth') }}</label>
+                                <label class="block text-sm font-medium mb-2">{{ t('settings.proxy_auth') }}</label>
                                 <input type="text" name="tg_proxy_auth" value="{{ tg_config.proxy_auth }}" placeholder="user:pass" class="input-field w-full px-4 py-2.5 font-mono text-xs">
                             </div>
                         </div>
@@ -411,8 +417,8 @@
     <div id="content-beszel" class="hidden">
         <div class="panel overflow-hidden mb-6">
             <div class="px-5 py-4 border-b border-default bg-panel/30">
-                <h2 class="text-base font-semibold text-primary flex items-center">
-                    <i class="fas fa-microchip mr-2 text-primary"></i>{{ t('settings.beszel') }}
+                <h2 class="text-base font-semibold flex items-center">
+                    <i class="fas fa-microchip mr-2 text-muted"></i>{{ t('settings.beszel') }}
                 </h2>
             </div>
             <div class="p-5">
@@ -422,7 +428,7 @@
                         <div class="space-y-4">
                             <h3 class="text-xs font-bold text-muted uppercase tracking-widest mb-4">{{ t('settings.beszel_hub') }}</h3>
                             <div>
-                                <label class="block text-sm font-medium text-primary mb-2">{{ t('settings.beszel_url')|default('Beszel URL') }}</label>
+                                <label class="block text-sm font-medium mb-2">{{ t('settings.beszel_url')|default('Beszel URL') }}</label>
                                 <input type="text" name="beszel_url" value="{{ beszel_config.url }}" placeholder="http://bz.example.com:8090" class="input-field w-full px-4 py-2.5 font-mono">
                                 <p class="mt-1 text-xs text-secondary">{{ t('settings.beszel_url_desc') }}</p>
                             </div>
@@ -431,11 +437,11 @@
                         <div class="space-y-4 border-l border-default/50 pl-0 md:pl-8">
                             <h3 class="text-xs font-bold text-muted uppercase tracking-widest mb-4">{{ t('common.credentials') }}</h3>
                             <div>
-                                <label class="block text-sm font-medium text-primary mb-2">{{ t('common.email_address') }}</label>
+                                <label class="block text-sm font-medium mb-2">{{ t('common.email_address') }}</label>
                                 <input type="email" name="beszel_email" value="{{ beszel_config.email }}" placeholder="admin@example.com" class="input-field w-full px-4 py-2.5 font-mono">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-primary mb-2">{{ t('common.password') }}</label>
+                                <label class="block text-sm font-medium mb-2">{{ t('common.password') }}</label>
                                 <input type="password" name="beszel_password" value="{{ beszel_config.password }}" placeholder="••••••••" class="input-field w-full px-4 py-2.5 font-mono">
                             </div>
                         </div>
@@ -459,7 +465,7 @@
                 <i class="fas fa-exclamation-triangle"></i>
             </div>
             <div>
-                <h3 class="text-lg font-bold text-primary">{{ t('settings.confirm_restore') }}</h3>
+                <h3 class="text-lg font-bold">{{ t('settings.confirm_restore') }}</h3>
                 <p class="text-xs text-amber-500/70 uppercase tracking-widest font-bold">{{ t('common.danger_zone') }}</p>
             </div>
         </div>

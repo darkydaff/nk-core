@@ -7,3 +7,4 @@ vendor/
 public/css/output.css
 node_modules/
 .antigravity/
+.agent/

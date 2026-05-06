@@ -22,7 +22,12 @@ class VpnClient {
      */
     private function load(): void {
         $pdo = DB::conn();
-        $stmt = $pdo->prepare('SELECT * FROM vpn_clients WHERE id = ? AND deleted_at IS NULL');
+        $stmt = $pdo->prepare('
+            SELECT c.*, s.name as server_name, s.host as server_host 
+            FROM vpn_clients c
+            LEFT JOIN vpn_servers s ON c.server_id = s.id
+            WHERE c.id = ? AND c.deleted_at IS NULL
+        ');
         $stmt->execute([$this->clientId]);
         $this->data = $stmt->fetch();
         if (!$this->data) {

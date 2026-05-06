@@ -1,5 +1,20 @@
 {% extends "layout.twig" %}
 {% block title %}{{ t('servers.deploy') }} {{ server.name }}{% endblock %}
+
+{% block breadcrumbs %}
+    <li class="flex items-center">
+        <a href="/servers" class="hover:text-primary">{{ t('menu.servers') }}</a>
+    </li>
+    <li class="flex items-center">
+        <i class="fas fa-chevron-right mx-2 opacity-30"></i>
+        <a href="/servers/{{ server.id }}" class="hover:text-primary">{{ server.name }}</a>
+    </li>
+    <li class="flex items-center">
+        <i class="fas fa-chevron-right mx-2 opacity-30"></i>
+        <span>{{ t('servers.deploy') }}</span>
+    </li>
+{% endblock %}
+
 {% block content %}
 <div class="max-w-4xl mx-auto px-4 py-8 w-full">
     <div class="mb-8 text-center">

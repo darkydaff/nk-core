@@ -320,6 +320,29 @@ class ServerMonitoring
         
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    /**
+     * Get aggregate traffic history for all clients (used for dashboard chart)
+     */
+    public static function getGlobalTrafficHistory(int $minutes = 30): array
+    {
+        $db = DB::conn();
+        
+        // Group by 30-second or 1-minute buckets to aggregate staggered collection times
+        $stmt = $db->prepare("
+            SELECT 
+                DATE_FORMAT(MIN(collected_at), '%H:%i:%s') as label,
+                SUM(COALESCE(speed_up_kbps, 0)) / 1024 as speed_up_mb,
+                SUM(COALESCE(speed_down_kbps, 0)) / 1024 as speed_down_mb
+            FROM client_metrics
+            WHERE collected_at > DATE_SUB(NOW(), INTERVAL ? MINUTE)
+            GROUP BY FLOOR(UNIX_TIMESTAMP(collected_at) / 30)
+            ORDER BY MIN(collected_at) ASC
+        ");
+        
+        $stmt->execute([(int)$minutes]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
     
     /**
      * Clean old metrics (older than 24 hours)

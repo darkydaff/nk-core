@@ -1,9 +1,20 @@
 {% extends "layout.twig" %}
 {% block title %}{{ t('servers.add') }}{% endblock %}
+
+{% block breadcrumbs %}
+    <li class="flex items-center">
+        <a href="/servers" class="hover:text-primary">{{ t('menu.servers') }}</a>
+    </li>
+    <li class="flex items-center">
+        <i class="fas fa-chevron-right mx-2 opacity-30"></i>
+        <span>{{ t('servers.add') }}</span>
+    </li>
+{% endblock %}
+
 {% block content %}
 <div class="max-w-3xl mx-auto px-4 w-full py-6">
     <div class="mb-6">
-        <h1 class="text-2xl font-bold text-primary flex items-center">
+        <h1 class="text-2xl font-bold flex items-center">
             <div class="w-10 h-10 rounded-lg bg-surface-hover text-primary flex items-center justify-center mr-3">
                 <i class="fas fa-plus-circle"></i>
             </div>
@@ -23,79 +34,79 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="md:col-span-2">
-                <label class="block text-sm font-medium text-primary mb-2">{{ t('servers.name') }}</label>
+                <label class="block text-sm font-medium mb-2">{{ t('servers.name') }}</label>
                 <div class="relative">
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
                         <i class="fas fa-tag"></i>
                     </div>
-                    <input name="name" required class="input-field w-full pl-11 pr-4 py-2.5" placeholder="{{ t('servers.placeholder_name') }}">
+                    <input name="name" required class="input-field w-full !pl-11 pr-4 py-2.5" placeholder="{{ t('servers.placeholder_name') }}">
                 </div>
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-primary mb-2">{{ t('servers.host_ip') }}</label>
+                <label class="block text-sm font-medium mb-2">{{ t('servers.host_ip') }}</label>
                 <div class="relative">
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
                         <i class="fas fa-network-wired text-xs"></i>
                     </div>
-                    <input name="host" required class="input-field w-full pl-11 pr-4 py-2.5" placeholder="{{ t('servers.placeholder_ip') }}">
+                    <input name="host" required class="input-field w-full !pl-11 pr-4 py-2.5" placeholder="{{ t('servers.placeholder_ip') }}">
                 </div>
             </div>
             
             <div>
-                <label class="block text-sm font-medium text-primary mb-2">{{ t('servers.ssh_port') }}</label>
+                <label class="block text-sm font-medium mb-2">{{ t('servers.ssh_port') }}</label>
                 <div class="relative">
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
                         <i class="fas fa-plug text-xs"></i>
                     </div>
-                    <input name="port" type="number" required class="input-field w-full pl-11 pr-4 py-2.5" value="22">
+                    <input name="port" type="number" required class="input-field w-full !pl-11 pr-4 py-2.5" value="22">
                 </div>
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-primary mb-2">{{ t('servers.vpn_port_udp') }}</label>
+                <label class="block text-sm font-medium mb-2">{{ t('servers.vpn_port_udp') }}</label>
                 <div class="relative">
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
                         <i class="fas fa-door-open text-xs"></i>
                     </div>
-                    <input name="vpn_port" type="number" required class="input-field w-full pl-11 pr-4 py-2.5" value="{{ random_port }}">
+                    <input name="vpn_port" type="number" required class="input-field w-full !pl-11 pr-4 py-2.5" value="{{ random_port }}">
                 </div>
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-primary mb-2">{{ t('servers.ssh_username') }}</label>
+                <label class="block text-sm font-medium mb-2">{{ t('servers.ssh_username') }}</label>
                 <div class="relative">
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
                         <i class="fas fa-user-shield"></i>
                     </div>
-                    <input name="username" value="root" class="input-field w-full pl-11 pr-4 py-2.5 font-mono">
+                    <input name="username" value="root" class="input-field w-full !pl-11 pr-4 py-2.5 font-mono">
                 </div>
             </div>
 
             <div class="md:col-span-2">
-                <label class="block text-sm font-medium text-primary mb-2">{{ t('servers.ssh_password') }}</label>
+                <label class="block text-sm font-medium mb-2">{{ t('servers.ssh_password') }}</label>
                 <div class="relative">
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
                         <i class="fas fa-key"></i>
                     </div>
-                    <input name="password" type="password" required class="input-field w-full pl-11 pr-4 py-2.5 font-mono">
+                    <input name="password" type="password" required class="input-field w-full !pl-11 pr-4 py-2.5 font-mono">
                 </div>
             </div>
         </div>
 
         <div class="border-t border-default pt-6">
-            <h3 class="text-base font-semibold text-primary mb-4 flex items-center">
-                <i class="fas fa-shield-alt mr-2 text-primary"></i>
+            <h3 class="text-base font-semibold mb-4 flex items-center">
+                <i class="fas fa-shield-alt mr-2 text-muted"></i>
                 {{ t('servers.awg_settings') }}
             </h3>
             
             <div class="p-4 bg-panel/30 rounded-lg border border-default">
-                <label class="block text-sm font-medium text-primary mb-2">{{ t('servers.mimicry') }}</label>
+                <label class="block text-sm font-medium mb-2">{{ t('servers.mimicry') }}</label>
                 <div class="relative mb-3">
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
                         <i class="fas fa-mask"></i>
                     </div>
-                    <select name="mimicry_type" class="input-field w-full pl-11 pr-10 py-2.5 appearance-none">
+                    <select name="mimicry_type" class="input-field w-full !pl-11 pr-10 py-2.5 appearance-none">
                         <option value="quic">{{ t('servers.mimicry_quic') }}</option>
                         <option value="dns">{{ t('servers.mimicry_dns') }}</option>
                         <option value="stun">{{ t('servers.mimicry_stun') }}</option>
@@ -110,32 +121,6 @@
             </div>
         </div>
         
-        <div class="border-t border-default pt-6">
-            <label class="flex items-center cursor-pointer">
-                <input type="checkbox" id="enableImport" name="enable_import" class="sr-only" onchange="toggleImportFields()">
-                <div class="w-10 h-6 toggle-bg rounded-full peer transition-colors relative cursor-pointer">
-                    <div class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform peer-checked:translate-x-4"></div>
-                </div>
-                <span class="ml-3 text-sm font-medium text-primary">{{ t('servers.import_from_panel') }}</span>
-            </label>
-            
-            <div id="importFields" style="display: none;" class="mt-4 p-4 bg-panel/30 rounded-lg border border-default space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-primary mb-2">{{ t('servers.select_panel_type') }}</label>
-                    <select name="panel_type" class="input-field w-full px-4 py-2.5">
-                        <option value="">-- {{ t('form.select') }} --</option>
-                        <option value="wg-easy">wg-easy</option>
-                        <option value="3x-ui">3x-ui</option>
-                    </select>
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-primary mb-2">{{ t('servers.upload_backup_file') }}</label>
-                    <input type="file" name="backup_file" accept=".json" class="input-field w-full px-4 py-2.5 text-sm file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-surface-hover file:text-secondary hover:file:bg-surface-border cursor-pointer">
-                    <p class="mt-2 text-xs text-muted">{{ t('servers.backup_file_hint') }}</p>
-                </div>
-            </div>
-        </div>
         
         <div class="pt-4">
             <button type="submit" class="btn-primary w-full py-3 text-sm font-semibold">

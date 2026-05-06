@@ -1,0 +1,42 @@
+-- Add missing translations for the new Dashboard UI
+INSERT INTO translations (locale, category, key_name, translation) VALUES
+-- English
+('en', 'dashboard', 'overview_subtitle', 'Global fleet and client overview'),
+('en', 'dashboard', 'active_nodes', 'Nodes across regions'),
+('en', 'dashboard', 'provisioned_access', 'Total access keys'),
+('en', 'dashboard', 'total_ingress', 'Cumulative inbound traffic'),
+('en', 'dashboard', 'total_egress', 'Cumulative outbound traffic'),
+('en', 'dashboard', 'traffic_analytics', 'Traffic Analytics'),
+('en', 'dashboard', 'fleet_search', 'Global Fleet Search'),
+('en', 'dashboard', 'search_placeholder', 'Search clients by name, IP or server...'),
+('en', 'status', 'live_monitoring', 'Live Monitoring'),
+('en', 'common', 'download', 'Download'),
+('en', 'common', 'upload', 'Upload'),
+('en', 'common', 'selected_count', '%s selected'),
+-- Ukrainian
+('uk', 'dashboard', 'overview_subtitle', 'Загальний огляд флоту та клієнтів'),
+('uk', 'dashboard', 'active_nodes', 'Вузли в різних регіонах'),
+('uk', 'dashboard', 'provisioned_access', 'Всього ключів доступу'),
+('uk', 'dashboard', 'total_ingress', 'Сумарний вхідний трафік'),
+('uk', 'dashboard', 'total_egress', 'Сумарний вихідний трафік'),
+('uk', 'dashboard', 'traffic_analytics', 'Аналітика трафіку'),
+('uk', 'dashboard', 'fleet_search', 'Глобальний пошук'),
+('uk', 'dashboard', 'search_placeholder', 'Пошук клієнтів за ім\'ям, IP або сервером...'),
+('uk', 'status', 'live_monitoring', 'Живий моніторинг'),
+('uk', 'common', 'download', 'Завантаження'),
+('uk', 'common', 'upload', 'Віддача'),
+('uk', 'common', 'selected_count', 'Вибрано: %s'),
+-- Russian
+('ru', 'dashboard', 'overview_subtitle', 'Общий обзор флота и клиентов'),
+('ru', 'dashboard', 'active_nodes', 'Узлы в разных регионах'),
+('ru', 'dashboard', 'provisioned_access', 'Всего ключей доступа'),
+('ru', 'dashboard', 'total_ingress', 'Суммарный входящий трафик'),
+('ru', 'dashboard', 'total_egress', 'Суммарный исходящий трафик'),
+('ru', 'dashboard', 'traffic_analytics', 'Аналитика трафика'),
+('ru', 'dashboard', 'fleet_search', 'Глобальный поиск'),
+('ru', 'dashboard', 'search_placeholder', 'Поиск клиентов по имени, IP или серверу...'),
+('ru', 'status', 'live_monitoring', 'Живой мониторинг'),
+('ru', 'common', 'download', 'Загрузка'),
+('ru', 'common', 'upload', 'Отдача'),
+('ru', 'common', 'selected_count', 'Выбрано: %s')
+ON DUPLICATE KEY UPDATE translation = VALUES(translation);

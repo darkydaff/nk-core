@@ -3,12 +3,22 @@
 	{{ server.name }}
 {% endblock %}
 
+{% block breadcrumbs %}
+    <li class="flex items-center">
+        <a href="/servers" class="hover:text-primary">{{ t('menu.servers') }}</a>
+    </li>
+    <li class="flex items-center">
+        <i class="fas fa-chevron-right mx-2 opacity-30"></i>
+        <span>{{ server.name }}</span>
+    </li>
+{% endblock %}
+
 {% block content %}
 	<div class="w-full mx-auto max-w-7xl">
 		<div class="mb-6 flex flex-col md:flex-row md:items-start justify-between gap-4">
 			<div>
-				<h1 class="text-2xl font-bold text-primary flex items-center">
-					<div class="w-10 h-10 rounded-lg bg-surface-hover text-primary flex items-center justify-center mr-3">
+				<h1 class="text-3xl font-bold flex items-center tracking-tight">
+					<div class="w-12 h-12 rounded-xl bg-surface-hover text-primary flex items-center justify-center mr-4">
 						<i class="fas fa-server"></i>
 					</div>
 					{{ server.name }}
@@ -84,7 +94,7 @@
 					<i class="fas fa-users text-muted text-xs"></i>
 				</div>
 				<div class="flex items-end gap-2">
-					<span class="text-2xl font-bold text-primary" id="summary-total">{{ stats_summary.total }}</span>
+					<span class="text-2xl font-bold" id="summary-total">{{ stats_summary.total }}</span>
 				</div>
 			</div>
 			<div class="panel p-5 border-l-4 border-primary">
@@ -128,14 +138,14 @@
 							<i class="fas fa-microchip text-lg"></i>
 						</div>
 						<div>
-							<h3 class="text-sm font-bold text-primary tracking-wide uppercase">{{ t('monitoring.beszel_health') }}</h3>
+							<h3 class="text-sm font-bold tracking-wide uppercase">{{ t('monitoring.beszel_health') }}</h3>
 							<p class="text-[10px] text-muted font-medium" id="beszel-uptime">{{ t('common.loading') }}</p>
 						</div>
 					</div>
 					<div class="flex items-center gap-6">
 						<div class="text-right">
 							<p class="text-[10px] text-muted uppercase font-bold tracking-tighter">{{ t('monitoring.load_avg') }}</p>
-							<p class="text-xs text-primary font-mono bg-panel/50 px-2 py-0.5 rounded" id="beszel-load">0.00 0.00 0.00</p>
+							<p class="text-xs font-mono bg-panel/50 px-2 py-0.5 rounded" id="beszel-load">0.00 0.00 0.00</p>
 						</div>
 						{% if beszel_config.url %}
 							<a href="{{ beszel_config.url }}" target="_blank" class="w-8 h-8 rounded-full bg-surface-hover flex items-center justify-center text-amber-500 hover:bg-amber-500 hover:text-white transition-all shadow-sm" title="{{ t('monitoring.open_hub') }}">
@@ -151,7 +161,7 @@
 					<div class="space-y-2">
 						<div class="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider">
 							<span class="text-muted">{{ t('monitoring.cpu_usage') }}</span>
-							<span id="beszel-cpu-val" class="text-primary">0%</span>
+							<span id="beszel-cpu-val">0%</span>
 						</div>
 						<div class="h-2 w-full bg-surface-hover rounded-full overflow-hidden">
 							<div id="beszel-cpu-bar" class="h-full bg-amber-500 transition-all duration-500" style="width: 0%"></div>
@@ -163,7 +173,7 @@
 					<div class="space-y-2">
 						<div class="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider">
 							<span class="text-muted">{{ t('monitoring.memory_usage') }}</span>
-							<span id="beszel-ram-val" class="text-primary">0%</span>
+							<span id="beszel-ram-val">0%</span>
 						</div>
 						<div class="h-2 w-full bg-surface-hover rounded-full overflow-hidden">
 							<div id="beszel-ram-bar" class="h-full bg-cyan-500 transition-all duration-500" style="width: 0%"></div>
@@ -175,7 +185,7 @@
 					<div class="space-y-2">
 						<div class="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider">
 							<span class="text-muted">{{ t('monitoring.disk_usage') }}</span>
-							<span id="beszel-disk-val" class="text-primary">0%</span>
+							<span id="beszel-disk-val">0%</span>
 						</div>
 						<div class="h-2 w-full bg-surface-hover rounded-full overflow-hidden">
 							<div id="beszel-disk-bar" class="h-full bg-purple-500 transition-all duration-500" style="width: 0%"></div>
@@ -187,12 +197,12 @@
 					<div class="space-y-2 flex flex-col justify-center">
 						<div class="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider">
 							<span class="text-muted">{{ t('monitoring.bandwidth') }}</span>
-							<span id="beszel-bw-total" class="text-primary">0 {{ t('common.mbps') }}</span>
+							<span id="beszel-bw-total" class="font-bold">0 {{ t('common.mbps') }}</span>
 						</div>
 						<div class="flex justify-between items-center bg-surface-hover/50 rounded-lg px-3 py-2">
 							<div class="flex flex-col">
 								<span class="text-[9px] text-muted uppercase font-bold opacity-50">{{ t('monitoring.download') }}</span>
-								<span id="beszel-bw-rx" class="text-xs text-primary font-mono">0 {{ t('common.mbps') }}</span>
+								<span id="beszel-bw-rx" class="text-xs dark:text-emerald-400 text-emerald-600 font-mono">0 {{ t('common.mbps') }}</span>
 							</div>
 							<div class="w-px h-6 bg-surface-border"></div>
 							<div class="flex flex-col text-right">
@@ -210,29 +220,29 @@
 			<!-- Quick Info & Add Client -->
 			<div class="lg:col-span-1 space-y-6">
 				<div class="panel p-5">
-					<h3 class="text-sm font-semibold mb-4 text-primary uppercase tracking-wider opacity-70">{{ t('servers.server_info') }}</h3>
+					<h3 class="text-sm font-semibold mb-4 uppercase tracking-wider opacity-70">{{ t('servers.server_info') }}</h3>
 					<div class="space-y-4">
 						<div>
 							<span class="text-[10px] text-muted block uppercase font-bold">{{ t('servers.vpn_port') }}</span>
-							<span class="text-sm text-primary font-mono">{{ server.vpn_port }}</span>
+							<span class="text-sm font-mono">{{ server.vpn_port }}</span>
 						</div>
 						<div>
 							<span class="text-[10px] text-muted block uppercase font-bold">{{ t('servers.subnet') }}</span>
-							<span class="text-sm text-primary font-mono">{{ server.vpn_subnet }}</span>
+							<span class="text-sm font-mono">{{ server.vpn_subnet }}</span>
 						</div>
 						<div>
 							<span class="text-[10px] text-muted block uppercase font-bold">{{ t('servers.protocol') }}</span>
-							<span class="text-sm text-primary font-mono uppercase">{{ server.awg_params.mimicry_type|default('quic') }}</span>
+							<span class="text-sm font-mono uppercase">{{ server.awg_params.mimicry_type|default('quic') }}</span>
 						</div>
 					</div>
 				</div>
 
 				<div class="panel p-5">
-					<h3 class="text-sm font-semibold mb-4 text-primary uppercase tracking-wider opacity-70">{{ t('clients.add') }}</h3>
+					<h3 class="text-sm font-semibold mb-4 uppercase tracking-wider opacity-70">{{ t('clients.add') }}</h3>
 					<form onsubmit="handleAjaxForm(event, '/servers/{{ server.id }}/clients/create')" id="createClientForm">
 						<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 						<div class="mb-3">
-							<input name="name" required class="w-full bg-base border border-default rounded-lg py-2.5 px-4 text-sm text-primary placeholder-slate-500 focus:outline-none focus:border-primary transition-all" placeholder="{{ t('clients.client_name') }}" id="clientName">
+							<input name="name" required class="input-field" placeholder="{{ t('clients.client_name') }}" id="clientName">
 						</div>
 						<button type="submit" class="btn-primary w-full py-2.5 text-sm" id="createClientBtn">
 							<i class="fas fa-plus mr-2"></i>
@@ -248,7 +258,7 @@
 				<div class="panel overflow-hidden flex flex-col min-h-[500px]">
 					<div class="px-5 py-4 border-b border-default bg-panel/30 flex items-center justify-between gap-4">
 						<div class="flex items-center gap-4">
-                            <h2 class="text-sm font-semibold text-primary uppercase tracking-widest opacity-70">{{ t('dashboard.fleet_search', [], 'Server Clients') }}</h2>
+                            <h2 class="text-sm font-semibold uppercase tracking-widest opacity-70">{{ t('dashboard.fleet_search', [], 'Server Clients') }}</h2>
                             <!-- Batch Actions Bar (Responsive) -->
                             <div id="batchActionBar" class="hidden flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-full animate-fade-in 
                                  fixed bottom-6 left-4 right-4 md:relative md:bottom-auto md:left-auto md:right-auto md:bg-primary/10 
@@ -275,30 +285,30 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
-						<div class="flex flex-wrap items-center gap-3">
+                        </div>						<div class="flex flex-wrap items-center gap-2">
 							<div class="relative w-48 lg:w-64">
-								<input type="text" id="clientSearch" class="w-full bg-base border border-default rounded-lg py-2 pl-10 pr-4 text-sm text-primary placeholder-slate-500 focus:outline-none focus:border-primary transition-all" placeholder="{{ t('dashboard.search_placeholder', [], 'Search clients...') }}">
-								<i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-muted text-xs"></i>
+								<input type="text" id="clientSearch" class="input-field input-with-icon !py-2 text-sm" placeholder="{{ t('dashboard.search_placeholder', [], 'Search clients...') }}">
+								<i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-muted text-xs"></i>
 							</div>
-							<select id="statusFilter" class="bg-base border border-default rounded-lg py-2 px-3 text-[11px] text-secondary focus:outline-none focus:border-primary transition-all cursor-pointer">
+							<select id="statusFilter" class="input-field !w-auto !py-2 px-3 text-[11px] font-bold">
 								<option value="all">{{ t('common.status_all', [], 'All Status') }}</option>
 								<option value="online">{{ t('common.status_online', [], 'Online') }}</option>
 								<option value="offline">{{ t('common.status_offline', [], 'Offline') }}</option>
 								<option value="revoked">{{ t('common.status_revoked', [], 'Revoked') }}</option>
 							</select>
-							<select id="trafficFilter" class="bg-base border border-default rounded-lg py-2 px-3 text-[11px] text-secondary focus:outline-none focus:border-primary transition-all cursor-pointer">
+							<select id="trafficFilter" class="input-field !w-auto !py-2 px-3 text-[11px] font-bold">
 								<option value="all">{{ t('common.traffic_all', [], 'All Traffic') }}</option>
 								<option value="medium">{{ t('common.traffic_medium', [], '> 100MB') }}</option>
 								<option value="high">{{ t('common.traffic_high', [], '> 1GB') }}</option>
 							</select>
-							<select id="sortFilter" class="bg-base border border-default rounded-lg py-2 px-3 text-[11px] text-secondary focus:outline-none focus:border-primary transition-all cursor-pointer">
+							<select id="sortFilter" class="input-field !w-auto !py-2 px-3 text-[11px] font-bold">
 								<option value="recent">{{ t('common.sort_newest', [], 'Newest') }}</option>
 								<option value="handshake">{{ t('common.sort_handshake', [], 'Last Activity') }}</option>
 								<option value="traffic">{{ t('common.sort_traffic', [], 'Most Traffic') }}</option>
 								<option value="oldest">{{ t('common.sort_oldest', [], 'Oldest') }}</option>
 							</select>
 						</div>
+
 					</div>
 
 					<div
@@ -496,7 +506,7 @@ function renderResults(results) {
                             <input type="checkbox" name="client_ids[]" value="${client.id}" class="client-checkbox rounded border-default bg-base text-primary focus:ring-primary/20 cursor-pointer">
                             <div class="w-8 h-8 rounded bg-surface-hover flex items-center justify-center text-sm">${client.flag}</div>
                             <div>
-                                <span class="text-sm font-bold ${isDisabled ? 'text-muted line-through' : 'text-primary'} block">${client.name}</span>
+                                <span class="text-sm font-bold ${isDisabled ? 'text-muted line-through' : ''} block">${client.name}</span>
                             </div>
                         </div>
                         <div class="flex items-center gap-1.5">
@@ -511,15 +521,15 @@ function renderResults(results) {
                     <div class="flex items-center justify-between text-[10px] bg-panel/50 rounded p-2">
                         <div class="flex flex-col">
                             <span class="text-muted uppercase font-bold tracking-tighter">${labels.traffic}</span>
-                            <span class="text-primary font-mono font-medium">${client.total_traffic}</span>
+                            <span class="font-mono font-medium">${client.total_traffic}</span>
                             <div class="flex gap-2 mt-1">
-                                <span class="text-[9px] dark:text-sky-400 text-sky-600 font-bold flex items-center bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20"><i class="fas fa-arrow-down mr-1 opacity-70"></i>${client.speed_down}</span>
-                                <span class="text-[9px] dark:text-indigo-400 text-indigo-600 font-bold flex items-center bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20"><i class="fas fa-arrow-up mr-1 opacity-70"></i>${client.speed_up}</span>
+                                <span class="text-[9px] dark:text-emerald-400 text-emerald-600 font-bold flex items-center bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20"><i class="fas fa-arrow-down mr-1 opacity-70"></i>${client.speed_down}</span>
+                                <span class="text-[9px] text-primary font-bold flex items-center bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20"><i class="fas fa-arrow-up mr-1 opacity-70"></i>${client.speed_up}</span>
                             </div>
                         </div>
                         <div class="flex flex-col text-right">
                             <span class="text-muted uppercase font-bold tracking-tighter">${labels.lastSeenLabel}</span>
-                            <span class="text-primary font-mono font-medium">${client.last_seen}</span>
+                            <span class="font-mono font-medium">${client.last_seen}</span>
                         </div>
                     </div>
                     <div class="flex items-center justify-between pt-2 border-t border-default/50">
@@ -528,7 +538,7 @@ function renderResults(results) {
                             <button onclick="clientAction(${client.id}, 'sync-stats', this)" class="p-2 text-muted hover:text-cyan-400"><i class="fas fa-sync-alt"></i></button>
                             <button onclick="clientAction(${client.id}, '${isDisabled ? 'restore' : 'revoke'}', this)" class="p-2 ${isDisabled ? 'text-green-500' : 'text-muted hover:text-orange-400'}"><i class="fas ${isDisabled ? 'fa-user-check' : 'fa-user-slash'}"></i></button>
                             <button onclick="clientAction(${client.id}, 'delete', this)" class="p-2 text-muted hover:text-red-500"><i class="fas fa-trash-alt"></i></button>
-                            <a href="/clients/${client.id}" class="ml-2 text-[10px] bg-primary text-primary px-3 py-1.5 rounded uppercase font-bold tracking-wider">${labels.edit}</a>
+                            <a href="/clients/${client.id}" class="ml-2 text-[10px] bg-primary text-white px-3 py-1.5 rounded-lg uppercase font-bold tracking-wider hover:bg-primary-hover transition-all">${labels.edit}</a>
                         </div>
                     </div>
                 </div>
@@ -566,7 +576,7 @@ function renderResults(results) {
                                 ${client.flag}
                             </div>
                             <div>
-                                <span class="text-sm font-medium ${isDisabled ? 'text-muted line-through' : 'text-primary'} block">${client.name}</span>
+                                <span class="text-sm font-medium ${isDisabled ? 'text-muted line-through' : ''} block">${client.name}</span>
                             </div>
                         </div>
                     </td>
@@ -583,12 +593,12 @@ function renderResults(results) {
                             <code class="text-[10px] text-secondary font-mono">${client.external_ip || 'No IP'}</code>
                         </div>
                     </td>
-                    <td class="px-5 py-4 text-primary font-mono text-xs">
+                    <td class="px-5 py-4 font-mono text-xs">
                         <div class="flex flex-col">
                             <span class="font-medium">${client.total_traffic}</span>
                             <div class="flex gap-2">
-                                <span class="text-[9px] dark:text-sky-400 text-sky-600 font-bold flex items-center bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20"><i class="fas fa-arrow-down mr-1 opacity-70"></i>${client.speed_down}</span>
-                                <span class="text-[9px] dark:text-indigo-400 text-indigo-600 font-bold flex items-center bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20"><i class="fas fa-arrow-up mr-1 opacity-70"></i>${client.speed_up}</span>
+                                <span class="text-[9px] dark:text-emerald-400 text-emerald-600 font-bold flex items-center bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20"><i class="fas fa-arrow-down mr-1 opacity-70"></i>${client.speed_down}</span>
+                                <span class="text-[9px] text-primary font-bold flex items-center bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20"><i class="fas fa-arrow-up mr-1 opacity-70"></i>${client.speed_up}</span>
                             </div>
                             <span class="text-[10px] text-muted uppercase tracking-tighter">${client.last_seen}</span>
                         </div>
@@ -605,7 +615,7 @@ function renderResults(results) {
                             <button onclick="clientAction(${client.id}, 'delete', this)" class="p-1.5 text-muted hover:text-red-500" title="${labels.delete}">
                                 <i class="fas fa-trash-alt text-xs"></i>
                             </button>
-                            <a href="/clients/${client.id}" class="ml-2 text-[10px] bg-panel hover:bg-primary text-secondary hover:text-primary px-2 py-1 rounded border border-default uppercase font-bold tracking-wider transition-all">
+                            <a href="/clients/${client.id}" class="ml-2 text-[10px] bg-panel hover:bg-primary text-secondary hover:text-white px-2 py-1 rounded border border-default uppercase font-bold tracking-wider transition-all">
                                 ${labels.edit}
                             </a>
                         </div>

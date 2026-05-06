@@ -1,6 +1,13 @@
 {% extends "layout.twig" %}
 {% block title %}{{ t('map.title')|default('Intelligence Map') }} — {{ app_name }}{% endblock %}
 
+{% block breadcrumbs %}
+    <li class="flex items-center">
+        <span>{{ t('map.title')|default('Intelligence Map') }}</span>
+    </li>
+{% endblock %}
+
+
 {% block styles %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
@@ -22,16 +29,16 @@
     /* Pulsing dot for online clients */
     .pulse-dot {
         width: 14px; height: 14px; border-radius: 50%;
-        background: #5b8def;
-        border: 2px solid rgba(91,141,239,0.5);
-        box-shadow: 0 0 8px rgba(91,141,239,0.8);
+        background: var(--color-primary);
+        border: 2px solid var(--color-primary-light);
+        box-shadow: 0 0 8px var(--color-primary-light);
         position: absolute; top: 50%; left: 50%;
         transform: translate(-50%, -50%);
     }
     .pulse-ring {
         width: 28px; height: 28px; border-radius: 50%;
-        background: rgba(91,141,239,0.25);
-        border: 2px solid rgba(91,141,239,0.4);
+        background: var(--color-primary-light);
+        border: 2px solid var(--color-primary-light);
         position: absolute; top: 50%; left: 50%;
         transform: translate(-50%, -50%);
         animation: pulse-expand 2s ease-out infinite;
@@ -56,59 +63,62 @@
 
     /* Popup styles */
     .leaflet-popup-content-wrapper {
-        background: #1e293b;
-        border: 1px solid rgba(255,255,255,0.1);
-        border-radius: 10px; color: #e2e8f0;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        background: var(--color-surface-panel);
+        border: 1px solid var(--color-surface-border);
+        border-radius: 12px; 
+        color: var(--color-content-primary);
+        box-shadow: var(--shadow);
     }
-    .leaflet-popup-tip { background: #1e293b; }
-    .leaflet-popup-content { margin: 0; min-width: 220px; max-width: 280px; }
-    .leaflet-popup-close-button { color: #94a3b8 !important; top: 10px !important; right: 12px !important; }
+    .leaflet-popup-tip { background: var(--color-surface-panel); }
+    .leaflet-popup-content { margin: 0; min-width: 240px; max-width: 300px; }
+    .leaflet-popup-close-button { color: var(--color-content-secondary) !important; top: 12px !important; right: 12px !important; }
 
     /* Single client popup */
-    .popup-inner { padding: 14px 16px; }
+    .popup-inner { padding: 16px; }
     .popup-name {
-        font-size: 14px; font-weight: 600; color: #e2e8f0;
-        margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
-        padding-right: 18px;
+        font-size: 14px; font-weight: 700; color: var(--color-content-primary);
+        margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+        padding-right: 20px;
     }
     .popup-status-badge {
-        font-size: 10px; padding: 2px 7px; border-radius: 999px;
-        font-weight: 600; letter-spacing: 0.04em; white-space: nowrap;
+        font-size: 10px; padding: 2px 8px; border-radius: 999px;
+        font-weight: 700; uppercase; tracking-wider; white-space: nowrap;
     }
-    .popup-status-online  { background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.3); }
-    .popup-status-offline { background: rgba(100,116,139,0.2); color: #94a3b8; border: 1px solid rgba(100,116,139,0.3); }
+    .popup-status-online  { background: var(--color-status-active-light); color: var(--color-status-active); border: 1px solid var(--color-status-active-border); }
+    .popup-status-offline { background: var(--color-status-offline-light); color: var(--color-status-offline); border: 1px solid var(--color-status-offline-border); }
+    
     .popup-row {
-        font-size: 12px; color: #94a3b8;
-        display: flex; align-items: flex-start; gap: 6px; margin-bottom: 4px;
+        font-size: 12px; color: var(--color-content-secondary);
+        display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px;
     }
-    .popup-row i { width: 14px; text-align: center; margin-top: 1px; color: #64748b; flex-shrink: 0; }
+    .popup-row i { width: 14px; text-align: center; margin-top: 1px; color: var(--color-content-muted); flex-shrink: 0; }
     .popup-link {
-        display: inline-flex; align-items: center; gap: 5px;
-        margin-top: 10px; font-size: 12px; color: #5b8def;
-        text-decoration: none; font-weight: 500;
+        display: inline-flex; align-items: center; gap: 6px;
+        margin-top: 12px; font-size: 11px; color: var(--color-primary);
+        text-decoration: none; font-weight: 700; text-transform: uppercase; tracking-wider;
     }
-    .popup-link:hover { color: #88aaee; }
+    .popup-link:hover { color: var(--color-primary-dark); }
 
     /* Multi-client popup (list) */
     .popup-header {
-        padding: 12px 16px 10px;
-        border-bottom: 1px solid rgba(255,255,255,0.08);
-        font-size: 12px; font-weight: 600;
-        color: #94a3b8; text-transform: uppercase; letter-spacing: 0.06em;
+        padding: 14px 16px 12px;
+        border-bottom: 1px solid var(--color-surface-border);
+        font-size: 11px; font-weight: 800;
+        color: var(--color-content-secondary); text-transform: uppercase; letter-spacing: 0.08em;
     }
-    .popup-list { max-height: 260px; overflow-y: auto; padding: 6px 0; }
+    .popup-list { max-height: 280px; overflow-y: auto; padding: 4px 0; }
     .popup-list::-webkit-scrollbar { width: 4px; }
-    .popup-list::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    .popup-list::-webkit-scrollbar-thumb { background: var(--color-surface-border); border-radius: 4px; }
     .popup-list-item {
-        padding: 8px 16px;
-        border-bottom: 1px solid rgba(255,255,255,0.04);
-        cursor: pointer; transition: background 0.15s;
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--color-surface-border);
+        cursor: pointer; transition: all 0.2s;
     }
-    .popup-list-item:hover { background: rgba(255,255,255,0.04); }
+    .popup-list-item:hover { background: var(--color-surface-hover); }
     .popup-list-item:last-child { border-bottom: none; }
-    .popup-item-name { font-size: 13px; font-weight: 600; color: #e2e8f0; display: flex; align-items: center; gap: 6px; margin-bottom: 3px; }
-    .popup-item-meta { font-size: 11px; color: #64748b; display: flex; gap: 10px; }
+    .popup-item-name { font-size: 13px; font-weight: 700; color: var(--color-content-primary); display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .popup-item-meta { font-size: 11px; color: var(--color-content-secondary); display: flex; flex-wrap: wrap; gap: 10px; }
+    .popup-item-meta i { color: var(--color-content-muted); }
 
     /* Map toolbar */
     #mapToolbar {
@@ -116,35 +126,39 @@
         z-index: 1000; display: flex; gap: 8px;
     }
     .map-btn {
-        background: rgba(15,23,42,0.9); border: 1px solid rgba(255,255,255,0.1);
-        color: #94a3b8; padding: 7px 14px; border-radius: 8px;
-        font-size: 12px; font-weight: 500; cursor: pointer;
-        display: flex; align-items: center; gap: 6px;
-        backdrop-filter: blur(8px); transition: all 0.2s; white-space: nowrap;
+        background: var(--color-surface-panel); 
+        border: 1px solid var(--color-surface-border);
+        color: var(--color-content-secondary); 
+        padding: 8px 16px; border-radius: 10px;
+        font-size: 11px; font-weight: 700; cursor: pointer;
+        display: flex; align-items: center; gap: 8px;
+        backdrop-filter: blur(12px); transition: all 0.2s; white-space: nowrap;
+        text-transform: uppercase; tracking-wider;
     }
-    .map-btn:hover { border-color: rgba(91,141,239,0.5); color: #e2e8f0; }
-    .map-btn.active { background: rgba(91,141,239,0.15); border-color: rgba(91,141,239,0.5); color: #5b8def; }
+    .map-btn:hover { border-color: var(--color-primary); color: var(--color-content-primary); background: var(--color-surface-base); }
+    .map-btn.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
 
     /* Stats bar */
     #mapStats {
-        display: flex; align-items: center; gap: 20px;
-        padding: 10px 16px;
-        background: rgba(30,41,59,0.8); border: 1px solid rgba(255,255,255,0.07);
-        border-radius: 10px; margin-bottom: 12px; backdrop-filter: blur(8px); flex-wrap: wrap;
+        display: flex; align-items: center; gap: 24px;
+        padding: 12px 20px;
+        background: var(--color-surface-panel); 
+        border: 1px solid var(--color-surface-border);
+        border-radius: 12px; margin-bottom: 16px; backdrop-filter: blur(12px); flex-wrap: wrap;
     }
-    .stat-item { display: flex; align-items: center; gap: 6px; font-size: 13px; }
-    .stat-dot { width: 8px; height: 8px; border-radius: 50%; }
-    .stat-dot-online  { background: #5b8def; box-shadow: 0 0 6px rgba(91,141,239,0.6); }
-    .stat-dot-offline { background: #475569; }
-    .stat-label { color: #94a3b8; }
-    .stat-value { color: #e2e8f0; font-weight: 600; }
+    .stat-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+    .stat-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .stat-dot-online  { background: var(--color-status-active); box-shadow: 0 0 10px var(--color-status-active-light); }
+    .stat-dot-offline { background: var(--color-status-offline); }
+    .stat-label { color: var(--color-content-secondary); font-weight: 500; }
+    .stat-value { color: var(--color-content-primary); font-weight: 800; font-family: 'Geist Mono', monospace; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="w-full">
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-        <h1 class="text-2xl font-bold text-primary flex items-center">
+        <h1 class="text-2xl font-bold flex items-center">
             <div class="w-10 h-10 rounded-lg bg-surface-hover text-primary flex items-center justify-center mr-3">
                 <i class="fas fa-globe-europe"></i>
             </div>
@@ -177,13 +191,13 @@
         <!-- Filter Toolbar overlaid on map -->
         <div id="mapToolbar">
             <button class="map-btn active" id="btnAll" onclick="setFilter('all')">
-                <i class="fas fa-globe"></i> {{ t('common.status_all')|default('All') }}
+                <i class="fas fa-globe"></i> {{ t('common.status_all', [], 'All') }}
             </button>
             <button class="map-btn" id="btnOnline" onclick="setFilter('online')">
-                <i class="fas fa-circle" style="color:#5b8def;font-size:8px;"></i> {{ t('common.status_online')|default('Online') }}
+                <i class="fas fa-circle text-[8px] text-status-active"></i> {{ t('common.status_online', [], 'Online') }}
             </button>
             <button class="map-btn" id="btnOffline" onclick="setFilter('offline')">
-                <i class="fas fa-circle" style="color:#475569;font-size:8px;"></i> {{ t('common.status_offline')|default('Offline') }}
+                <i class="fas fa-circle text-[8px] text-muted"></i> {{ t('common.status_offline', [], 'Offline') }}
             </button>
         </div>
     </div>
@@ -194,11 +208,24 @@
 document.addEventListener('DOMContentLoaded', function () {
 
     const map = L.map('map', { center: [58, 60], zoom: 4 });
+    let tileLayer;
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
-        subdomains: 'abcd', maxZoom: 19
-    }).addTo(map);
+    function updateMapTheme() {
+        if (tileLayer) map.removeLayer(tileLayer);
+        
+        const isDark = document.documentElement.classList.contains('dark');
+        const tileUrl = isDark 
+            ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+            : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+            
+        tileLayer = L.tileLayer(tileUrl, {
+            attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+            subdomains: 'abcd', maxZoom: 19
+        }).addTo(map);
+    }
+
+    updateMapTheme();
+    window.addEventListener('themeChanged', updateMapTheme);
 
     let allMarkers = [];
     let currentFilter = 'all';
@@ -279,7 +306,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>`).join('');
 
         return `<div class="popup-header">
-                    <i class="fas fa-map-marker-alt" style="margin-right:5px;color:#5b8def;"></i>
+                    <i class="fas fa-map-marker-alt" style="margin-right:5px;color:var(--color-primary);"></i>
                     ${location} &mdash; ${group.length} clients, ${onlineCount} online
                 </div>
                 <div class="popup-list">${items}</div>`;
