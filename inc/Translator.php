@@ -72,6 +72,44 @@ class Translator
             ");
             $stmt->execute([$locale, $locale]);
         }
+
+        self::seedEssentialTranslations();
+    }
+
+    /**
+     * Ensure core status and common translations exist for all primary locales.
+     * This acts as an automatic migration for critical UI components.
+     */
+    private static function seedEssentialTranslations(): void
+    {
+        $pdo = DB::conn();
+        $essential = [
+            'status.online' => ['en' => 'Online', 'uk' => 'В мережі', 'ru' => 'В сети'],
+            'status.offline' => ['en' => 'Offline', 'uk' => 'Офлайн', 'ru' => 'Оффлайн'],
+            'status.revoked' => ['en' => 'Revoked', 'uk' => 'Відкликано', 'ru' => 'Отозван'],
+            'status.provisioning' => ['en' => 'Provisioning', 'uk' => 'Налаштування', 'ru' => 'Настройка'],
+            'status.deleting' => ['en' => 'Deleting', 'uk' => 'Видалення', 'ru' => 'Удаление'],
+            'status.verifying' => ['en' => 'Verifying', 'uk' => 'Перевірка', 'ru' => 'Проверка'],
+            'status.error' => ['en' => 'Error', 'uk' => 'Помилка', 'ru' => 'Ошибка'],
+            'status.never' => ['en' => 'Never Connected', 'uk' => 'Не підключався', 'ru' => 'Не подключался'],
+            'status.all' => ['en' => 'All Status', 'uk' => 'Усі статуси', 'ru' => 'Все статусы'],
+            // Also seed common filter labels to ensure consistency
+            'common.status_all' => ['en' => 'All Status', 'uk' => 'Усі статуси', 'ru' => 'Все статусы'],
+            'common.status_online' => ['en' => 'Online', 'uk' => 'В мережі', 'ru' => 'В сети'],
+            'common.status_offline' => ['en' => 'Offline', 'uk' => 'Офлайн', 'ru' => 'Оффлайн'],
+            'common.status_revoked' => ['en' => 'Revoked', 'uk' => 'Відкликано', 'ru' => 'Отозван'],
+        ];
+
+        $stmt = $pdo->prepare("INSERT INTO translations (locale, category, key_name, translation) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE translation = VALUES(translation)");
+
+        foreach ($essential as $key => $locales) {
+            $parts = explode('.', $key, 2);
+            $cat = $parts[0];
+            $kn = $parts[1];
+            foreach ($locales as $locale => $text) {
+                $stmt->execute([$locale, $cat, $kn, $text]);
+            }
+        }
     }
 
     /**

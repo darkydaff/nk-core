@@ -191,13 +191,13 @@
         <!-- Filter Toolbar overlaid on map -->
         <div id="mapToolbar">
             <button class="map-btn active" id="btnAll" onclick="setFilter('all')">
-                <i class="fas fa-globe"></i> {{ t('common.status_all', [], 'All') }}
+                <i class="fas fa-globe"></i> {{ t('status.all', [], 'All') }}
             </button>
             <button class="map-btn" id="btnOnline" onclick="setFilter('online')">
-                <i class="fas fa-circle text-[8px] text-status-active"></i> {{ t('common.status_online', [], 'Online') }}
+                <i class="fas fa-circle text-[8px] text-status-active"></i> {{ t('status.online', [], 'Online') }}
             </button>
             <button class="map-btn" id="btnOffline" onclick="setFilter('offline')">
-                <i class="fas fa-circle text-[8px] text-muted"></i> {{ t('common.status_offline', [], 'Offline') }}
+                <i class="fas fa-circle text-[8px] text-muted"></i> {{ t('status.offline', [], 'Offline') }}
             </button>
         </div>
     </div>
@@ -240,8 +240,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function statusBadge(status) {
         const cls = status === 'online' ? 'popup-status-online' : 'popup-status-offline';
         const label = status === 'online'
-            ? '{{ t("common.status_online")|default("Online") }}'
-            : '{{ t("common.status_offline")|default("Offline") }}';
+            ? '{{ t("status.online", [], "Online") }}'
+            : '{{ t("status.offline", [], "Offline") }}';
         return `<span class="popup-status-badge ${cls}">${label}</span>`;
     }
 

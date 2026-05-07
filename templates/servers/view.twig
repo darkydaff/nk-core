@@ -294,7 +294,7 @@
 								<option value="all">{{ t('common.status_all', [], 'All Status') }}</option>
 								<option value="online">{{ t('common.status_online', [], 'Online') }}</option>
 								<option value="offline">{{ t('common.status_offline', [], 'Offline') }}</option>
-								<option value="revoked">{{ t('common.status_revoked', [], 'Revoked') }}</option>
+								<option value="revoked">{{ t('status.revoked', [], 'Revoked') }}</option>
 							</select>
 							<select id="trafficFilter" class="input-field !w-auto !py-2 px-3 text-[11px] font-bold">
 								<option value="all">{{ t('common.traffic_all', [], 'All Traffic') }}</option>
@@ -387,7 +387,7 @@ const labels = {
     restore: "{{ t('common.restore') }}",
     delete: "{{ t('common.delete') }}",
     confirmDelete: "{{ t('common.confirm_delete') }}",
-    revoked: "{{ t('status.revoked')|default('REVOKED') }}",
+    revoked: "{{ t('status.revoked', [], 'Revoked') }}",
     edit: "{{ t('common.edit') }}",
     selected: "{{ t('common.selected_count', [], '%s items selected') }}",
     traffic: "{{ t('common.traffic') }}",

@@ -44,7 +44,7 @@
                         {% elseif client.status == 'error' %}
                             {{ t('status.error')|default('ERROR') }}
                         {% elseif client.status == 'disabled' %}
-                            {{ t('status.revoked')|default('REVOKED') }}
+                            {{ t('status.revoked', [], 'Revoked') }}
                         {% elseif client.connection_status == 'online' %}
                             {{ t('status.online') }}
                         {% elseif client.connection_status == 'never' %}
