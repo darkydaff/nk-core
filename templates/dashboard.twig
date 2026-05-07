@@ -216,7 +216,11 @@
             searching: "{{ t('common.searching') }}",
             noMatches: "{{ t('common.no_matches') }}",
             download: "{{ t('common.download', [], 'Download') }}",
-            upload: "{{ t('common.upload', [], 'Upload') }}"
+            upload: "{{ t('common.upload', [], 'Upload') }}",
+            provisioning: "{{ t('status.provisioning', [], 'Provisioning') }}",
+            deleting: "{{ t('status.deleting', [], 'Deleting') }}",
+            error: "{{ t('status.error', [], 'Error') }}",
+            verifying: "{{ t('status.verifying', [], 'Verifying') }}"
         };
 
         // --- Chart Configuration ---
@@ -396,10 +400,10 @@
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-1.5">
-                                    <div class="flex items-center px-1.5 py-1 rounded ${isRevoked ? 'bg-amber-500/10' : (isOnline ? 'bg-sky-500/10' : (isNever ? 'bg-slate-500/10' : 'bg-red-500/10'))} border ${isRevoked ? 'border-amber-500/20' : (isOnline ? 'border-sky-500/20' : (isNever ? 'border-slate-500/20' : 'border-red-500/20'))} h-5">
-                                        <span class="w-1 h-1 rounded-full ${isOnline ? 'bg-sky-500 animate-pulse' : (isRevoked ? 'bg-amber-500' : (isNever ? 'bg-slate-400' : 'bg-red-500'))} mr-1.5"></span>
-                                        <span class="text-[8px] uppercase tracking-wider ${isRevoked ? 'text-amber-500' : (isOnline ? 'text-sky-500' : (isNever ? 'text-slate-500' : 'text-red-500'))} font-bold">
-                                            ${isRevoked ? labels.revoked : (isOnline ? labels.online : (isNever ? labels.never : labels.offline))}
+                                    <div class="flex items-center px-1.5 py-1 rounded ${isRevoked ? 'bg-amber-500/10' : (c.db_status === 'deleting' ? 'bg-red-500/10' : (c.db_status === 'provisioning' ? 'bg-sky-500/10' : (c.db_status === 'error' ? 'bg-red-500/10' : (isOnline ? 'bg-sky-500/10' : (isNever ? 'bg-slate-500/10' : 'bg-red-500/10')))))} border ${isRevoked ? 'border-amber-500/20' : (c.db_status === 'deleting' ? 'border-red-500/20' : (c.db_status === 'provisioning' ? 'border-sky-500/20' : (c.db_status === 'error' ? 'border-red-500/20' : (isOnline ? 'border-sky-500/20' : (isNever ? 'border-slate-500/20' : 'border-red-500/20')))))} h-5">
+                                        <span class="w-1 h-1 rounded-full ${isOnline ? 'bg-sky-500 animate-pulse' : (isRevoked ? 'bg-amber-500' : (c.db_status === 'deleting' ? 'bg-red-500' : (c.db_status === 'provisioning' ? 'bg-sky-500' : (c.db_status === 'error' ? 'bg-red-500' : (isNever ? 'bg-slate-400' : 'bg-red-500')))))} mr-1.5"></span>
+                                        <span class="text-[8px] uppercase tracking-wider ${isRevoked ? 'text-amber-500' : (c.db_status === 'deleting' ? 'text-red-500' : (c.db_status === 'provisioning' ? 'text-sky-500' : (c.db_status === 'error' ? 'text-red-500' : (isOnline ? 'text-sky-500' : (isNever ? 'text-slate-500' : 'text-red-500')))))} font-bold">
+                                            ${isRevoked ? labels.revoked : (c.db_status === 'deleting' ? labels.deleting : (c.db_status === 'provisioning' ? labels.provisioning : (c.db_status === 'error' ? labels.error : (isOnline ? labels.online : (isNever ? labels.never : labels.offline)))))}
                                         </span>
                                     </div>
                                 </div>
@@ -473,10 +477,10 @@
                             <td class="px-5 py-4">
                                 <div class="flex flex-col">
                                     <div class="flex items-center gap-1.5 mb-1">
-                                        <div class="flex items-center px-1.5 py-1 rounded ${isRevoked ? 'bg-amber-500/10 border border-amber-500/20' : (isOnline ? 'bg-sky-500/10 border border-sky-500/20' : (isNever ? 'bg-slate-500/10 border border-slate-500/20' : 'bg-red-500/10 border border-red-500/20'))} h-5">
-                                            <span class="w-1 h-1 rounded-full ${isOnline ? 'bg-sky-500 animate-pulse' : (isRevoked ? 'bg-amber-500' : (isNever ? 'bg-slate-400' : 'bg-red-500'))} mr-1.5"></span>
-                                            <span class="text-[9px] uppercase tracking-wider ${isRevoked ? 'text-amber-500' : (isOnline ? 'text-sky-500' : (isNever ? 'text-slate-500' : 'text-red-500'))} font-bold leading-none">
-                                                ${isRevoked ? labels.revoked : (isOnline ? labels.online : (isNever ? labels.never : labels.offline))}
+                                        <div class="flex items-center px-1.5 py-1 rounded ${isRevoked ? 'bg-amber-500/10 border border-amber-500/20' : (c.db_status === 'deleting' ? 'bg-red-500/10 border border-red-500/20' : (c.db_status === 'provisioning' ? 'bg-sky-500/10 border border-sky-500/20' : (c.db_status === 'error' ? 'bg-red-500/10 border border-red-500/20' : (isOnline ? 'bg-sky-500/10 border border-sky-500/20' : (isNever ? 'bg-slate-500/10 border border-slate-500/20' : 'bg-red-500/10 border border-red-500/20')))))} h-5">
+                                            <span class="w-1 h-1 rounded-full ${isOnline ? 'bg-sky-500 animate-pulse' : (isRevoked ? 'bg-amber-500' : (c.db_status === 'deleting' ? 'bg-red-500' : (c.db_status === 'provisioning' ? 'bg-sky-500' : (c.db_status === 'error' ? 'bg-red-500' : (isNever ? 'bg-slate-400' : 'bg-red-500')))))} mr-1.5"></span>
+                                            <span class="text-[9px] uppercase tracking-wider ${isRevoked ? 'text-amber-500' : (c.db_status === 'deleting' ? 'text-red-500' : (c.db_status === 'provisioning' ? 'text-sky-500' : (c.db_status === 'error' ? 'text-red-500' : (isOnline ? 'text-sky-500' : (isNever ? 'text-slate-500' : 'text-red-500')))))} font-bold leading-none">
+                                                ${isRevoked ? labels.revoked : (c.db_status === 'deleting' ? labels.deleting : (c.db_status === 'provisioning' ? labels.provisioning : (c.db_status === 'error' ? labels.error : (isOnline ? labels.online : (isNever ? labels.never : labels.offline)))))}
                                             </span>
                                         </div>
                                     </div>

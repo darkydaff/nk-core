@@ -36,15 +36,19 @@
                 <span class="text-xs text-muted">
                     <i class="fas fa-calendar-alt mr-1"></i>{{ client.created_at|date('Y-m-d H:i') }}
                 </span>
-                <div class="flex items-center px-2 py-1 rounded {% if client.status == 'disabled' %}bg-orange-500/10 border-orange-500/20 text-orange-500{% elseif client.connection_status == 'online' %}bg-sky-500/10 border-sky-500/20 text-sky-500{% elseif client.connection_status == 'never' %}bg-muted/10 border-muted/20 text-muted{% else %}bg-red-500/10 border-red-500/20 text-red-500{% endif %} border h-5">
-                    <span class="w-1 h-1 rounded-full {% if client.status == 'disabled' %}bg-orange-500{% elseif client.connection_status == 'online' %}bg-sky-500 animate-pulse{% elseif client.connection_status == 'never' %}bg-muted{% else %}bg-red-500{% endif %} mr-1.5"></span>
+                <div class="flex items-center px-2 py-1 rounded {% if client.status == 'disabled' %}bg-amber-500/10 border-amber-500/20 text-amber-500{% elseif client.status == 'deleting' %}bg-red-500/10 border-red-500/20 text-red-500{% elseif client.status == 'provisioning' or client.status == 'verifying' %}bg-sky-500/10 border-sky-500/20 text-sky-500{% elseif client.status == 'error' %}bg-red-500/10 border-red-500/20 text-red-500{% elseif client.connection_status == 'online' %}bg-sky-500/10 border-sky-500/20 text-sky-500{% elseif client.connection_status == 'never' %}bg-muted/10 border-muted/20 text-muted{% else %}bg-red-500/10 border-red-500/20 text-red-500{% endif %} border h-5">
+                    <span class="w-1 h-1 rounded-full {% if client.connection_status == 'online' %}bg-sky-500 animate-pulse{% elseif client.status == 'disabled' %}bg-amber-500{% elseif client.status == 'deleting' %}bg-red-500{% elseif client.status == 'provisioning' or client.status == 'verifying' %}bg-sky-500{% elseif client.status == 'error' %}bg-red-500{% elseif client.connection_status == 'never' %}bg-muted{% else %}bg-red-500{% endif %} mr-1.5"></span>
                     <span class="text-[9px] uppercase tracking-wider font-bold leading-none">
-                        {% if client.status == 'provisioning' %}
-                            {{ t('status.provisioning')|default('PROVISIONING') }}
-                        {% elseif client.status == 'error' %}
-                            {{ t('status.error')|default('ERROR') }}
-                        {% elseif client.status == 'disabled' %}
+                        {% if client.status == 'disabled' %}
                             {{ t('status.revoked', [], 'Revoked') }}
+                        {% elseif client.status == 'deleting' %}
+                            {{ t('status.deleting', [], 'Deleting') }}
+                        {% elseif client.status == 'provisioning' %}
+                            {{ t('status.provisioning', [], 'Provisioning') }}
+                        {% elseif client.status == 'verifying' %}
+                            {{ t('status.verifying', [], 'Verifying') }}
+                        {% elseif client.status == 'error' %}
+                            {{ t('status.error', [], 'Error') }}
                         {% elseif client.connection_status == 'online' %}
                             {{ t('status.online') }}
                         {% elseif client.connection_status == 'never' %}

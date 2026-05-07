@@ -388,6 +388,10 @@ const labels = {
     delete: "{{ t('common.delete') }}",
     confirmDelete: "{{ t('common.confirm_delete') }}",
     revoked: "{{ t('status.revoked', [], 'Revoked') }}",
+    provisioning: "{{ t('status.provisioning', [], 'Provisioning') }}",
+    deleting: "{{ t('status.deleting', [], 'Deleting') }}",
+    error: "{{ t('status.error', [], 'Error') }}",
+    verifying: "{{ t('status.verifying', [], 'Verifying') }}",
     edit: "{{ t('common.edit') }}",
     selected: "{{ t('common.selected_count', [], '%s items selected') }}",
     traffic: "{{ t('common.traffic') }}",
@@ -583,12 +587,12 @@ function renderResults(results) {
                     <td class="px-5 py-4">
                         <div class="flex flex-col">
                             <div class="flex items-center gap-1.5 mb-1">
-                                <div class="flex items-center px-1.5 py-1 rounded ${isDisabled ? 'bg-orange-500/10' : (client.db_status === 'deleting' ? 'bg-red-500/10' : (client.db_status === 'provisioning' ? 'bg-amber-500/10' : (client.db_status === 'error' ? 'bg-red-500/10' : (client.connection_status === 'online' ? 'bg-sky-500/10' : (client.connection_status === 'never' ? 'bg-slate-500/10' : 'bg-red-500/10')))))} border ${isDisabled ? 'border-orange-500/20' : (client.db_status === 'deleting' ? 'border-red-500/20' : (client.db_status === 'provisioning' ? 'border-amber-500/20' : (client.db_status === 'error' ? 'border-red-500/20' : (client.connection_status === 'online' ? 'border-sky-500/20' : (client.connection_status === 'never' ? 'border-slate-500/20' : 'border-red-500/20')))))} h-5">
-                                    <span class="w-1 h-1 rounded-full ${isDisabled ? 'bg-orange-500' : (client.db_status === 'deleting' ? 'bg-red-600 animate-pulse' : (client.db_status === 'provisioning' ? 'bg-amber-500 animate-pulse' : (client.db_status === 'error' ? 'bg-red-600' : (client.connection_status === 'online' ? 'bg-sky-500 animate-pulse' : (client.connection_status === 'never' ? 'bg-slate-400' : 'bg-red-500')))))} mr-1.5"></span>
-                                    <span class="text-[9px] uppercase tracking-wider ${isDisabled ? 'text-orange-500' : (client.db_status === 'deleting' ? 'text-red-500' : (client.db_status === 'provisioning' ? 'text-amber-500' : (client.db_status === 'error' ? 'text-red-500' : (client.connection_status === 'online' ? 'text-sky-500' : (client.connection_status === 'never' ? 'text-slate-500' : 'text-red-500')))))} font-bold leading-none">
-                                        ${isDisabled ? labels.revoked : (client.db_status === 'deleting' ? labels.deleting : (client.db_status === 'provisioning' ? labels.provisioning : (client.db_status === 'error' ? labels.error : (client.connection_status === 'online' ? labels.online : (client.connection_status === 'never' ? labels.never : labels.offline)))))}
-                                    </span>
-                                </div>
+                                    <div class="flex items-center px-1.5 py-1 rounded ${isDisabled ? 'bg-amber-500/10 border border-amber-500/20' : (client.db_status === 'deleting' ? 'bg-red-500/10 border border-red-500/20' : (client.db_status === 'provisioning' ? 'bg-sky-500/10 border border-sky-500/20' : (client.db_status === 'verifying' ? 'bg-sky-500/10 border border-sky-500/20' : (client.db_status === 'error' ? 'bg-red-500/10 border border-red-500/20' : (client.connection_status === 'online' ? 'bg-sky-500/10 border border-sky-500/20' : (client.connection_status === 'never' ? 'bg-slate-500/10 border border-slate-500/20' : 'bg-red-500/10 border border-red-500/20'))))))} h-5">
+                                        <span class="w-1 h-1 rounded-full ${client.connection_status === 'online' ? 'bg-sky-500 animate-pulse' : (isDisabled ? 'bg-amber-500' : (client.db_status === 'deleting' ? 'bg-red-500' : (client.db_status === 'provisioning' ? 'bg-sky-500' : (client.db_status === 'verifying' ? 'bg-sky-500' : (client.db_status === 'error' ? 'bg-red-500' : (client.connection_status === 'never' ? 'bg-slate-400' : 'bg-red-500'))))))} mr-1.5"></span>
+                                        <span class="text-[9px] uppercase tracking-wider ${isDisabled ? 'text-amber-500' : (client.db_status === 'deleting' ? 'text-red-500' : (client.db_status === 'provisioning' ? 'text-sky-500' : (client.db_status === 'verifying' ? 'text-sky-500' : (client.db_status === 'error' ? 'text-red-500' : (client.connection_status === 'online' ? 'text-sky-500' : (client.connection_status === 'never' ? 'text-slate-500' : 'text-red-500'))))))} font-bold leading-none">
+                                            ${isDisabled ? labels.revoked : (client.db_status === 'deleting' ? labels.deleting : (client.db_status === 'provisioning' ? labels.provisioning : (client.db_status === 'verifying' ? labels.verifying : (client.db_status === 'error' ? labels.error : (client.connection_status === 'online' ? labels.online : (client.connection_status === 'never' ? labels.never : labels.offline))))))}
+                                        </span>
+                                    </div>    </div>
                             </div>
                             <code class="text-[10px] text-secondary font-mono">${client.external_ip || 'No IP'}</code>
                         </div>
