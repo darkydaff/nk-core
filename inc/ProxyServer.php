@@ -35,6 +35,7 @@ class ProxyServer
             // Pull official image
             $this->executeCommand('docker pull 3proxy/3proxy:latest', true, true);
             $this->executeCommand('mkdir -p /etc/3proxy /var/log/3proxy', true, true);
+            $this->executeCommand('chmod -R 777 /var/log/3proxy', true);
             return;
         }
 
@@ -107,16 +108,19 @@ class ProxyServer
                 if ($type === ProxyType::SOCKS5) {
                     $config .= "socks -p" . $proxy['port'] . "\n";
                 } else {
-                    $config .= "proxy -n -a -p" . $proxy['port'] . "\n";
+                    // Removed -a (anonymous) to ensure 'auth strong' works
+                    $config .= "proxy -n -p" . $proxy['port'] . "\n";
                 }
                 $config .= "flush\n\n";
                 
                 // Specific firewall rules (iptables + ufw)
-                $this->executeCommand("iptables -C INPUT -p tcp --dport {$proxy['port']} -j ACCEPT 2>/dev/null || iptables -A INPUT -p tcp --dport {$proxy['port']} -j ACCEPT", true);
-                $this->executeCommand("iptables -C OUTPUT -p tcp --sport {$proxy['port']} -j ACCEPT 2>/dev/null || iptables -A OUTPUT -p tcp --sport {$proxy['port']} -j ACCEPT", true);
-                
-                // Open port in UFW if present
-                $this->executeCommand("which ufw > /dev/null && ufw allow {$proxy['port']}/tcp || true", true);
+                // Open both TCP and UDP for SOCKS5, TCP for HTTP
+                $protocols = ($type === ProxyType::SOCKS5) ? ['tcp', 'udp'] : ['tcp'];
+                foreach ($protocols as $proto) {
+                    $this->executeCommand("iptables -C INPUT -p {$proto} --dport {$proxy['port']} -j ACCEPT 2>/dev/null || iptables -A INPUT -p {$proto} --dport {$proxy['port']} -j ACCEPT", true);
+                    $this->executeCommand("iptables -C OUTPUT -p {$proto} --sport {$proxy['port']} -j ACCEPT 2>/dev/null || iptables -A OUTPUT -p {$proto} --sport {$proxy['port']} -j ACCEPT", true);
+                    $this->executeCommand("which ufw > /dev/null && ufw allow {$proxy['port']}/{$proto} || true", true);
+                }
             }
         }
 
