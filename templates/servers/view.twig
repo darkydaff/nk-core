@@ -387,7 +387,7 @@ const labels = {
     restore: "{{ t('common.restore') }}",
     delete: "{{ t('common.delete') }}",
     confirmDelete: "{{ t('common.confirm_delete') }}",
-    revoked: "{{ t('revoked') }}",
+    revoked: "{{ t('status.revoked')|default('REVOKED') }}",
     edit: "{{ t('common.edit') }}",
     selected: "{{ t('common.selected_count', [], '%s items selected') }}",
     traffic: "{{ t('common.traffic') }}",

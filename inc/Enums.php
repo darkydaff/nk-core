@@ -34,7 +34,7 @@ enum ClientStatus: string {
             self::PROVISIONING => in_array($newStatus, [self::VERIFYING, self::ACTIVE, self::ERROR, self::DELETED, self::DELETING]),
             self::VERIFYING => in_array($newStatus, [self::ACTIVE, self::ERROR, self::DELETED, self::DELETING]),
             self::ACTIVE => in_array($newStatus, [self::DISABLED, self::DELETED, self::ERROR, self::DELETING]),
-            self::DISABLED => in_array($newStatus, [self::ACTIVE, self::DELETED, self::DELETING]),
+            self::DISABLED => in_array($newStatus, [self::PROVISIONING, self::ACTIVE, self::DELETED, self::DELETING]),
             self::DELETING => in_array($newStatus, [self::DELETED, self::ERROR]),
             self::ERROR => in_array($newStatus, [self::PROVISIONING, self::DELETED, self::DELETING]),
             self::DELETED => false,

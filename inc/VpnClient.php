@@ -69,7 +69,7 @@ class VpnClient {
         
         // Generate keys locally if possible or via fixed path inside container
         // To fix the security risk, we use fixed temp files instead of dynamic ones
-        $keys = self::generateClientKeys($serverData, 'tmp_provision');
+        $keys = self::generateClientKeys($server, 'tmp_provision');
         
         // Get next available IP
         $clientIP = self::getNextClientIP($serverData);
@@ -141,7 +141,7 @@ class VpnClient {
     {
         if (!$this->data) return false;
         
-        $server = new VpnServer($this->data['server_id']);
+        $server = new VpnServer((int)$this->data['server_id']);
         $serverData = $server->getData();
         
         try {
@@ -164,7 +164,7 @@ class VpnClient {
             );
 
             // Add to WireGuard
-            self::addClientToServer($serverData, $this->data['public_key'], $this->data['client_ip']);
+            self::addClientToServer($server, $this->data['public_key'], $this->data['client_ip']);
             
             // Set status to VERIFYING
             $pdo = DB::conn();
@@ -172,7 +172,7 @@ class VpnClient {
                 ->execute([ClientStatus::VERIFYING->value, $this->clientId]);
 
             // VERIFICATION: Check if peer is actually in the running interface
-            $verified = self::verifyPeerInRuntime($serverData, $this->data['public_key'], true, $this->data['client_ip']);
+            $verified = self::verifyPeerInRuntime($server, $this->data['public_key'], true, $this->data['client_ip']);
             if (!$verified) {
                 throw new Exception("Infrastructure verification failed: Peer {$this->data['public_key']} not active or misconfigured in kernel interface after 5 attempts.");
             }
@@ -195,7 +195,8 @@ class VpnClient {
     /**
      * Generate client keys on remote server
      */
-    private static function generateClientKeys(array $serverData, string $clientName): array {
+    private static function generateClientKeys(array|VpnServer $server, string $clientName): array {
+        $serverData = is_array($server) ? $server : $server->getData();
         $containerName = $serverData['container_name'];
         
         // SECURITY: Use fixed filenames for the temporary keys to prevent shell injection 
@@ -209,7 +210,9 @@ class VpnClient {
             $privFile, $pubFile, $privFile, $pubFile, $privFile, $pubFile
         );
         
-        $server = new VpnServer((int)$serverData['id']);
+        if (is_array($server)) {
+            $server = new VpnServer((int)$server['id']);
+        }
         $out = $server->executeCommand($cmd, true);
         
         $parts = explode("---", trim($out));
@@ -316,12 +319,13 @@ class VpnClient {
     /**
      * Add client to server using official method (append + wg syncconf)
      */
-    public static function addClientToServer(array $serverData, string $publicKey, string $clientIP): void {
+    public static function addClientToServer(array|VpnServer $server, string $publicKey, string $clientIP): void {
+        $serverData = is_array($server) ? $server : $server->getData();
         $containerName = $serverData['container_name'];
         
         // 1. Get current config
         $readCmd = "docker exec -i {$containerName} cat /opt/amnezia/awg/wg0.conf";
-        $currentConfig = self::executeServerCommand($serverData, $readCmd, true);
+        $currentConfig = self::executeServerCommand($server, $readCmd, true);
         
         // 2. Check if peer already exists (IDEMPOTENCY)
         if (strpos($currentConfig, $publicKey) !== false) {
@@ -348,21 +352,22 @@ class VpnClient {
             $containerName
         );
         
-        self::executeServerCommand($serverData, $writeCmd, true);
+        self::executeServerCommand($server, $writeCmd, true);
         
         // Update clientsTable
-        self::updateClientsTable($serverData, $publicKey, $clientIP);
+        self::updateClientsTable($server, $publicKey, $clientIP);
     }
     
     /**
      * Update clientsTable on server
      */
-    private static function updateClientsTable(array $serverData, string $publicKey, string $name): void {
+    private static function updateClientsTable(array|VpnServer $server, string $publicKey, string $name): void {
+        $serverData = is_array($server) ? $server : $server->getData();
         $containerName = $serverData['container_name'];
         
         // Read current table
         $cmd = sprintf("docker exec -i %s cat /opt/amnezia/awg/clientsTable 2>/dev/null", $containerName);
-        $tableJson = self::executeServerCommand($serverData, $cmd, true);
+        $tableJson = self::executeServerCommand($server, $cmd, true);
         $table = json_decode(trim($tableJson), true);
         
         if (!is_array($table)) {
@@ -382,15 +387,17 @@ class VpnClient {
         $newTableJson = json_encode($table, JSON_PRETTY_PRINT);
         $escaped = addslashes($newTableJson);
         $updateCmd = sprintf("docker exec -i %s sh -c 'echo \"%s\" > /opt/amnezia/awg/clientsTable'", $containerName, $escaped);
-        self::executeServerCommand($serverData, $updateCmd, true);
+        self::executeServerCommand($server, $updateCmd, true);
     }
     
     /**
      * Execute command on server.
      * Delegates to VpnServer::executeCommand for hardened logic and error handling.
      */
-    private static function executeServerCommand(array $serverData, string $command, bool $sudo = false): string {
-        $server = new VpnServer((int)$serverData['id']);
+    private static function executeServerCommand(array|VpnServer $server, string $command, bool $sudo = false): string {
+        if (is_array($server)) {
+            $server = new VpnServer((int)$server['id']);
+        }
         // Use true for checkExit to ensure failures throw exceptions
         return $server->executeCommand($command, $sudo, true);
     }
@@ -502,12 +509,13 @@ class VpnClient {
     /**
      * Remove client from server WireGuard configuration
      */
-    public static function removeClientFromServer(array $serverData, string $publicKey): void {
+    public static function removeClientFromServer(array|VpnServer $server, string $publicKey): void {
+        $serverData = is_array($server) ? $server : $server->getData();
         $containerName = $serverData['container_name'];
         
         // 1. UPDATE CONFIG (Desired State)
         $readCmd = sprintf("docker exec -i %s cat /opt/amnezia/awg/wg0.conf", $containerName);
-        $config = self::executeServerCommand($serverData, $readCmd, true);
+        $config = self::executeServerCommand($server, $readCmd, true);
         $newConfig = self::removePeerFromConfig($config, $publicKey);
         
         $base64Config = base64_encode($newConfig);
@@ -519,23 +527,23 @@ class VpnClient {
             ),
             $containerName
         );
-        self::executeServerCommand($serverData, $writeCmd, true);
+        self::executeServerCommand($server, $writeCmd, true);
 
         // 2. APPLY (syncconf)
         $syncCmd = sprintf(
             "docker exec -i %s bash -c '/usr/local/bin/awg syncconf wg0 <(/usr/local/bin/awg-quick strip /opt/amnezia/awg/wg0.conf)'",
             $containerName
         );
-        self::executeServerCommand($serverData, $syncCmd, true);
+        self::executeServerCommand($server, $syncCmd, true);
         
         // 3. VERIFICATION (Retry loop)
-        $verified = self::verifyPeerInRuntime($serverData, $publicKey, false);
+        $verified = self::verifyPeerInRuntime($server, $publicKey, false);
         if (!$verified) {
             throw new Exception("Runtime removal failed: Peer {$publicKey} still exists in kernel memory after 5 attempts.");
         }
 
         // 4. METADATA REMOVAL
-        self::removeFromClientsTable($serverData, $publicKey);
+        self::removeFromClientsTable($server, $publicKey);
     }
     
     /**
@@ -598,12 +606,13 @@ class VpnClient {
     /**
      * Remove client from clientsTable
      */
-    private static function removeFromClientsTable(array $serverData, string $publicKey): void {
+    private static function removeFromClientsTable(array|VpnServer $server, string $publicKey): void {
+        $serverData = is_array($server) ? $server : $server->getData();
         $containerName = $serverData['container_name'];
         
         // Read current table - ignore failure if table doesn't exist
         $cmd = sprintf("docker exec -i %s cat /opt/amnezia/awg/clientsTable 2>/dev/null", $containerName);
-        $tableJson = self::executeServerCommand($serverData, $cmd, false);
+        $tableJson = self::executeServerCommand($server, $cmd, false);
         $table = json_decode(trim($tableJson), true);
         
         if (!is_array($table)) {
@@ -622,7 +631,7 @@ class VpnClient {
         $newTableJson = json_encode($table, JSON_PRETTY_PRINT);
         $escaped = addslashes($newTableJson);
         $updateCmd = sprintf("docker exec -i %s sh -c 'echo \"%s\" > /opt/amnezia/awg/clientsTable'", $containerName, $escaped);
-        self::executeServerCommand($serverData, $updateCmd, true);
+        self::executeServerCommand($server, $updateCmd, true);
     }
     
     /**
@@ -1338,13 +1347,14 @@ public static function getClientsOverLimit(): array {
      * Deep runtime verification with retries.
      * Checks if peer exists (or doesn't) and optionally validates AllowedIPs.
      */
-    private static function verifyPeerInRuntime(array $serverData, string $publicKey, bool $shouldExist, ?string $expectedIP = null): bool {
+    private static function verifyPeerInRuntime(array|VpnServer $server, string $publicKey, bool $shouldExist, ?string $expectedIP = null): bool {
+        $serverData = is_array($server) ? $server : $server->getData();
         $containerName = $serverData['container_name'];
         $verifyCmd = "docker exec -i {$containerName} /usr/local/bin/awg show wg0";
         
         for ($i = 0; $i < 5; $i++) {
             try {
-                $output = self::executeServerCommand($serverData, $verifyCmd, false);
+                $output = self::executeServerCommand($server, $verifyCmd, false);
                 $lines = explode("\n", (string)$output);
                 
                 $found = false;

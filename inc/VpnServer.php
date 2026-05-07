@@ -119,43 +119,43 @@ class VpnServer
      */
     private function ensureMux(): void
     {
-        if ($this->muxSocket && file_exists($this->muxSocket)) {
-            // Check if the master is actually alive and responsive
-            $checkCmd = sprintf(
-                'ssh -o ControlPath=%s -O check dummy 2>&1',
-                escapeshellarg($this->muxSocket)
-            );
-            $checkOut = shell_exec($checkCmd);
-            if (stripos((string)$checkOut, 'Master running') !== false) {
-                return; // Already open and alive
-            }
-            
-            // If we get here, the socket exists but the master is dead or unresponsive
-            Logger::warning("Stale SSH Mux socket found, cleaning up", ['socket' => $this->muxSocket]);
-            
-            // Try to kill the master process officially
-            $killCmd = sprintf(
-                'ssh -o ControlPath=%s -O exit dummy 2>&1',
-                escapeshellarg($this->muxSocket)
-            );
-            shell_exec($killCmd);
-            
-            @unlink($this->muxSocket);
-            $this->muxSocket = null;
-            $this->muxOwner = false;
-        }
-
         $muxDir = '/tmp/ssh_mux';
         if (!is_dir($muxDir)) {
             @mkdir($muxDir, 0700, true);
         }
 
-        $this->muxSocket = $muxDir . '/nk_' . md5($this->data['host'] . ':' . $this->data['port']) . '_' . getmypid();
+        // Calculate expected socket path based on host, port and current PID
+        $socketPath = $muxDir . '/nk_' . md5(($this->data['host'] ?? '') . ':' . ($this->data['port'] ?? '')) . '_' . getmypid();
+
+        // If we already have a socket path set but it doesn't match current PID (shouldn't happen with getmypid() but for safety)
+        // or if we have a stale file on disk from a previous crashed process with the same PID.
+        if (file_exists($socketPath)) {
+            // Check if the master is actually alive and responsive
+            $checkCmd = sprintf(
+                'ssh -o ControlPath=%s -O check dummy 2>&1',
+                escapeshellarg($socketPath)
+            );
+            $checkOut = (string)shell_exec($checkCmd);
+            if (stripos($checkOut, 'Master running') !== false) {
+                $this->muxSocket = $socketPath;
+                return; // Already open and alive
+            }
+            
+            // If we get here, the socket exists but the master is dead or unresponsive
+            Logger::warning("Stale SSH Mux socket found, cleaning up", ['socket' => $socketPath, 'output' => trim($checkOut)]);
+            
+            // Try to kill the master process officially, then force unlink
+            $killCmd = sprintf('ssh -o ControlPath=%s -O exit dummy 2>&1', escapeshellarg($socketPath));
+            @shell_exec($killCmd);
+            @unlink($socketPath);
+        }
+
+        $this->muxSocket = $socketPath;
 
         [$authPrefix, $authOpts, $keyFile] = $this->buildSshAuth();
         $sshOpts = array_merge($this->buildSshOptions(), $authOpts, [
             '-o ControlMaster=yes',
-            '-o ControlPersist=300',
+            '-o ControlPersist=600',
             sprintf('-o ControlPath=%s', escapeshellarg($this->muxSocket)),
             '-N',
             '-f', // Go to background
@@ -165,29 +165,33 @@ class VpnServer
             '%s ssh %s %s@%s',
             $authPrefix,
             implode(' ', $sshOpts),
-            escapeshellarg($this->data['username']),
-            escapeshellarg($this->data['host'])
+            escapeshellarg($this->data['username'] ?? 'root'),
+            escapeshellarg($this->data['host'] ?? '')
         ));
 
         $muxOut = shell_exec($cmd . ' 2>&1');
         
-        // Clean up temp key file
+        // Clean up temp key file if one was created
         if ($keyFile && file_exists($keyFile)) {
-            unlink($keyFile);
+            @unlink($keyFile);
         }
         
-        // Give the master a moment to establish
-        usleep(500000); // 500ms
+        // Give the master a moment to establish and create the socket file
+        for ($i = 0; $i < 10; $i++) {
+            if (file_exists($this->muxSocket)) break;
+            usleep(100000); // 100ms * 10 = 1s max wait
+        }
 
         if (!file_exists($this->muxSocket)) {
             if ($muxOut && trim($muxOut)) {
                 Logger::warning("SSH Mux establishment failed", [
-                    'host' => $this->data['host'],
+                    'host' => $this->data['host'] ?? 'unknown',
                     'output' => trim($muxOut)
                 ]);
             }
             $this->muxSocket = null;
-            // Don't throw — fall back to per-command connections
+            $this->muxOwner = false;
+            // Fall back to per-command connections
         } else {
             $this->muxOwner = true;
         }
@@ -463,44 +467,65 @@ class VpnServer
         $wrappedCommand = $command . '; echo "__EXIT_CODE__:$?"';
         $escapedCommand = escapeshellarg($wrappedCommand);
 
-        // Try multiplexed connection first
-        $this->ensureMux();
+        $maxRetries = 2;
+        $attempt = 0;
+        $rawOutput = '';
 
-        if ($this->muxSocket && file_exists($this->muxSocket)) {
-            $sshCommand = sprintf(
-                'ssh -o ControlPath=%s %s %s@%s %s 2>&1',
-                escapeshellarg($this->muxSocket),
-                implode(' ', $this->buildSshOptions()),
-                escapeshellarg($this->data['username'] ?? 'root'),
-                escapeshellarg($this->data['host'] ?? ''),
-                "timeout 60s sh -c " . escapeshellarg($escapedCommand)
-            );
-        } else {
-            [$authPrefix, $authOpts, $keyFile] = $this->buildSshAuth();
-            $sshOpts = array_merge($this->buildSshOptions(), $authOpts);
+        while ($attempt < $maxRetries) {
+            $attempt++;
+            
+            // Try multiplexed connection first
+            $this->ensureMux();
 
-            $sshCommand = sprintf(
-                '%s ssh %s %s@%s %s 2>&1',
-                $authPrefix,
-                implode(' ', $sshOpts),
-                escapeshellarg($this->data['username'] ?? 'root'),
-                escapeshellarg($this->data['host'] ?? ''),
-                "timeout 60s sh -c " . escapeshellarg($escapedCommand)
-            );
-        }
+            if ($this->muxSocket && file_exists($this->muxSocket)) {
+                $sshCommand = sprintf(
+                    'ssh -o ControlPath=%s %s %s@%s %s 2>&1',
+                    escapeshellarg($this->muxSocket),
+                    implode(' ', $this->buildSshOptions()),
+                    escapeshellarg($this->data['username'] ?? 'root'),
+                    escapeshellarg($this->data['host'] ?? ''),
+                    "timeout 60s sh -c " . escapeshellarg($escapedCommand)
+                );
+            } else {
+                [$authPrefix, $authOpts, $keyFile] = $this->buildSshAuth();
+                $sshOpts = array_merge($this->buildSshOptions(), $authOpts);
 
-        if (!$silent && class_exists('Logger')) {
-            Logger::channel('ssh')->info('Executing command', [
-                'server_id' => $this->serverId ?? null,
-                'host' => $this->data['host'] ?? null,
-                'command' => $loggedCommand
-            ]);
-        }
+                $sshCommand = sprintf(
+                    '%s ssh %s %s@%s %s 2>&1',
+                    $authPrefix,
+                    implode(' ', $sshOpts),
+                    escapeshellarg($this->data['username'] ?? 'root'),
+                    escapeshellarg($this->data['host'] ?? ''),
+                    "timeout 60s sh -c " . escapeshellarg($escapedCommand)
+                );
+            }
 
-        $rawOutput = shell_exec($sshCommand) ?? '';
+            if (!$silent && $attempt === 1 && class_exists('Logger')) {
+                Logger::channel('ssh')->info('Executing command', [
+                    'server_id' => $this->serverId ?? null,
+                    'host' => $this->data['host'] ?? null,
+                    'command' => $loggedCommand
+                ]);
+            }
 
-        if (isset($keyFile) && $keyFile && file_exists($keyFile)) {
-            unlink($keyFile);
+            $rawOutput = (string)shell_exec($sshCommand);
+
+            if (isset($keyFile) && $keyFile && file_exists($keyFile)) {
+                @unlink($keyFile);
+            }
+
+            // Check for specific transient errors that warrant a retry
+            if (stripos($rawOutput, 'Connection refused') !== false && stripos($rawOutput, 'Control socket') !== false) {
+                Logger::warning("SSH Control socket refused connection, retrying without Mux", ['socket' => $this->muxSocket]);
+                if ($this->muxSocket) {
+                    @unlink($this->muxSocket);
+                    $this->muxSocket = null;
+                }
+                continue; // Retry
+            }
+            
+            // If we got here, either it succeeded or it's a non-retryable error
+            break;
         }
 
         if (preg_match('/^(.*?)__EXIT_CODE__:(\d+)\s*$/s', $rawOutput, $m)) {
