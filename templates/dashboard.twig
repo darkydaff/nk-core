@@ -235,6 +235,19 @@
             gradientUp.addColorStop(0, 'rgba(43, 89, 255, 0.2)');
             gradientUp.addColorStop(1, 'rgba(43, 89, 255, 0)');
 
+            function getThemeColors() {
+                const isDark = document.documentElement.classList.contains('dark');
+                return {
+                    grid: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+                    text: isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
+                    tooltipBg: isDark ? '#111421' : '#ffffff',
+                    tooltipText: isDark ? '#f8fafc' : '#1c1917',
+                    tooltipBorder: isDark ? '#23293d' : '#e6e1d6'
+                };
+            }
+
+            const colors = getThemeColors();
+
             trafficChart = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -273,13 +286,15 @@
                             enabled: true,
                             mode: 'index',
                             intersect: false,
-                            backgroundColor: '#111421',
-                            titleColor: '#f8fafc',
-                            bodyColor: '#94a3b8',
-                            borderColor: '#23293d',
+                            backgroundColor: colors.tooltipBg,
+                            titleColor: colors.tooltipText,
+                            bodyColor: colors.tooltipText,
+                            borderColor: colors.tooltipBorder,
                             borderWidth: 1,
                             padding: 12,
                             cornerRadius: 8,
+                            titleFont: { family: 'Inter', size: 12, weight: 'bold' },
+                            bodyFont: { family: 'Inter', size: 12 },
                             callbacks: {
                                 label: function(context) {
                                     return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' Mbps';
@@ -290,18 +305,18 @@
                     scales: {
                         y: {
                             beginAtZero: true,
-                            grid: { color: 'rgba(255, 255, 255, 0.03)' },
+                            grid: { color: colors.grid },
                             ticks: { 
-                                color: 'rgba(255, 255, 255, 0.4)',
-                                font: { size: 10, family: 'Geist Mono' },
+                                color: colors.text,
+                                font: { size: 10, family: 'Inter', weight: '500' },
                                 callback: function(value) { return value + ' Mbps'; }
                             }
                         },
                         x: { 
                             grid: { display: false },
                             ticks: {
-                                color: 'rgba(255, 255, 255, 0.4)',
-                                font: { size: 9, family: 'Geist Mono' }
+                                color: colors.text,
+                                font: { size: 9, family: 'Inter', weight: '500' }
                             }
                         }
                     },
@@ -311,6 +326,18 @@
                         point: { radius: 0, hoverRadius: 5, hoverBackgroundColor: '#fff', hoverBorderWidth: 2 }
                     }
                 }
+            });
+
+            window.addEventListener('themeChanged', () => {
+                const newColors = getThemeColors();
+                trafficChart.options.scales.y.grid.color = newColors.grid;
+                trafficChart.options.scales.y.ticks.color = newColors.text;
+                trafficChart.options.scales.x.ticks.color = newColors.text;
+                trafficChart.options.plugins.tooltip.backgroundColor = newColors.tooltipBg;
+                trafficChart.options.plugins.tooltip.titleColor = newColors.tooltipText;
+                trafficChart.options.plugins.tooltip.bodyColor = newColors.tooltipText;
+                trafficChart.options.plugins.tooltip.borderColor = newColors.tooltipBorder;
+                trafficChart.update();
             });
 
             // Pre-load history
