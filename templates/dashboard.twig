@@ -101,7 +101,7 @@
                 <div class="px-5 py-4 border-b border-default bg-surface-base/30">
                     <h2 class="text-xs font-bold uppercase tracking-widest opacity-70">{{ t('dashboard.fleet_health', [], 'Fleet Health') }}</h2>
                 </div>
-                <div class="p-4 grid grid-cols-1 xl:grid-cols-2 gap-3 max-h-[380px] overflow-y-auto">
+                <div class="p-4 pr-2 grid grid-cols-1 xl:grid-cols-2 gap-3 max-h-[380px] overflow-y-auto custom-scrollbar">
                     {% for server in servers %}
                         <a href="/servers/{{ server.id }}" class="flex items-center p-3 rounded-xl border border-default hover:border-primary transition-all group" data-server-ip="{{ server.host }}">
                             <div class="w-8 h-8 rounded-lg bg-base border border-default flex items-center justify-center mr-3 group-hover:bg-primary/5">
