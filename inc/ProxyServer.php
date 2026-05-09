@@ -25,9 +25,20 @@ class ProxyServer
 
     /**
      * Install 3proxy via Docker (preferred) or native package
+     * Idempotent: skips if already present
      */
     public function install(): void
     {
+        // 0. Check if already installed (native or docker)
+        $hasNative = !empty(trim($this->executeCommand('which 3proxy')));
+        $hasDockerContainer = !empty(trim($this->executeCommand('docker ps -a --filter name=3proxy --format "{{.Names}}"')));
+        
+        if ($hasNative || $hasDockerContainer) {
+            // Already installed, but ensure directories exist for config sync
+            $this->executeCommand('mkdir -p /etc/3proxy /var/log/3proxy', true);
+            return;
+        }
+
         // 1. Check if Docker is available
         $hasDocker = !empty(trim($this->executeCommand('which docker')));
 
@@ -40,11 +51,8 @@ class ProxyServer
         }
 
         // 2. Fallback to native installation if Docker is not present
-        $check = $this->executeCommand('which 3proxy');
-        if (empty(trim($check))) {
-            $this->executeCommand('apt-get update', true, true);
-            $this->executeCommand('apt-get install -y 3proxy', true, true);
-        }
+        $this->executeCommand('apt-get update', true, true);
+        $this->executeCommand('apt-get install -y 3proxy', true, true);
 
         $this->executeCommand('mkdir -p /var/log/3proxy /etc/3proxy', true, true);
         $this->executeCommand('chown proxy:proxy /var/log/3proxy', true, true);
@@ -71,11 +79,23 @@ class ProxyServer
         $stmt->execute([$this->serverId]);
         $proxies = $stmt->fetchAll();
 
+        // Detect if we should try to import existing config (only if DB is empty for this server)
+        if (empty($proxies)) {
+            $imported = $this->detectAndImportExistingConfig();
+            if ($imported > 0) {
+                // Refresh proxies list after import
+                $stmt->execute([$this->serverId]);
+                $proxies = $stmt->fetchAll();
+            }
+        }
+
         $hasDocker = !empty(trim($this->executeCommand('which docker')));
         
-        // If no docker and no native 3proxy, we need to install first (likely after a server wipe)
+        // Check if 3proxy is already running (native or docker)
         $hasNative = !empty(trim($this->executeCommand('which 3proxy')));
-        if (!$hasDocker && !$hasNative) {
+        $hasDockerContainer = !empty(trim($this->executeCommand('docker ps -a --filter name=3proxy --format "{{.Names}}"')));
+
+        if (!$hasDocker && !$hasNative && !$hasDockerContainer) {
             $this->install();
             $hasDocker = !empty(trim($this->executeCommand('which docker')));
         }
@@ -209,6 +229,101 @@ class ProxyServer
                 $stmt->execute([$received, $sent, $proxy['id']]);
             }
         }
+    }
+    /**
+     * Detect existing 3proxy configuration on the server and import users to DB
+     */
+    public function detectAndImportExistingConfig(): int
+    {
+        $pdo = DB::conn();
+        $configPath = '/etc/3proxy/3proxy.cfg';
+        $exists = !empty(trim($this->executeCommand("[ -f $configPath ] && echo '1' || echo ''")));
+        
+        if (!$exists) {
+            $configPath = '/etc/3proxy.cfg';
+            $exists = !empty(trim($this->executeCommand("[ -f $configPath ] && echo '1' || echo ''")));
+        }
+        
+        $content = '';
+        if ($exists) {
+            $content = $this->executeCommand("cat $configPath", true);
+        } else {
+            // Try fallback to docker container if it exists
+            $dockerExists = !empty(trim($this->executeCommand("docker ps --filter name=3proxy --format '{{.Names}}'")));
+            if ($dockerExists) {
+                $content = $this->executeCommand("docker exec 3proxy cat /etc/3proxy/3proxy.cfg 2>/dev/null || docker exec 3proxy cat /etc/3proxy.cfg 2>/dev/null", true);
+            }
+        }
+        
+        if (empty($content)) return 0;
+        
+        $importedCount = 0;
+        $lines = explode("\n", $content);
+        
+        // Parse users: "users username:CL:password"
+        $foundUsers = [];
+        foreach ($lines as $line) {
+            if (preg_match('/^users\s+([^:]+):CL:(.+)$/i', trim($line), $matches)) {
+                $foundUsers[$matches[1]] = $matches[2];
+            }
+        }
+        
+        if (empty($foundUsers)) return 0;
+        
+        // Parse ports: "proxy -pPort" or "socks -pPort"
+        $foundPorts = []; // username => [port, type]
+        $currentAllow = null;
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (preg_match('/^allow\s+(.+)$/i', $line, $matches)) {
+                $currentAllow = $matches[1];
+            } elseif (preg_match('/^(proxy|socks)\s+.*-p(\d+)/i', $line, $matches)) {
+                if ($currentAllow && isset($foundUsers[$currentAllow])) {
+                    $foundPorts[$currentAllow] = [
+                        'port' => (int)$matches[2],
+                        'type' => strtolower($matches[1]) === 'socks' ? 'socks5' : 'http'
+                    ];
+                }
+            }
+        }
+        
+        // Default port if not found (very rough fallback)
+        $defaultPort = 30001;
+
+        foreach ($foundUsers as $username => $password) {
+            $portData = $foundPorts[$username] ?? ['port' => $defaultPort++, 'type' => 'http'];
+            
+            // Assign to server owner, fallback to 1 (admin) if not found
+            $ownerId = $this->data['user_id'] ?? 1;
+
+            // Check if already in DB (including soft-deleted)
+            $check = $pdo->prepare('SELECT id, deleted_at FROM http_proxies WHERE server_id = ? AND username = ?');
+            $check->execute([$this->serverId, $username]);
+            $existing = $check->fetch();
+            
+            if ($existing) {
+                if ($existing['deleted_at']) {
+                    // RESTORE: It was deleted in panel but exists on server!
+                    $pdo->prepare('UPDATE http_proxies SET deleted_at = NULL, status = "active" WHERE id = ?')
+                        ->execute([$existing['id']]);
+                    $importedCount++;
+                }
+                continue;
+            }
+
+            $stmt = $pdo->prepare('INSERT INTO http_proxies (user_id, server_id, username, password, port, type, status) VALUES (?, ?, ?, ?, ?, ?, "active")');
+            $stmt->execute([
+                $ownerId,
+                $this->serverId,
+                $username,
+                $password,
+                $portData['port'],
+                $portData['type']
+            ]);
+            $importedCount++;
+        }
+        
+        return $importedCount;
     }
     /**
      * Synchronize all proxies on all servers

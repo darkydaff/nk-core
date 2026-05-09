@@ -164,7 +164,7 @@ class VpnClient {
             );
 
             // Add to WireGuard
-            self::addClientToServer($server, $this->data['public_key'], $this->data['client_ip']);
+            self::addClientToServer($server, $this->data['public_key'], $this->data['client_ip'], $this->data['private_key'], $this->data['name']);
             
             // Set status to VERIFYING
             $pdo = DB::conn();
@@ -277,7 +277,6 @@ class VpnClient {
         $config = "[Interface]\n";
         if ($clientName) {
             $config .= "# Name = {$clientName}\n";
-            $config .= "# Remark: {$clientName}\n";
         }
         $config .= "PrivateKey = {$privateKey}\n";
         $config .= "Address = {$clientIP}/32\n";
@@ -319,7 +318,7 @@ class VpnClient {
     /**
      * Add client to server using official method (append + wg syncconf)
      */
-    public static function addClientToServer(array|VpnServer $server, string $publicKey, string $clientIP): void {
+    public static function addClientToServer(array|VpnServer $server, string $publicKey, string $clientIP, string $privateKey = '', string $name = ''): void {
         $serverData = is_array($server) ? $server : $server->getData();
         $containerName = $serverData['container_name'];
         
@@ -333,7 +332,8 @@ class VpnClient {
         }
 
         // 3. Build full new config
-        $newPeer = "\n[Peer]\n";
+        $newPeer = "\n# Name = " . ($name ?: $clientIP) . "\n";
+        $newPeer .= "[Peer]\n";
         $newPeer .= "PublicKey = {$publicKey}\n";
         $newPeer .= "PresharedKey = {$serverData['preshared_key']}\n";
         $newPeer .= "AllowedIPs = {$clientIP}/32\n";
@@ -354,14 +354,14 @@ class VpnClient {
         
         self::executeServerCommand($server, $writeCmd, true);
         
-        // Update clientsTable
-        self::updateClientsTable($server, $publicKey, $clientIP);
+        // Update clientsTable with private key for discovery resilience
+        self::updateClientsTable($server, $publicKey, $name ?: $clientIP, $privateKey);
     }
     
     /**
      * Update clientsTable on server
      */
-    private static function updateClientsTable(array|VpnServer $server, string $publicKey, string $name): void {
+    private static function updateClientsTable(array|VpnServer $server, string $publicKey, string $name, string $privateKey = ''): void {
         $serverData = is_array($server) ? $server : $server->getData();
         $containerName = $serverData['container_name'];
         
@@ -377,6 +377,9 @@ class VpnClient {
         // Add new client
         $table[] = [
             'clientId' => $publicKey,
+            'public_key' => $publicKey, // for easier discovery
+            'private_key' => $privateKey, // for discovery resilience
+            'name' => $name,
             'userData' => [
                 'clientName' => $name,
                 'creationDate' => date('D M j H:i:s Y')
@@ -694,7 +697,7 @@ class VpnClient {
     public function getConfig(): string {
         $config = $this->data['config'] ?? '';
         // If config is missing or old, regenerate it
-        if (!$config || strpos($config, '# Remark:') === false) {
+        if (!$config || strpos($config, '# Name:') === false) {
             try {
                 $this->regenerateConfig();
                 return $this->data['config'] ?? '';
@@ -838,18 +841,19 @@ class VpnClient {
             $parts = preg_split('/\s+/', $line);
             $count = count($parts);
             
+            // Search for the Public Key (44 chars ending in =) to identify the peer.
             $isKey0 = (strlen($parts[0]) === 44 && str_ends_with($parts[0], '='));
-            $isKey1 = (strlen($parts[1]) === 44 && str_ends_with($parts[1], '='));
+            $isKey1 = (isset($parts[1]) && strlen($parts[1]) === 44 && str_ends_with($parts[1], '='));
 
-            if ($count === 8 && $isKey0) {
-                // Peer line, no interface prefix
+            if ($isKey0) {
                 $offset = 0;
-            } elseif ($count === 9 && $isKey1) {
-                // Peer line, with interface prefix
+            } elseif ($isKey1) {
                 $offset = 1;
             } else {
-                continue; // Interface line or unrecognized format
+                continue;
             }
+
+            if ($count < (5 + $offset)) continue;
 
             $publicKey = $parts[0 + $offset];
             $endpoint = $parts[2 + $offset] ?? '(none)';
@@ -1264,9 +1268,12 @@ public static function getClientsOverLimit(): array {
      * Lookup IP Geolocation data using ip-api.com
      */
     private static function lookupIpGeo(string $ip): ?array {
-        // We use fields parameter to get only what we need
-        // fields=61439 is a generated numeric value for status,message,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,query
-        // But for clarity we'll use names
+        // Defensive: strip port if present
+        if (strpos($ip, ':') !== false) {
+            $ip = (strpos($ip, ']:') !== false) ? substr($ip, 1, strpos($ip, ']:') - 1) : explode(':', $ip)[0];
+        }
+
+        // First try ip-api.com (HTTP only for free tier)
         $fields = 'status,message,country,countryCode,city,isp,org,lat,lon,query';
         $url = "http://ip-api.com/json/{$ip}?fields={$fields}";
         
@@ -1277,16 +1284,55 @@ public static function getClientsOverLimit(): array {
         
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
+        // curl_close is no longer needed in PHP 8.0+
         
-        if ($httpCode !== 200 || !$response) {
-            return null;
+        if ($httpCode === 200 && $response) {
+            $data = json_decode($response, true);
+            if (($data['status'] ?? '') === 'success') {
+                return $data;
+            }
+            if (class_exists('Logger')) {
+                Logger::warning("GeoIP lookup (ip-api.com) failed for {$ip}: " . ($data['message'] ?? 'Unknown error'));
+            }
+        } else {
+            if (class_exists('Logger')) {
+                Logger::warning("GeoIP lookup (ip-api.com) unreachable for {$ip}. HTTP: {$httpCode}, Error: {$error}");
+            }
+        }
+
+        // Fallback to freeipapi.com (Supports HTTPS)
+        if (class_exists('Logger')) {
+            Logger::info("Trying fallback GeoIP (freeipapi.com) for {$ip}");
         }
         
-        $data = json_decode($response, true);
-        if (($data['status'] ?? '') === 'success') {
-            return $data;
-        }
+        $url = "https://freeipapi.com/api/json/{$ip}";
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'NK-Panel/1.0');
         
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        // curl_close is no longer needed in PHP 8.0+
+        
+        if ($httpCode === 200 && $response) {
+            $data = json_decode($response, true);
+            if (isset($data['countryName'])) {
+                return [
+                    'status' => 'success',
+                    'country' => $data['countryName'],
+                    'countryCode' => $data['countryCode'],
+                    'city' => $data['cityName'],
+                    'isp' => $data['as'] ?? 'Unknown',
+                    'org' => $data['as'] ?? 'Unknown',
+                    'lat' => $data['latitude'] ?? null,
+                    'lon' => $data['longitude'] ?? null,
+                    'query' => $ip
+                ];
+            }
+        }
+
         return null;
     }
 

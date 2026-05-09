@@ -207,6 +207,7 @@ Router::get('/servers/{id}/deploy', ['ServerController', 'showDeploy']);
 Router::post('/servers/{id}/deploy', ['ServerController', 'deploy']);
 Router::get('/servers/{id}/status', ['ServerController', 'getStatus']);
 Router::get('/servers/{id}/logs', ['ServerController', 'getLogs']);
+Router::get('/api/servers/{id}/deployment-logs', ['ApiController', 'getDeploymentLogs']);
 Router::get('/servers/{id}', ['ServerController', 'view']);
 Router::post('/servers/{id}/sync-stats', ['ServerController', 'syncStats']);
 Router::post('/servers/sync-all', ['ServerController', 'syncAll']);

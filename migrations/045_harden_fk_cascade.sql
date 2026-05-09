@@ -9,12 +9,16 @@
 -- user account is hard-deleted; the admin must clean up clients first.
 
 ALTER TABLE vpn_clients
-    DROP FOREIGN KEY vpn_clients_ibfk_1,   -- server_id FK (may vary by install)
-    DROP FOREIGN KEY vpn_clients_ibfk_2;   -- user_id  FK (may vary by install)
+    DROP CONSTRAINT IF EXISTS fk_vpn_clients_server_id,
+    DROP CONSTRAINT IF EXISTS fk_vpn_clients_user_id,
+    DROP CONSTRAINT IF EXISTS vpn_clients_ibfk_1,
+    DROP CONSTRAINT IF EXISTS vpn_clients_ibfk_2;
 
 ALTER TABLE http_proxies
-    DROP FOREIGN KEY http_proxies_ibfk_1,  -- user_id FK (may vary by install)
-    DROP FOREIGN KEY http_proxies_ibfk_2;  -- server_id FK (may vary by install)
+    DROP CONSTRAINT IF EXISTS fk_http_proxies_user_id,
+    DROP CONSTRAINT IF EXISTS fk_http_proxies_server_id,
+    DROP CONSTRAINT IF EXISTS http_proxies_ibfk_1,
+    DROP CONSTRAINT IF EXISTS http_proxies_ibfk_2;
 
 -- Re-add with RESTRICT
 ALTER TABLE vpn_clients

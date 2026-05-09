@@ -300,21 +300,52 @@ class VpnServer
                 ->execute([ServerStatus::DEPLOYING->value, $this->serverId]);
             $this->data['status'] = ServerStatus::DEPLOYING;
 
+            Logger::channel('deployments')->info("Starting deployment process", ['server_id' => $this->serverId, 'host' => $this->data['host']]);
+
             // Test SSH connection
+            Logger::channel('deployments')->info("Testing SSH connection...", ['server_id' => $this->serverId]);
             if (!$this->testConnection()) {
                 throw new Exception('SSH connection failed');
             }
+            Logger::channel('deployments')->info("SSH connection successful", ['server_id' => $this->serverId]);
 
             // Prepare system (sudo, curl, etc)
+            Logger::channel('deployments')->info("Preparing remote system environment...", ['server_id' => $this->serverId]);
             $this->prepareSystem();
 
             // Install Docker if needed
+            Logger::channel('deployments')->info("Checking Docker installation...", ['server_id' => $this->serverId]);
             $this->installDocker();
 
             // Install AmneziaWG kernel module on host for high performance
+            Logger::channel('deployments')->info("Installing AmneziaWG kernel module (this may take a few minutes)...", ['server_id' => $this->serverId]);
             $this->installKernelModule();
 
+            // IDEMPOTENCY: Check if container already exists and try to adopt it
+            $containerName = $this->data['container_name'] ?? 'nk-awg-v2';
+            $containerRunning = !empty(trim($this->executeCommand("docker ps --filter name={$containerName} --format '{{.Names}}'")));
+            
+            if ($containerRunning && !$forceRebuild) {
+                Logger::channel('deployments')->info("Existing AWG container '{$containerName}' detected. Initiating adoption...", ['server_id' => $this->serverId]);
+                try {
+                    $importedData = $this->detectAndImportExistingConfig();
+                    if ($importedData) {
+                        Logger::channel('deployments')->info("Successfully adopted existing configuration and imported clients.", ['server_id' => $this->serverId]);
+                        $this->load();
+                        return [
+                            'success' => true,
+                            'vpn_port' => (int)$this->data['vpn_port'],
+                            'public_key' => $this->data['server_public_key']
+                        ];
+                    }
+                } catch (Exception $e) {
+                    Logger::channel('deployments')->warning("Failed to adopt existing config: " . $e->getMessage(), ['server_id' => $this->serverId]);
+                    // Continue with normal deployment if adoption fails
+                }
+            }
+
             // Create directories
+            Logger::channel('deployments')->info("Creating deployment directories...", ['server_id' => $this->serverId]);
             $this->executeCommand('mkdir -p /opt/amnezia/nk-awg-v2', true, true);
 
             // Use existing VPN port if available, otherwise find a free one
@@ -324,15 +355,19 @@ class VpnServer
             }
 
             // Create Dockerfile
+            Logger::channel('deployments')->info("Generating Dockerfile...", ['server_id' => $this->serverId]);
             $this->createDockerfile();
 
             // Create start script
+            Logger::channel('deployments')->info("Generating start scripts...", ['server_id' => $this->serverId]);
             $this->createStartScript();
 
             // Build Docker image
+            Logger::channel('deployments')->info("Building Docker image (compiling AmneziaWG-go)...", ['server_id' => $this->serverId]);
             $this->buildDockerImage($forceRebuild);
 
             // Run container
+            Logger::channel('deployments')->info("Starting VPN container...", ['server_id' => $this->serverId]);
             $this->runContainer($vpnPort);
 
             // Allow UDP port on host
@@ -342,9 +377,11 @@ class VpnServer
             $this->executeCommand("sysctl -w net.ipv4.ip_forward=1 && echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf", true);
 
             // Initialize server config
+            Logger::channel('deployments')->info("Initializing VPN configuration and keys...", ['server_id' => $this->serverId]);
             $keys = $this->initializeServerConfig($vpnPort);
 
             // Update database with deployment info
+            Logger::channel('deployments')->info("Finalizing server activation...", ['server_id' => $this->serverId]);
             $stmt = $pdo->prepare('
                 UPDATE vpn_servers 
                 SET vpn_port = ?, 
@@ -1211,7 +1248,7 @@ BASH;
     {
         $pdo = DB::conn();
         $stmt = $pdo->query('
-            SELECT s.*, ANY_VALUE(u.email) as user_email, COUNT(CASE WHEN c.deleted_at IS NULL THEN 1 END) as client_count 
+            SELECT s.*, MAX(u.email) as user_email, COUNT(CASE WHEN c.deleted_at IS NULL THEN 1 END) as client_count 
             FROM vpn_servers s 
             LEFT JOIN users u ON s.user_id = u.id 
             LEFT JOIN vpn_clients c ON s.id = c.server_id 
@@ -1623,6 +1660,7 @@ BASH;
 
         // 2. Add All Peers
         foreach ($clients as $client) {
+            $wgConfig .= "# Name = {$client['name']}\n";
             $wgConfig .= "[Peer]\n";
             $wgConfig .= "PublicKey = {$client['public_key']}\n";
             $wgConfig .= "PresharedKey = {$this->data['preshared_key']}\n";
@@ -1633,10 +1671,16 @@ BASH;
         $clientsTable = [];
         foreach ($clients as $client) {
             $clientsTable[] = [
+                'clientId' => $client['public_key'],
                 'name' => $client['name'],
                 'public_key' => $client['public_key'],
+                'private_key' => $client['private_key'],
                 'client_ip' => $client['client_ip'],
-                'created_at' => $client['created_at']
+                'created_at' => $client['created_at'],
+                'userData' => [
+                    'clientName' => $client['name'],
+                    'creationDate' => $client['created_at']
+                ]
             ];
         }
         $clientsTableJson = json_encode($clientsTable);
@@ -1648,6 +1692,168 @@ BASH;
         $this->executeCommand("echo \"{$base64}\" | docker exec -i {$containerName} sh -c 'base64 -d > /opt/amnezia/awg/wg0.conf && chmod 600 /opt/amnezia/awg/wg0.conf'", true);
         $this->executeCommand("echo \"{$clientsTableBase64}\" | docker exec -i {$containerName} sh -c 'base64 -d > /opt/amnezia/awg/clientsTable'", true);
         $this->executeCommand("docker exec -i {$containerName} bash -c '/usr/local/bin/awg syncconf wg0 <(/usr/local/bin/awg-quick strip /opt/amnezia/awg/wg0.conf)'", true);
+    }
+
+    /**
+     * Detect existing AWG configuration and import to database
+     */
+    public function detectAndImportExistingConfig(): ?array
+    {
+        $pdo = DB::conn();
+        $containerName = $this->data['container_name'] ?? 'nk-awg-v2';
+        
+        // 1. Read wg0.conf from container
+        $wgConf = $this->executeCommand("docker exec {$containerName} cat /opt/amnezia/awg/wg0.conf 2>/dev/null", true);
+        if (empty($wgConf)) return null;
+
+        $awgParams = [];
+        $privKey = '';
+        $vpnPort = 0;
+        $lines = explode("\n", $wgConf);
+        $currentSection = '';
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line) || str_starts_with($line, '#')) continue;
+            
+            if (preg_match('/^\[(.*)\]$/', $line, $m)) {
+                $currentSection = strtolower($m[1]);
+                continue;
+            }
+
+            if ($currentSection === 'interface') {
+                if (preg_match('/^PrivateKey\s*=\s*(.+)$/i', $line, $m)) $privKey = trim($m[1]);
+                elseif (preg_match('/^ListenPort\s*=\s*(\d+)$/i', $line, $m)) $vpnPort = (int)$m[1];
+                elseif (preg_match('/^(Jc|Jmin|Jmax|S1|S2|S3|S4|H1|H2|H3|H4|I1|I2|I3|I4|I5|I6|I7|I8|I9)\s*=\s*(.+)$/i', $line, $m)) {
+                    $awgParams[$m[1]] = trim($m[2]);
+                }
+            }
+        }
+
+        if (empty($privKey)) return null;
+
+        // 2. Read Public Key and PSK
+        $pubKey = trim($this->executeCommand("docker exec {$containerName} cat /opt/amnezia/awg/wireguard_server_public_key.key 2>/dev/null", true));
+        $psk = trim($this->executeCommand("docker exec {$containerName} cat /opt/amnezia/awg/wireguard_psk.key 2>/dev/null", true));
+
+        if (empty($pubKey) || empty($psk)) return null;
+
+        // 3. Update server record
+        $stmt = $pdo->prepare('
+            UPDATE vpn_servers 
+            SET vpn_port = ?, 
+                server_public_key = ?, 
+                server_private_key = ?,
+                preshared_key = ?, 
+                awg_params = ?,
+                status = ?,
+                deployed_at = NOW()
+            WHERE id = ?
+        ');
+        $stmt->execute([
+            $vpnPort,
+            $pubKey,
+            $privKey,
+            $psk,
+            json_encode($awgParams),
+            ServerStatus::ACTIVE->value,
+            $this->serverId
+        ]);
+
+        // 4. Import Clients
+        $this->importClientsFromContainer($containerName, $psk);
+
+        return [
+            'public_key' => $pubKey,
+            'private_key' => $privKey,
+            'preshared_key' => $psk,
+            'awg_params' => $awgParams,
+            'vpn_port' => $vpnPort
+        ];
+    }
+
+    /**
+     * Import clients from container files
+     */
+    private function importClientsFromContainer(string $containerName, string $psk): void
+    {
+        $pdo = DB::conn();
+        
+        // Read clientsTable (JSON)
+        $tableJson = $this->executeCommand("docker exec {$containerName} cat /opt/amnezia/awg/clientsTable 2>/dev/null", true);
+        $clientsTable = json_decode(trim($tableJson), true) ?: [];
+        
+        // Read wg0.conf again to get IPs and names for public keys
+        $wgConf = $this->executeCommand("docker exec {$containerName} cat /opt/amnezia/awg/wg0.conf 2>/dev/null", true);
+        $peers = []; // pubKey => ['ip' => ..., 'name' => ...]
+        if (preg_match_all('/(?:#\s*Name\s*=\s*([^\r\n]+)\s+)?\[Peer\]\s+PublicKey\s*=\s*([^\s\r\n]+)\s+.*?AllowedIPs\s*=\s*([^\/]+)/s', $wgConf, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $m) {
+                $name = !empty($m[1]) ? trim($m[1]) : null;
+                $peers[trim($m[2])] = [
+                    'ip' => trim($m[3]),
+                    'name' => $name
+                ];
+            }
+        }
+
+        foreach ($peers as $pubKey => $peerData) {
+            $ip = $peerData['ip'];
+            
+            // Check if already in DB (including soft-deleted)
+            $stmt = $pdo->prepare('SELECT id, deleted_at FROM vpn_clients WHERE server_id = ? AND public_key = ?');
+            $stmt->execute([$this->serverId, $pubKey]);
+            $existing = $stmt->fetch();
+            
+            if ($existing) {
+                if ($existing['deleted_at']) {
+                    // RESTORE: It was deleted in panel but exists on server!
+                    $pdo->prepare('UPDATE vpn_clients SET deleted_at = NULL, status = ? WHERE id = ?')
+                        ->execute([ClientStatus::ACTIVE->value, $existing['id']]);
+                    Logger::info("Restored soft-deleted client during discovery", ['public_key' => $pubKey]);
+                }
+                continue; 
+            }
+
+            // Find name and private key from clientsTable, fallback to comment name
+            $name = $peerData['name'] ?? ("imported_" . substr($pubKey, 0, 8));
+            $privKey = 'IMPORTED_KEY_UNKNOWN';
+            foreach ($clientsTable as $entry) {
+                // Compatibility with both formats
+                $match = false;
+                if (($entry['clientId'] ?? '') === $pubKey) $match = true;
+                elseif (($entry['public_key'] ?? '') === $pubKey) $match = true;
+
+                if ($match) {
+                    $name = $entry['userData']['clientName'] ?? $entry['name'] ?? $name;
+                    $privKey = $entry['private_key'] ?? 'IMPORTED_KEY_UNKNOWN';
+                    break;
+                }
+            }
+
+            // Insert client
+            $stmt = $pdo->prepare('
+                INSERT INTO vpn_clients 
+                (server_id, user_id, name, client_ip, public_key, private_key, preshared_key, status, created_at) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            ');
+            $stmt->execute([
+                $this->serverId,
+                $this->data['user_id'] ?? 1,
+                $name,
+                $ip,
+                $pubKey,
+                $privKey,
+                $psk,
+                ClientStatus::ACTIVE->value
+            ]);
+        }
+
+        // Trigger immediate stats sync so traffic shows up right away
+        try {
+            $this->syncClientsWithServer(); 
+        } catch (Exception $e) {
+            Logger::warning("Initial stats sync failed after discovery: " . $e->getMessage());
+        }
     }
 
     /**

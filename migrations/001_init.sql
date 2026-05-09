@@ -69,8 +69,8 @@ CREATE TABLE IF NOT EXISTS vpn_clients (
   INDEX idx_expires_at (expires_at),
   INDEX idx_last_handshake (last_handshake),
   UNIQUE KEY unique_server_client_ip (server_id, client_ip),
-  FOREIGN KEY (server_id) REFERENCES vpn_servers(id) ON DELETE CASCADE,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  CONSTRAINT fk_vpn_clients_server_id FOREIGN KEY (server_id) REFERENCES vpn_servers(id) ON DELETE CASCADE,
+  CONSTRAINT fk_vpn_clients_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- API Tokens table
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS api_tokens (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_token (token),
   INDEX idx_user_id (user_id),
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  CONSTRAINT fk_api_tokens_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Settings table

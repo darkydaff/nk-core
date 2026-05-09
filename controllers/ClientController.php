@@ -128,8 +128,16 @@ class ClientController {
             $pdo = DB::conn();
 
             if (isset($_POST['name']) && trim($_POST['name']) !== '') {
+                $newName = trim($_POST['name']);
                 $stmt = $pdo->prepare('UPDATE vpn_clients SET name = ? WHERE id = ?');
-                $stmt->execute([trim($_POST['name']), $clientId]);
+                $stmt->execute([$newName, $clientId]);
+
+                // Trigger infrastructure sync to update names on server
+                require_once __DIR__ . '/../inc/Queue.php';
+                Queue::push('deployments', [
+                    'type' => 'sync_server',
+                    'server_id' => $clientData['server_id']
+                ]);
             }
             
             if (!empty($_POST['add_days'])) {

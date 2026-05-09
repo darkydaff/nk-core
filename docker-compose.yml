@@ -1,16 +1,16 @@
 services:
   db:
-    image: mysql:8.4
+    image: mariadb:12.2
     container_name: nk-panel-db
     restart: unless-stopped
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --mysql-native-password=ON --log_bin_trust_function_creators=ON
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --log_bin_trust_function_creators=ON
     env_file:
       - .env
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
-      MYSQL_DATABASE: ${DB_DATABASE:-amnezia_panel}
-      MYSQL_USER: ${DB_USERNAME:-amnezia}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-amnezia}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpassword}
+      MARIADB_DATABASE: ${DB_DATABASE:-amnezia_panel}
+      MARIADB_USER: ${DB_USERNAME:-amnezia}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-amnezia}
     ports:
       - "3308:3306"
     volumes:
@@ -18,7 +18,7 @@ services:
       - ./migrations:/docker-entrypoint-initdb.d
       - ./my.cnf:/etc/mysql/conf.d/my.cnf:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -43,11 +43,13 @@ services:
       DB_USERNAME: ${DB_USERNAME:-amnezia}
       DB_PASSWORD: ${DB_PASSWORD:-amnezia}
     ports:
-      - "8084:443"
+      - "8443:443"
     volumes:
+      - .:/var/www/html
       - /var/www/html/node_modules
       - /var/www/html/vendor
       - twig_cache:/var/www/html/storage/cache/twig
+      - panel_logs:/var/log/nk-panel
       - ./certs:/certs:ro
 
   beanstalkd:
@@ -63,7 +65,7 @@ services:
       dockerfile: Dockerfile
     container_name: nk-panel-worker
     restart: unless-stopped
-    command: php /var/www/html/bin/queue_worker.php
+    command: /start.sh worker
     depends_on:
       db:
         condition: service_healthy
@@ -81,10 +83,13 @@ services:
       QUEUE_HOST: beanstalkd
       QUEUE_PORT: 11300
     volumes:
+      - .:/var/www/html
       - /var/www/html/vendor
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/amnezia:/opt/amnezia
+      - panel_logs:/var/log/nk-panel
 
 volumes:
   db_data:
   twig_cache:
+  panel_logs:

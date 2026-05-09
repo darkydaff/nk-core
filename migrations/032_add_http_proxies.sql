@@ -17,8 +17,8 @@ CREATE TABLE IF NOT EXISTS http_proxies (
   INDEX idx_server_id (server_id),
   INDEX idx_status (status),
   INDEX idx_deleted_at (deleted_at),
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (server_id) REFERENCES vpn_servers(id) ON DELETE CASCADE
+  CONSTRAINT fk_http_proxies_user_id FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  CONSTRAINT fk_http_proxies_server_id FOREIGN KEY (server_id) REFERENCES vpn_servers(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Translations for HTTP Proxies

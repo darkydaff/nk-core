@@ -8,6 +8,9 @@ require_once __DIR__ . '/../inc/Logger.php';
 require_once __DIR__ . '/../inc/Enums.php';
 require_once __DIR__ . '/../inc/Lock.php';
 require_once __DIR__ . '/../inc/VpnServer.php';
+require_once __DIR__ . '/../inc/VpnClient.php';
+require_once __DIR__ . '/../inc/ProxyServer.php';
+require_once __DIR__ . '/../inc/Translator.php';
 
 use Pheanstalk\Pheanstalk;
 use Pheanstalk\Values\TubeName;
@@ -216,6 +219,7 @@ while (true) {
                     VpnClient::syncAllStatsForServer($serverId);
                     
                     $proxy = new ProxyServer($serverId);
+                    $proxy->syncUsers();
                     $proxy->updateTrafficStats();
                 } finally {
                     Lock::release($lockName);

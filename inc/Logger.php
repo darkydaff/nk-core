@@ -32,25 +32,36 @@ class Logger
      */
     private static function createLogger(string $channel): MonologLogger
     {
-        if (!is_dir(self::$logDir)) {
-            @mkdir(self::$logDir, 0755, true);
-        }
+        try {
+            if (!is_dir(self::$logDir)) {
+                @mkdir(self::$logDir, 0777, true);
+            }
 
-        $logger = new MonologLogger($channel);
-        $filename = self::getFilenameForChannel($channel);
-        
-        // Keep 14 days of logs
-        $fileHandler = new RotatingFileHandler(self::$logDir . '/' . $filename, 14, MonologLogger::DEBUG);
-        $fileHandler->setFormatter(new JsonFormatter());
-        
-        // Also log to stdout for Docker
-        $streamHandler = new StreamHandler('php://stdout', MonologLogger::DEBUG);
-        $streamHandler->setFormatter(new JsonFormatter());
-        
-        $logger->pushHandler($fileHandler);
-        $logger->pushHandler($streamHandler);
-        
-        return $logger;
+            $logger = new MonologLogger($channel);
+            $filename = self::getFilenameForChannel($channel);
+            $logPath = self::$logDir . '/' . $filename;
+            
+            // Keep 14 days of logs. We'll rely on the 777 directory for new files.
+            // We pass null for permission to let the OS/start.sh handle it,
+            // or 0666 if we are sure we won't trigger a 'chmod' error on an existing file.
+            $fileHandler = new RotatingFileHandler($logPath, 14, MonologLogger::DEBUG, true, 0666);
+            $fileHandler->setFormatter(new JsonFormatter());
+            
+            // Also log to stdout for Docker
+            $streamHandler = new StreamHandler('php://stdout', MonologLogger::DEBUG);
+            $streamHandler->setFormatter(new JsonFormatter());
+            
+            $logger->pushHandler($fileHandler);
+            $logger->pushHandler($streamHandler);
+
+            return $logger;
+        } catch (\Throwable $e) {
+            // Fallback to error_log to prevent 500 errors
+            error_log("Logger failure for channel {$channel}: " . $e->getMessage());
+            $logger = new MonologLogger($channel);
+            $logger->pushHandler(new \Monolog\Handler\ErrorLogHandler());
+            return $logger;
+        }
     }
 
     private static function getFilenameForChannel(string $channel): string
@@ -86,5 +97,47 @@ class Logger
     public static function warning(string $message, array $context = []): void
     {
         self::channel('system')->warning($message, $context);
+    }
+
+    /**
+     * Get logs for a specific channel, filtered by context
+     */
+    public static function getLogs(string $channel, array $filter = [], int $limit = 50): array
+    {
+        $filename = self::getFilenameForChannel($channel);
+        $logFile = self::$logDir . '/' . $filename;
+        
+        if (!file_exists($logFile)) {
+            // Check for rotated files too (simplified)
+            $logFile = self::$logDir . '/' . $filename . '-1';
+            if (!file_exists($logFile)) return [];
+        }
+
+        $lines = [];
+        $fp = fopen($logFile, 'r');
+        if (!$fp) return [];
+
+        // Seek to end and read backwards is better, but for simplicity we read last $limit lines
+        // Monolog JSON format: {"message":"...","context":{...},"level":200,"level_name":"INFO","channel":"...","datetime":"...","extra":{}}
+        
+        while (($line = fgets($fp)) !== false) {
+            $data = json_decode($line, true);
+            if (!$data) continue;
+
+            $match = true;
+            foreach ($filter as $key => $value) {
+                if (!isset($data['context'][$key]) || $data['context'][$key] != $value) {
+                    $match = false;
+                    break;
+                }
+            }
+
+            if ($match) {
+                $lines[] = $data;
+            }
+        }
+        fclose($fp);
+
+        return array_slice($lines, -$limit);
     }
 }

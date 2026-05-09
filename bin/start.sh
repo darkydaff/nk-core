@@ -43,9 +43,16 @@ mkdir -p /var/log/nk-panel
 touch /var/log/cron.log
 touch /var/log/metrics_collector.log
 chown -R www-data:www-data /var/log/nk-panel
-chmod -R 755 /var/log/nk-panel
+chmod -R 777 /var/log/nk-panel
 chown www-data:www-data /var/log/cron.log
 chown www-data:www-data /var/log/metrics_collector.log
+
+# Handle Worker Mode
+if [ "$1" = "worker" ]; then
+    echo "Starting Queue Worker..."
+    # Run worker as root to maintain access to docker.sock and ssh
+    exec php /var/www/html/bin/queue_worker.php
+fi
 
 # Start metrics collector in background as www-data
 su -s /bin/bash -c "php /var/www/html/bin/collect_metrics.php >> /var/log/metrics_collector.log 2>&1 &" www-data

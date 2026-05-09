@@ -600,6 +600,26 @@ class ApiController {
         } else { $this->respond(['error' => 'Proxy not found'], 404); }
     }
 
+    public function getDeploymentLogs($params) {
+        header('Content-Type: application/json');
+        $user = $this->requireAnyAuth();
+        if (!$user) { $this->respond(['error' => 'Unauthorized'], 401); }
+        
+        $serverId = (int)$params['id'];
+        
+        try {
+            $server = new VpnServer($serverId);
+            if ($server->getData()['user_id'] != $user['id'] && $user['role'] !== 'admin') {
+                $this->respond(['error' => 'Forbidden'], 403);
+            }
+            
+            $logs = Logger::getLogs('deployments', ['server_id' => $serverId], 100);
+            $this->respond(['success' => true, 'logs' => $logs]);
+        } catch (Exception $e) {
+            $this->respond(['error' => $e->getMessage()], 500);
+        }
+    }
+
     private function requireAnyAuth() {
         $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
         if ($authHeader && preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {

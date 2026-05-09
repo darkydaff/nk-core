@@ -61,7 +61,6 @@ class ServerMonitoring
 
         try {
             foreach ($clients as $client) {
-                // Support both string and Enum status
                 $status = $client['status'];
                 if ($status instanceof ClientStatus) {
                     $status = $status->value;
@@ -74,15 +73,15 @@ class ServerMonitoring
 
                 $peer = $peerStats[$publicKey];
                 
-                // Safety check for handshake activity
-                $handshake = $peer['last_handshake'] ?? 0;
-                // Consider active if handshake in last 3 minutes
-                // Use absolute difference to handle slight clock skews or future timestamps
-                if ($handshake > 0 && abs(time() - $handshake) < 180) {
-                    $stats = $this->calculateSpeed($client, $peer);
+                // Always sync traffic totals and handshake, even if offline
+                $stats = $this->calculateSpeed($client, $peer);
 
-                    if ($stats) {
-                        $this->saveClientMetrics($client['id'], $stats);
+                if ($stats) {
+                    $this->saveClientMetrics($client['id'], $stats);
+                    
+                    // Only add to real-time results if actually active (handshake < 3 mins)
+                    $handshake = $peer['bytes_received'] > 0 ? ($peer['last_handshake'] ?? 0) : 0;
+                    if ($handshake > 0 && abs(time() - $handshake) < 180) {
                         $results[] = [
                             'client_id' => $client['id'],
                             'client_name' => $client['name'],
@@ -129,31 +128,41 @@ class ServerMonitoring
             $parts = preg_split('/\s+/', $line);
             $count = count($parts);
             
-            // WireGuard dump format:
-            // Peer line:    [iface] publicKey  presharedKey  endpoint  allowedIPs  latestHandshake  transferRx  transferTx  persistentKeepalive
-            // Interface line: [iface] privateKey publicKey listenPort fwmark (many more in AmneziaWG)
-
+            // AmneziaWG adds many columns for obfuscation. Standard WG is 8-9.
+            // We search for the Public Key (44 chars ending in =) to identify the peer.
             $isKey0 = (strlen($parts[0]) === 44 && str_ends_with($parts[0], '='));
-            $isKey1 = (strlen($parts[1]) === 44 && str_ends_with($parts[1], '='));
+            $isKey1 = (isset($parts[1]) && strlen($parts[1]) === 44 && str_ends_with($parts[1], '='));
 
-            if ($count === 8 && $isKey0) {
+            if ($isKey0) {
                 // Peer line, no interface prefix
                 $offset = 0;
-            } elseif ($count === 9 && $isKey1) {
+            } elseif ($isKey1) {
                 // Peer line, with interface prefix
                 $offset = 1;
             } else {
                 continue; // Interface line or unrecognized format
             }
 
-            $publicKey = $parts[0 + $offset];
+            // Standard WireGuard indices relative to the key:
+            // 0: publicKey
+            // 1: presharedKey
+            // 2: endpoint
+            // 3: allowedIPs
+            // 4: latestHandshake
+            // 5: transferRx
+            // 6: transferTx
+            // 7: persistentKeepalive
             
+            if ($count < (5 + $offset)) continue; // Not enough data for stats
+
+            $publicKey = $parts[0 + $offset];
             $peers[$publicKey] = [
-                'endpoint'   => $parts[2 + $offset],
-                'allowed_ips'=> $parts[3 + $offset],
-                'last_handshake' => (int)$parts[4 + $offset],
-                'bytes_sent' => (float)$parts[5 + $offset], // rx = client sent
-                'bytes_received' => (float)$parts[6 + $offset], // tx = client received
+                'preshared_key' => $parts[1 + $offset] ?? '(none)',
+                'endpoint'      => $parts[2 + $offset] ?? '(none)',
+                'allowed_ips'   => $parts[3 + $offset] ?? '(none)',
+                'last_handshake'=> (int)($parts[4 + $offset] ?? 0),
+                'bytes_sent'    => (float)($parts[6 + $offset] ?? 0), // tx = client received
+                'bytes_received'=> (float)($parts[5 + $offset] ?? 0), // rx = client sent
             ];
         }
         return $peers;
