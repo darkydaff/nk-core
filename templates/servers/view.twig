@@ -25,12 +25,12 @@
 				</h1>
 				<div class="mt-2 ml-13 flex flex-wrap items-center gap-3">
 					<code class="text-xs text-secondary bg-panel px-2 py-1 rounded">{{ server.host }}</code>
-					{% if server.status == 'active' %}
+					{% if server.status.value == 'active' %}
 						<span class="badge-active text-xs px-2 py-1 rounded-md flex items-center">
 							<span class="w-1.5 h-1.5 rounded-full bg-cyan-400 mr-1.5"></span>
 							{{ t('status.active') }}
 						</span>
-					{% elseif server.status == 'deploying' %}
+					{% elseif server.status.value == 'deploying' %}
 						<span class="text-xs px-2 py-1 rounded-md flex items-center bg-amber-500/15 border border-amber-500/30 text-amber-400">
 							<i class="fas fa-spinner fa-spin text-[8px] mr-1.5"></i>
 							{{ t('status.deploying')|default('Deploying…') }}
@@ -39,12 +39,12 @@
 						<div class="flex items-center gap-2">
 							<span class="badge-error text-xs px-2 py-1 rounded-md flex items-center">
 								<span class="w-1.5 h-1.5 rounded-full bg-red-400 mr-1.5"></span>
-								{{ t('status.' ~ server.status)|default(server.status) }}
+								{{ t('status.' ~ server.status.value)|default(server.status.value) }}
 							</span>
 							{% if server.error_message %}
 								<div class="group relative inline-block">
 									<i class="fas fa-exclamation-triangle text-amber-500 text-xs cursor-help animate-pulse"></i>
-									<div class="absolute left-0 bottom-full mb-2 w-72 p-3 bg-slate-900 border border-red-500/30 rounded-lg text-[10px] text-red-200 shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[100] font-mono leading-relaxed backdrop-blur-md">
+									<div class="absolute left-0 bottom-full mb-2 w-72 p-3 bg-slate-900 border border-red-500/30 rounded-lg text-[10px] text-red-200 shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[100] font-mono leading-relaxed">
 										<div class="text-red-400 font-bold mb-1 uppercase tracking-tighter border-b border-red-500/20 pb-1">Last Deployment Error:</div>
 										{{ server.error_message }}
 									</div>
@@ -322,7 +322,7 @@
 	<!-- ===== Terminal Log Modal ===== -->
 	<div id="logsModal" class="fixed inset-0 z-[200] flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true" aria-labelledby="logsModalTitle">
 		<!-- Backdrop -->
-		<div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeLogsModal()"></div>
+		<div class="absolute inset-0 bg-black/80" onclick="closeLogsModal()"></div>
 		<!-- Panel -->
 		<div class="relative w-full max-w-4xl flex flex-col rounded-xl overflow-hidden shadow-2xl border border-slate-700/60" style="max-height:85vh;">
 			<!-- Terminal chrome -->
@@ -790,7 +790,7 @@ setInterval(() => initBeszel('{{ server.host }}'), 15000);
 
 // ===== Smart Polling (deploying state) =====
 (function () {
-	const currentStatus = '{{ server.status }}';
+	const currentStatus = '{{ server.status.value }}';
 	if (currentStatus !== 'deploying') return;
 
 	const serverId = {{ server.id }};

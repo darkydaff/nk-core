@@ -16,230 +16,443 @@
 {% endblock %}
 
 {% block content %}
-<div class="max-w-4xl mx-auto px-4 py-8 w-full">
-    <div class="mb-8 text-center">
-        <div class="w-16 h-16 rounded-xl bg-surface-hover text-primary flex items-center justify-center mx-auto mb-4">
-            <i class="fas fa-rocket text-3xl"></i>
+<div class="max-w-6xl mx-auto px-4 py-12 w-full">
+    <!-- Header -->
+    <div class="mb-12 text-center">
+        <div class="w-20 h-20 rounded-3xl bg-surface-hover text-primary flex items-center justify-center mx-auto mb-6 shadow-md border border-default animate-float">
+            <i class="fas fa-rocket text-4xl"></i>
         </div>
-        <h1 class="text-2xl font-bold text-primary mb-2">{{ t('servers.deploying') }}: {{ server.name }}</h1>
-        <p class="text-secondary">{{ t('servers.deploy_init') }} <code class="text-primary">{{ server.host }}</code></p>
-    </div>
-
-    <div class="panel p-0 mb-6 overflow-hidden border-2 border-primary/20 shadow-lg shadow-primary/5">
-        <!-- Terminal Header -->
-        <div class="flex items-center justify-between px-4 py-2 bg-surface-hover border-b border-default">
-            <div class="flex items-center gap-2">
-                <div class="w-3 h-3 rounded-full bg-red-500/80 shadow-sm shadow-red-500/20"></div>
-                <div class="w-3 h-3 rounded-full bg-yellow-500/80 shadow-sm shadow-yellow-500/20"></div>
-                <div class="w-3 h-3 rounded-full bg-green-500/80 shadow-sm shadow-green-500/20"></div>
-                <span class="ml-3 text-[10px] uppercase tracking-widest font-bold text-muted">deployment_console.sh</span>
-            </div>
-            <div class="text-[10px] font-mono text-muted/50 uppercase tracking-wider">SSHv2 / AES-256</div>
-        </div>
-        
-        <!-- Terminal Body -->
-        <div class="relative group">
-            <!-- Scanline Overlay -->
-            <div class="pointer-events-none absolute inset-0 bg-scanlines opacity-[0.03] z-10"></div>
-            
-            <div id="deployLog" class="bg-[#0c0c0d] text-primary/90 p-6 font-mono text-xs leading-relaxed h-[400px] overflow-y-auto scrollbar-thin scrollbar-thumb-primary/20">
-                <div class="text-muted/60 mb-2 flex items-center gap-2">
-                    <span class="text-green-500">➜</span>
-                    <span class="text-blue-400">~/nk-panel</span>
-                    <span class="text-primary/40 font-bold">./deploy --target={{ server.host }}</span>
-                </div>
-                <div class="text-primary/40 italic mb-4 border-b border-primary/5 pb-2">Initializing secure handshake...</div>
-                <div id="logContent">
-                    <div class="text-muted/50 italic">{{ t('servers.ready_to_deploy') }}</div>
-                </div>
-                <!-- Blinking Cursor -->
-                <div class="inline-block w-1.5 h-4 bg-primary/40 ml-1 terminal-cursor align-middle"></div>
-            </div>
+        <h1 class="text-4xl font-extrabold text-primary mb-3 tracking-tight">{{ t('servers.deploying') }}: {{ server.name }}</h1>
+        <div class="flex items-center justify-center gap-3">
+            <span class="flex h-2 w-2 relative">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+            </span>
+            <p class="text-secondary font-mono text-sm tracking-wider">{{ server.host }}</p>
         </div>
     </div>
 
-    <div class="text-center">
-        <button id="deployBtn" onclick="deploy()" class="btn-primary px-10 py-4 text-base font-bold shadow-xl shadow-primary/20 hover:scale-[1.02] transition-all active:scale-[0.98]">
-            <span id="btnText">{{ t('servers.start_deploy') }}</span>
-            <i id="btnSpinner" class="fas fa-spinner fa-spin ml-2 hidden"></i>
-            <i class="fas fa-rocket ml-2" id="btnIcon"></i>
-        </button>
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <!-- Left: Stepper UI (4 columns) -->
+        <div class="lg:col-span-4 h-full">
+            <div class="panel h-full flex flex-col p-8 border-default bg-surface shadow-sm">
+                <div class="flex items-center justify-between mb-10">
+                    <h3 class="text-xs font-black uppercase tracking-[0.2em] text-muted">{{ t('deployment.progress') }}</h3>
+                    <div id="deploymentSummary" class="hidden">
+                         <div id="totalDuration" class="text-sm font-mono font-bold text-primary bg-panel px-3 py-1 rounded-md border border-default">00:00</div>
+                    </div>
+                </div>
+                
+                <div id="stepper" class="space-y-0 flex-1 overflow-y-auto pr-2 scrollbar-thin">
+                    <!-- Steps will be injected here -->
+                    <div class="flex flex-col items-center justify-center py-24 text-muted/20 italic text-sm">
+                        <i class="fas fa-hourglass-start text-3xl mb-5 opacity-10"></i>
+                        {{ t('deployment.waiting_to_start') }}
+                    </div>
+                </div>
+
+                <!-- Cancel Button -->
+                <div id="cancelContainer" class="mt-8 hidden pt-8 border-t border-default">
+                    <button onclick="requestCancel()" class="w-full py-4 text-xs font-black uppercase tracking-widest text-red-400 hover:text-white hover:bg-red-500 border border-red-500/20 rounded-xl transition-all duration-200">
+                        <i class="fas fa-stop-circle mr-2"></i>{{ t('deployment.cancel') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Terminal UI (8 columns) -->
+        <div class="lg:col-span-8">
+            <div class="panel p-0 overflow-hidden border border-default shadow-2xl bg-[#0c0c0d] rounded-2xl">
+                <!-- Terminal Header -->
+                <div class="flex items-center justify-between px-6 py-4 bg-[#1a1b1e] border-b border-white/5">
+                    <div class="flex items-center gap-4">
+                        <div class="flex gap-2">
+                            <div class="w-3.5 h-3.5 rounded-full bg-[#ff5f56]"></div>
+                            <div class="w-3.5 h-3.5 rounded-full bg-[#ffbd2e]"></div>
+                            <div class="w-3.5 h-3.5 rounded-full bg-[#27c93f]"></div>
+                        </div>
+                        <div class="h-4 w-px bg-white/10 mx-2"></div>
+                        <span class="text-[10px] uppercase tracking-[0.3em] font-black text-white/20 font-mono">deployment_console.sh</span>
+                    </div>
+                    <div id="connectionStatus" class="flex items-center gap-3 text-[10px] font-mono font-bold text-muted uppercase tracking-tighter bg-black px-4 py-2 rounded-lg border border-white/5">
+                        <span id="connDot" class="w-2 h-2 rounded-full bg-muted"></span>
+                        <span id="connText">Initializing</span>
+                    </div>
+                </div>
+                
+                <!-- Terminal Body -->
+                <div class="relative group">
+                    <div class="pointer-events-none absolute inset-0 bg-scanlines opacity-[0.03] z-10"></div>
+                    
+                    <!-- Reconnection Overlay -->
+                    <div id="reconnectOverlay" class="absolute inset-0 bg-black/80 z-20 flex items-center justify-center opacity-0 pointer-events-none transition-all duration-300">
+                        <div class="bg-[#1a1b1e] border border-white/10 p-8 rounded-2xl shadow-3xl flex items-center gap-6">
+                            <div class="w-14 h-14 rounded-full bg-yellow-500/10 flex items-center justify-center">
+                                <i class="fas fa-wifi text-yellow-500 text-2xl animate-pulse"></i>
+                            </div>
+                            <div>
+                                <div class="font-bold text-white text-lg mb-1">Connection Lost</div>
+                                <div class="text-xs text-muted/50">Re-establishing secure bridge to orchestrator...</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="deployLog" class="text-primary/90 p-10 font-mono text-[14px] leading-relaxed h-[600px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 selection:bg-primary/40 antialiased">
+                        <div id="logContent" class="space-y-2">
+                            <!-- Logs will be injected here -->
+                        </div>
+                        <div id="terminalCursor" class="inline-block w-2.5 h-5 bg-primary/50 mt-2 terminal-cursor align-middle hidden"></div>
+                    </div>
+
+                    <!-- Auto-scroll toggle -->
+                    <div id="autoscrollBadge" class="absolute bottom-8 right-10 px-4 py-2 bg-black border border-white/10 rounded-xl text-[9px] uppercase font-black tracking-widest text-primary opacity-0 transition-all duration-200 shadow-lg">
+                        <i class="fas fa-angle-double-down mr-2"></i> Auto-Scroll Active
+                    </div>
+                </div>
+            </div>
+
+            <!-- Start Button -->
+            <div id="startAction" class="mt-12 text-center">
+                <button id="deployBtn" onclick="startDeployment()" class="btn-primary px-20 py-6 text-xl font-black uppercase tracking-widest shadow-xl group relative overflow-hidden rounded-2xl">
+                    <span id="btnText" class="relative">{{ t('servers.start_deploy') }}</span>
+                    <i id="btnIcon" class="fas fa-rocket ml-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform relative"></i>
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
+<!-- Centrifuge.js -->
+<script src="https://cdn.jsdelivr.net/npm/centrifuge@3.1.0/dist/centrifuge.min.js"></script>
+
 <style>
-/* Performance-optimized scanlines using a simple repeating pattern */
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+.animate-float { animation: float 6s ease-in-out infinite; }
+
 .bg-scanlines {
-    background: linear-gradient(
-        to bottom,
-        transparent,
-        transparent 50%,
-        rgba(0, 0, 0, 0.15) 50%,
-        rgba(0, 0, 0, 0.15)
-    );
-    background-size: 100% 4px;
+    background: linear-gradient(to bottom, transparent, transparent 50%, rgba(0, 0, 0, 0.4) 50%, rgba(0, 0, 0, 0.4));
+    background-size: 100% 3px;
 }
 
-/* Fast opacity-based blink for the cursor */
-@keyframes blink {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0; }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+.terminal-cursor { animation: blink 1s step-end infinite; }
+
+.step-item { position: relative; padding-bottom: 2rem; transition: all 0.5s ease; }
+.step-item:last-child { padding-bottom: 0; }
+.step-item:not(:last-child)::after {
+    content: ''; position: absolute; left: calc(1rem - 1px); top: 2.25rem; bottom: 0.25rem;
+    width: 2px; background: var(--color-primary); opacity: 0.1;
 }
-.terminal-cursor {
-    animation: blink 1s step-end infinite;
+.step-item.active:not(:last-child)::after {
+    background: linear-gradient(to bottom, var(--color-primary), transparent);
+    opacity: 0.3;
 }
+.step-item.completed:not(:last-child)::after { background: var(--color-primary); opacity: 0.4; }
+
+.step-icon {
+    width: 2rem; height: 2rem; border-radius: 0.6rem; 
+    display: flex; align-items: center; justify-content: center; 
+    font-size: 0.75rem;
+    background: var(--color-surface-panel); 
+    border: 1px solid var(--color-surface-border);
+    z-index: 10; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-shrink: 0;
+}
+.step-item.active .step-icon { 
+    border-color: var(--color-primary); 
+    color: var(--color-primary); 
+    background: var(--bg-surface-hover);
+    box-shadow: 0 4px 12px rgba(var(--color-primary-rgb), 0.1);
+    transform: scale(1.1);
+}
+.step-item.completed .step-icon { 
+    background: var(--color-primary); 
+    border-color: var(--color-primary); 
+    color: white;
+    transform: scale(1);
+}
+
+.scrollbar-thin::-webkit-scrollbar { width: 6px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+.scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
 </style>
 
 <script>
-function deploy() {
-    const btn = document.getElementById('deployBtn');
-    const btnText = document.getElementById('btnText');
-    const btnSpinner = document.getElementById('btnSpinner');
-    const btnIcon = document.getElementById('btnIcon');
-    const log = document.getElementById('deployLog');
-    const logContent = document.getElementById('logContent');
-    
-    btn.disabled = true;
-    btnText.textContent = '{{ t('servers.deploying')|e('js') }}...';
-    btnSpinner.classList.remove('hidden');
-    if(btnIcon) btnIcon.classList.add('hidden');
-    
-    logContent.innerHTML = '<div class="text-primary/60 mb-2">Connecting to deployment engine...</div>';
+let centrifuge = null;
+let subscription = null;
+let maxEventId = 0;
+let isUserScrolling = false;
+let currentJobId = {{ server.status.value == 'deploying' ? (server.current_job_id ?? 'null') : 'null' }};
+let startTime = null;
+let timerInterval = null;
+
+const UI = {
+    log: document.getElementById('deployLog'),
+    logContent: document.getElementById('logContent'),
+    stepper: document.getElementById('stepper'),
+    connStatus: document.getElementById('connectionStatus'),
+    btn: document.getElementById('deployBtn'),
+    btnText: document.getElementById('btnText'),
+    cursor: document.getElementById('terminalCursor'),
+    cancel: document.getElementById('cancelContainer'),
+    startAction: document.getElementById('startAction'),
+    totalTime: document.getElementById('totalDuration'),
+    summary: document.getElementById('deploymentSummary'),
+    autoscrollBadge: document.getElementById('autoscrollBadge')
+};
+
+// 1. Initial State Check
+document.addEventListener('DOMContentLoaded', () => {
+    if (currentJobId) {
+        initDeploymentView(currentJobId);
+    }
+
+    UI.log.addEventListener('scroll', () => {
+        const distanceToBottom = UI.log.scrollHeight - UI.log.scrollTop - UI.log.clientHeight;
+        isUserScrolling = distanceToBottom > 50;
+        UI.autoscrollBadge.style.opacity = isUserScrolling ? '0' : '1';
+    });
+});
+
+async function startDeployment() {
+    UI.btn.disabled = true;
+    UI.btnText.textContent = '{{ t('servers.initiating')|e('js') }}...';
     
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-    fetch('/servers/{{ server.id }}/deploy', {
-        method: 'POST',
-        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': csrfToken }
-    })
-    .then(async (r) => {
-        const raw = await r.text();
-        let d;
-        try { d = JSON.parse(raw); }
-        catch (e) { throw new Error('{{ t('servers.non_json_response')|e('js') }}: ' + raw.slice(0, 240)); }
-        if (!r.ok && !d.error) d.error = 'HTTP ' + r.status;
-        return d;
-    })
-    .then(d => {
-        if (d.success) {
-            btnText.textContent = '{{ t('servers.deploying')|e('js') }}…';
-            btnSpinner.classList.remove('hidden');
-
-            const displayedLogs = new Set();
-            let isUserScrolling = false;
-
-            // Detect if user is manually scrolling up
-            log.addEventListener('scroll', () => {
-                const distanceToBottom = log.scrollHeight - log.scrollTop - log.clientHeight;
-                isUserScrolling = distanceToBottom > 50; 
-            });
-
-            // Polling logs every second
-            const logTimer = setInterval(() => {
-                fetch('/api/servers/{{ server.id }}/deployment-logs', {
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.success && data.logs) {
-                        data.logs.forEach(entry => {
-                            // Unique key using timestamp, message and level
-                            const logKey = `${entry.datetime}_${entry.level}_${entry.message}`;
-                            if (!displayedLogs.has(logKey)) {
-                                const time = new Date(entry.datetime).toLocaleTimeString();
-                                let color = 'text-primary/80';
-                                let icon = '<span class="text-blue-500/50">⬡</span>';
-                                
-                                if (entry.level_name === 'WARNING') {
-                                    color = 'text-yellow-400';
-                                    icon = '<span class="text-yellow-500">⚠</span>';
-                                } else if (entry.message.toLowerCase().includes('successful') || entry.message.toLowerCase().includes('complete')) {
-                                    color = 'text-green-400 font-bold';
-                                    icon = '<span class="text-green-500">✓</span>';
-                                } else if (entry.message.includes('Starting') || entry.message.includes('Initiating')) {
-                                    color = 'text-blue-300 font-bold';
-                                    icon = '<span class="text-blue-500">➜</span>';
-                                }
-
-                                const logLine = document.createElement('div');
-                                logLine.className = `${color} mb-1 flex gap-3 opacity-0 translate-y-1 transition-all duration-300`;
-                                logLine.innerHTML = `
-                                    <span class="text-muted/30 text-[10px] w-16 shrink-0 font-mono">${time}</span>
-                                    <span class="shrink-0 w-4 text-center">${icon}</span>
-                                    <span class="break-words">${entry.message}</span>
-                                `;
-                                
-                                logContent.appendChild(logLine);
-                                displayedLogs.add(logKey);
-                                
-                                // Trigger entry animation
-                                setTimeout(() => logLine.classList.remove('opacity-0', 'translate-y-1'), 10);
-
-                                // Only auto-scroll if user isn't reading history
-                                if (!isUserScrolling) {
-                                    log.scrollTo({ top: log.scrollHeight, behavior: 'smooth' });
-                                }
-                            }
-                        });
-                    }
-                })
-                .catch(() => {});
-            }, 1000);
-
-            // Polling status for completion
-            let pollAttempts = 0;
-            const maxPollAttempts = 240; 
-            const pollTimer = setInterval(() => {
-                if (++pollAttempts > maxPollAttempts) {
-                    clearInterval(pollTimer);
-                    clearInterval(logTimer);
-                    log.innerHTML += '<div class="text-yellow-400 mt-2">Polling timed out. <a href="/servers/{{ server.id }}" class="underline">Click here</a> to check status.</div>';
-                    log.scrollTop = log.scrollHeight;
-                    btn.disabled = false;
-                    btnText.textContent = '{{ t('servers.retry_deploy')|e('js') }}';
-                    btnSpinner.classList.add('hidden');
-                    if (btnIcon) btnIcon.classList.remove('hidden');
-                    return;
-                }
-                
-                fetch('/servers/{{ server.id }}/status', {
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                })
-                .then(r => r.json())
-                .then(data => {
-                    if (data.status && data.status !== 'deploying') {
-                        clearInterval(pollTimer);
-                        setTimeout(() => clearInterval(logTimer), 2000); 
-                        logContent.innerHTML += `<div class="text-green-400 font-bold mt-4 p-3 bg-green-500/5 border border-green-500/20 rounded-lg flex items-center gap-3">
-                            <i class="fas fa-check-circle"></i>
-                            <span>Deployment successful! Redirecting to server dashboard...</span>
-                        </div>`;
-                        log.scrollTo({ top: log.scrollHeight, behavior: 'smooth' });
-                        setTimeout(() => window.location.href = '/servers/{{ server.id }}', 2000);
-                    }
-                })
-                .catch(() => {});
-            }, 2500);
+    try {
+        const r = await fetch('/servers/{{ server.id }}/deploy', {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': csrfToken }
+        });
+        const d = await r.json();
+        
+        if (d.success && d.job_id) {
+            currentJobId = d.job_id;
+            initDeploymentView(d.job_id, d.subscription_token);
         } else {
-            logContent.innerHTML += `<div class="text-red-400 font-bold mt-4 p-3 bg-red-500/5 border border-red-500/20 rounded-lg flex items-center gap-3">
-                <i class="fas fa-exclamation-triangle"></i>
-                <span>{{ t('message.error')|e('js') }}: ${d.error || '{{ t('message.unknown_error')|e('js') }}'}</span>
-            </div>`;
-            btn.disabled = false;
-            btnText.textContent = '{{ t('servers.retry_deploy')|e('js') }}';
-            btnSpinner.classList.add('hidden');
-            if(btnIcon) btnIcon.classList.remove('hidden');
+            showError(d.error || 'Failed to start deployment');
         }
-    })
-    .catch(e => {
-        logContent.innerHTML += `<div class="text-red-400 font-bold mt-4 p-3 bg-red-500/5 border border-red-500/20 rounded-lg flex items-center gap-3">
-            <i class="fas fa-wifi"></i>
-            <span>{{ t('message.connection_error')|e('js') }}: ${e.message}</span>
-        </div>`;
-        btn.disabled = false;
-        btnText.textContent = '{{ t('servers.retry_deploy')|e('js') }}';
-        btnSpinner.classList.add('hidden');
-        if(btnIcon) btnIcon.classList.remove('hidden');
+    } catch (e) {
+        showError(e.message);
+    }
+}
+
+async function initDeploymentView(jobId, subToken = null) {
+    UI.startAction.classList.add('hidden');
+    UI.cancel.classList.remove('hidden');
+    UI.cursor.classList.remove('hidden');
+    UI.stepper.innerHTML = '';
+    UI.logContent.innerHTML = '';
+    UI.summary.classList.remove('hidden');
+    startTime = Date.now();
+    startTimer();
+
+    // 2. Hydration (Fetch History) - Batch rendering using DocumentFragment
+    try {
+        const r = await fetch(`/api/jobs/${jobId}/events`);
+        const d = await r.json();
+        if (d.success && d.events) {
+            const fragment = document.createDocumentFragment();
+            const stepperFragment = document.createDocumentFragment();
+            
+            d.events.forEach(event => {
+                processEvent(event, fragment, stepperFragment);
+            });
+            
+            UI.logContent.appendChild(fragment);
+            UI.log.scrollTo({ top: UI.log.scrollHeight });
+        }
+    } catch (e) { console.error("Hydration failed", e); }
+
+    // 3. Connect to WebSocket
+    initCentrifuge(jobId, subToken);
+}
+
+function initCentrifuge(jobId, subToken = null) {
+    centrifuge = new Centrifuge('{{ centrifugo_url }}', {
+        token: '{{ connection_token }}'
     });
+
+    centrifuge.on('connected', () => {
+        updateConnStatus('Connected', 'bg-green-500');
+    });
+
+    centrifuge.on('disconnected', () => {
+        updateConnStatus('Disconnected', 'bg-muted');
+    });
+
+    // Use provided token or fall back to template-injected one (for resumption)
+    const token = subToken || '{{ subscription_token }}';
+    
+    subscription = centrifuge.newSubscription(`job:${jobId}`, {
+        token: token
+    });
+
+    subscription.on('publication', (ctx) => {
+        processEvent(ctx.data);
+    });
+
+    subscription.subscribe();
+    centrifuge.connect();
+}
+
+function processEvent(event, logTarget = null, stepperTarget = null) {
+    // 4. Monotonic Deduplication
+    if (event.id && event.id <= maxEventId) return;
+    if (event.id) maxEventId = event.id;
+
+    const time = new Date(event.timestamp).toLocaleTimeString();
+
+    switch (event.type) {
+        case 'step.start':
+            addStep(event.payload.step, event.message, stepperTarget);
+            appendLog(`[STEP] ${event.message}`, 'text-blue-400 font-bold', '➜', logTarget);
+            break;
+        case 'step.end':
+            completeStep(event.payload.step, event.payload.duration_ms);
+            appendLog(`[OK] ${event.message} (${formatDuration(event.payload.duration_ms)})`, 'text-green-400 font-bold', '✓', logTarget);
+            break;
+        case 'step.error':
+            failStep(event.payload.step, event.payload.error);
+            appendLog(`[ERROR] ${event.payload.error}`, 'text-red-400 font-bold', '✕', logTarget);
+            break;
+        case 'log':
+            appendLog(event.message, event.level === 'error' ? 'text-red-400' : 'text-primary/60', null, logTarget);
+            break;
+        case 'job.success':
+            finishJob(true);
+            appendLog("DEPLOYMENT COMPLETED SUCCESSFULLY", "text-green-400 font-bold bg-green-500/10 p-2 rounded block mt-4 text-center", "★", logTarget);
+            break;
+        case 'job.error':
+            finishJob(false, event.payload.error);
+            appendLog(`FATAL ERROR: ${event.payload.error}`, "text-red-400 font-bold bg-red-500/10 p-2 rounded block mt-4 text-center", "⚠", logTarget);
+            break;
+    }
+}
+
+function addStep(id, title, target = null) {
+    const existing = document.getElementById(`step-${id}`);
+    if (existing) {
+        existing.classList.add('active');
+        return;
+    }
+
+    const div = document.createElement('div');
+    div.id = `step-${id}`;
+    div.className = 'step-item active flex gap-4';
+    div.innerHTML = `
+        <div class="step-icon"><i class="fas fa-circle"></i></div>
+        <div class="flex-1">
+            <div class="text-sm font-bold text-primary">${title}</div>
+            <div class="text-[10px] text-muted uppercase tracking-tighter step-meta">In progress...</div>
+        </div>
+    `;
+    (target || UI.stepper).appendChild(div);
+}
+
+function completeStep(id, duration) {
+    const step = document.getElementById(`step-${id}`);
+    if (!step) return;
+    step.classList.remove('active');
+    step.classList.add('completed');
+    step.querySelector('.step-icon').innerHTML = '<i class="fas fa-check"></i>';
+    step.querySelector('.step-meta').textContent = `Completed in ${formatDuration(duration)}`;
+}
+
+function failStep(id, error) {
+    const step = document.getElementById(`step-${id}`);
+    if (!step) return;
+    step.classList.remove('active');
+    step.querySelector('.step-icon').classList.replace('border-primary', 'border-red-500');
+    step.querySelector('.step-icon').innerHTML = '<i class="fas fa-times text-red-500"></i>';
+    step.querySelector('.step-meta').className = 'text-[10px] text-red-400 uppercase tracking-tighter';
+    step.querySelector('.step-meta').textContent = error;
+}
+
+function appendLog(msg, color = 'text-primary/60', icon = null, target = null) {
+    const div = document.createElement('div');
+    div.className = `${color} flex gap-3`;
+    div.innerHTML = `
+        ${icon ? `<span class="shrink-0 w-4 text-center">${icon}</span>` : '<span class="w-4"></span>'}
+        <span class="break-words">${msg}</span>
+    `;
+    
+    const container = target || UI.logContent;
+    container.appendChild(div);
+
+    // DOM Protection: Cap log history to 1000 lines (only for live stream, not for initial hydration fragment)
+    if (!target && container.children.length > 1000) {
+        container.removeChild(container.firstChild);
+    }
+
+    if (!target && !isUserScrolling) {
+        UI.log.scrollTo({ top: UI.log.scrollHeight, behavior: 'smooth' });
+    }
+}
+
+function finishJob(success, error = '') {
+    clearInterval(timerInterval);
+    UI.cancel.classList.add('hidden');
+    UI.cursor.classList.add('hidden');
+    
+    if (success) {
+        setTimeout(() => window.location.href = '/servers/{{ server.id }}', 3000);
+    } else {
+        UI.startAction.classList.remove('hidden');
+        UI.btnText.textContent = '{{ t('servers.retry_deploy')|e('js') }}';
+        UI.btn.disabled = false;
+    }
+}
+
+async function requestCancel() {
+    if (!confirm('Abort deployment? Partial state may remain on the server.')) return;
+    
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    try {
+        await fetch(`/api/jobs/${currentJobId}/cancel`, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': csrfToken }
+        });
+    } catch (e) { console.error("Cancel failed", e); }
+}
+
+function startTimer() {
+    timerInterval = setInterval(() => {
+        const diff = Date.now() - startTime;
+        const mins = Math.floor(diff / 60000).toString().padStart(2, '0');
+        const secs = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+        UI.totalTime.textContent = `${mins}:${secs}`;
+    }, 1000);
+}
+
+function formatDuration(ms) {
+    if (ms < 1000) return `${ms}ms`;
+    return `${(ms / 1000).toFixed(1)}s`;
+}
+
+function updateConnStatus(text, colorClass) {
+    const dot = document.getElementById('connDot');
+    const label = document.getElementById('connText');
+    const overlay = document.getElementById('reconnectOverlay');
+    
+    dot.className = `w-1.5 h-1.5 rounded-full ${colorClass}`;
+    label.textContent = text;
+    
+    if (colorClass === 'bg-green-500') {
+        overlay.classList.add('opacity-0', 'pointer-events-none');
+    } else if (colorClass === 'bg-red-500' || colorClass === 'bg-yellow-500') {
+        overlay.classList.remove('opacity-0', 'pointer-events-none');
+    }
+}
+
+function showError(msg) {
+    appendLog(msg, 'text-red-400 font-bold', '⚠');
+    UI.btn.disabled = false;
+    UI.btnText.textContent = '{{ t('servers.retry_deploy')|e('js') }}';
 }
 </script>
 {% endblock %}

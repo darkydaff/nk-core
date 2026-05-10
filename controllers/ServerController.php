@@ -231,7 +231,20 @@ class ServerController
                 return;
             }
 
-            View::render('servers/deploy.twig', ['server' => $serverData]);
+            $user = Auth::user();
+            $connToken = EventBus::generateConnectionToken((string)$user['id']);
+            
+            $subToken = '';
+            if ($serverData['status'] === ServerStatus::DEPLOYING && !empty($serverData['current_job_id'])) {
+                $subToken = EventBus::generateSubscriptionToken((string)$user['id'], "job:{$serverData['current_job_id']}");
+            }
+
+            View::render('servers/deploy.twig', [
+                'server' => $serverData,
+                'centrifugo_url' => getenv('CENTRIFUGO_WS_URL') ?: 'ws://localhost:8000/connection/websocket',
+                'connection_token' => $connToken,
+                'subscription_token' => $subToken
+            ]);
         } catch (Exception $e) {
             http_response_code(404);
             echo Translator::t('servers.not_found');
@@ -264,17 +277,40 @@ class ServerController
                 require_once __DIR__ . '/../inc/Queue.php';
             }
 
-            // Set DB status to deploying
+            // Create Job for tracking with a snapshot of server metadata
+            $job = Job::create((int)$user['id'], 'provision_server', $serverId, [
+                'server_name' => $serverData['name'],
+                'host' => $serverData['host'],
+                'snapshot' => [
+                    'os' => $serverData['os'] ?? 'linux',
+                    'provider' => $serverData['provider'] ?? 'custom'
+                ]
+            ]);
+            
+            if (!$job) {
+                throw new Exception("Failed to create orchestration job. Check database connectivity.");
+            }
+
+            // Set DB status to deploying and link current job
             $pdo = DB::conn();
-            $pdo->prepare("UPDATE vpn_servers SET status = 'deploying' WHERE id = ?")->execute([$serverId]);
+            $pdo->prepare("UPDATE vpn_servers SET status = 'deploying', current_job_id = ? WHERE id = ?")->execute([$job->getId(), $serverId]);
 
             Queue::push('deployments', [
                 'type' => 'provision_server',
-                'server_id' => $serverId
+                'server_id' => $serverId,
+                'job_id' => $job->getId()
             ]);
 
+            $jobId = $job->getId();
+            $subToken = EventBus::generateSubscriptionToken((string)$user['id'], "job:{$jobId}");
+
             ob_get_clean();
-            echo json_encode(['success' => true, 'message' => 'Deployment queued']);
+            echo json_encode([
+                'success' => true, 
+                'message' => 'Deployment queued',
+                'job_id' => $jobId,
+                'subscription_token' => $subToken
+            ]);
         } catch (Throwable $e) {
             $unexpectedOutput = trim((string) ob_get_clean());
             http_response_code(500);

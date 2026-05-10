@@ -213,7 +213,8 @@
         }
 
         .bg-primary { background-color: var(--color-primary); }
-        .bg-base { background-color: var(--color-surface-base); }
+        .bg-base, .bg-surface { background-color: var(--color-surface-base); }
+        .bg-panel, .bg-surface-panel { background-color: var(--color-surface-panel); }
         .bg-status-active { background-color: var(--color-status-active); }
         .text-primary { color: var(--color-primary); }
         .text-status-active { color: var(--color-status-active); }
@@ -290,9 +291,8 @@
                 display: none;
                 position: fixed;
                 inset: 0;
-                background: rgba(0,0,0,0.5);
+                background: rgba(0,0,0,0.6);
                 z-index: 95;
-                backdrop-filter: blur(2px);
             }
             .sidebar-overlay.open {
                 display: block;

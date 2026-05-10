@@ -18,7 +18,7 @@
 				<h1 class="text-3xl font-bold tracking-tight">{{ t('proxies.title') }}</h1>
 				<p class="text-secondary mt-1">{{ t('proxies.description')|default('Manage lightweight HTTP/SOCKS5 proxies via 3proxy') }}</p>
 			</div>
-			<div class="flex items-center gap-3">
+			<div class="flex items-center gap-3 flex-wrap md:justify-end">
 				<button onclick="globalSyncAll(this)" class="btn-secondary px-5 py-2.5 flex items-center gap-2 whitespace-nowrap">
 					<i class="fas fa-sync-alt"></i>
 					{{ t('common.sync_all')|default('Sync All') }}
@@ -157,7 +157,7 @@
 
 	<!-- Create Proxy Modal -->
 	<div id="createModal" class="modal fixed inset-0 z-50 flex items-center justify-center hidden">
-		<div class="modal-overlay absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+		<div class="modal-overlay absolute inset-0 bg-black/60"></div>
 		<div class="modal-container bg-panel w-full max-w-md mx-auto rounded-xl shadow-2xl z-50 overflow-hidden border border-default">
 			<div class="px-6 py-4 border-b border-default flex justify-between items-center">
 				<h3 class="text-lg font-bold">{{ t('proxies.create') }}</h3>

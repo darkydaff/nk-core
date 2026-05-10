@@ -42,6 +42,9 @@ services:
       DB_DATABASE: ${DB_DATABASE:-amnezia_panel}
       DB_USERNAME: ${DB_USERNAME:-amnezia}
       DB_PASSWORD: ${DB_PASSWORD:-amnezia}
+      CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY:-secret_api_key}
+      CENTRIFUGO_API_URL: http://centrifugo:8000/api
+      CENTRIFUGO_TOKEN_HMAC_SECRET: ${CENTRIFUGO_TOKEN_HMAC_SECRET:-secret_hmac}
     ports:
       - "8443:443"
     volumes:
@@ -82,12 +85,28 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-amnezia}
       QUEUE_HOST: beanstalkd
       QUEUE_PORT: 11300
+      CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY:-secret_api_key}
+      CENTRIFUGO_API_URL: http://centrifugo:8000/api
     volumes:
       - .:/var/www/html
       - /var/www/html/vendor
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/amnezia:/opt/amnezia
       - panel_logs:/var/log/nk-panel
+
+  centrifugo:
+    image: centrifugo/centrifugo:v5
+    container_name: nk-centrifugo
+    restart: unless-stopped
+    volumes:
+      - ./centrifugo.json:/centrifugo/config.json
+    command: centrifugo -c config.json
+    env_file:
+      - .env
+    ulimits:
+      nofile:
+        soft: 65535
+        hard: 65535
 
 volumes:
   db_data:

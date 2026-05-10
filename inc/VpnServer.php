@@ -17,6 +17,9 @@ class VpnServer
     /** @var bool Whether this instance owns the master connection */
     private bool $muxOwner = false;
 
+    /** @var Job|null Current active background job for tracking */
+    private ?Job $currentJob = null;
+
     public function __construct(?int $serverId = null)
     {
         $this->serverId = $serverId;
@@ -48,6 +51,58 @@ class VpnServer
             @unlink($this->muxSocket);
             $this->muxSocket = null;
             $this->muxOwner = false;
+        }
+    }
+
+    public function setJob(?Job $job): void
+    {
+        $this->currentJob = $job;
+    }
+
+    public function getJob(): ?Job
+    {
+        return $this->currentJob;
+    }
+
+    /**
+     * Run a deployment step with automatic logging and event emitting
+     */
+    public function runStep(string $title, string $stepType, callable $work): mixed
+    {
+        if ($this->currentJob) {
+            // Cooperative Abort check
+            if ($this->currentJob->isCancelled()) {
+                throw new Exception("Job was cancelled. Aborting at step: $title");
+            }
+
+            $this->currentJob->heartbeat();
+            $this->currentJob->startStep($stepType);
+            $this->currentJob->emit('step.start', $title, ['step' => $stepType]);
+        }
+
+        try {
+            $result = $work();
+            
+            if ($this->currentJob) {
+                $duration = $this->currentJob->endStep($stepType);
+                $this->currentJob->emit('step.end', "Completed: $title", [
+                    'step' => $stepType, 
+                    'success' => true,
+                    'duration_ms' => $duration
+                ]);
+            }
+            
+            return $result;
+        } catch (\Throwable $e) {
+            if ($this->currentJob) {
+                $duration = $this->currentJob->endStep($stepType);
+                $this->currentJob->emit('step.error', "Failed: $title", [
+                    'step' => $stepType,
+                    'error' => $e->getMessage(),
+                    'duration_ms' => $duration
+                ], 'error');
+            }
+            throw $e;
         }
     }
 
@@ -300,119 +355,45 @@ class VpnServer
                 ->execute([ServerStatus::DEPLOYING->value, $this->serverId]);
             $this->data['status'] = ServerStatus::DEPLOYING;
 
-            Logger::channel('deployments')->info("Starting deployment process", ['server_id' => $this->serverId, 'host' => $this->data['host']]);
-
-            // Test SSH connection
-            Logger::channel('deployments')->info("Testing SSH connection...", ['server_id' => $this->serverId]);
-            if (!$this->testConnection()) {
-                throw new Exception('SSH connection failed');
-            }
-            Logger::channel('deployments')->info("SSH connection successful", ['server_id' => $this->serverId]);
-
-            // Prepare system (sudo, curl, etc)
-            Logger::channel('deployments')->info("Preparing remote system environment...", ['server_id' => $this->serverId]);
-            $this->prepareSystem();
-
-            // Install Docker if needed
-            Logger::channel('deployments')->info("Checking Docker installation...", ['server_id' => $this->serverId]);
-            $this->installDocker();
-
-            // Install AmneziaWG kernel module on host for high performance
-            Logger::channel('deployments')->info("Installing AmneziaWG kernel module (this may take a few minutes)...", ['server_id' => $this->serverId]);
-            $this->installKernelModule();
+            // Pipeline execution
+            $this->runStep("Testing SSH connection...", 'test_connection', fn() => $this->stepTestConnection());
+            $this->runStep("Preparing remote system...", 'prepare_system', fn() => $this->prepareSystem());
+            $this->runStep("Installing Docker...", 'install_docker', fn() => $this->installDocker());
+            $this->runStep("Installing AmneziaWG Kernel Module...", 'install_kernel_module', fn() => $this->installKernelModule());
 
             // IDEMPOTENCY: Check if container already exists and try to adopt it
             $containerName = $this->data['container_name'] ?? 'nk-awg-v2';
             $containerRunning = !empty(trim($this->executeCommand("docker ps --filter name={$containerName} --format '{{.Names}}'")));
             
             if ($containerRunning && !$forceRebuild) {
-                Logger::channel('deployments')->info("Existing AWG container '{$containerName}' detected. Initiating adoption...", ['server_id' => $this->serverId]);
-                try {
-                    $importedData = $this->detectAndImportExistingConfig();
-                    if ($importedData) {
-                        Logger::channel('deployments')->info("Successfully adopted existing configuration and imported clients.", ['server_id' => $this->serverId]);
-                        $this->load();
-                        return [
-                            'success' => true,
-                            'vpn_port' => (int)$this->data['vpn_port'],
-                            'public_key' => $this->data['server_public_key']
-                        ];
-                    }
-                } catch (Exception $e) {
-                    Logger::channel('deployments')->warning("Failed to adopt existing config: " . $e->getMessage(), ['server_id' => $this->serverId]);
-                    // Continue with normal deployment if adoption fails
+                if ($this->tryAdoptExistingConfig()) {
+                    return $this->getDeploymentResult();
                 }
             }
 
-            // Create directories
-            Logger::channel('deployments')->info("Creating deployment directories...", ['server_id' => $this->serverId]);
-            $this->executeCommand('mkdir -p /opt/amnezia/nk-awg-v2', true, true);
+            $this->runStep("Creating directories...", 'create_dirs', fn() => $this->executeCommand('mkdir -p /opt/amnezia/nk-awg-v2', true, true));
 
-            // Use existing VPN port if available, otherwise find a free one
-            $vpnPort = (int) ($this->data['vpn_port'] ?? 0);
+            $vpnPort = (int)($this->data['vpn_port'] ?? 0);
             if ($vpnPort <= 0) {
-                $vpnPort = $this->findFreeUdpPort();
+                $vpnPort = $this->runStep("Finding free UDP port...", 'find_port', fn() => $this->findFreeUdpPort());
             }
 
-            // Create Dockerfile
-            Logger::channel('deployments')->info("Generating Dockerfile...", ['server_id' => $this->serverId]);
-            $this->createDockerfile();
+            $this->runStep("Generating Dockerfile...", 'create_dockerfile', fn() => $this->createDockerfile());
+            $this->runStep("Generating scripts...", 'create_scripts', fn() => $this->createStartScript());
+            $this->runStep("Building Image...", 'build_image', fn() => $this->buildDockerImage($forceRebuild));
+            
+            $this->runStep("Starting VPN Container...", 'run_container', function() use ($vpnPort) {
+                $this->runContainer($vpnPort);
+                $this->executeCommand("iptables -A INPUT -p udp --dport {$vpnPort} -j ACCEPT 2>/dev/null || true", true);
+                $this->executeCommand("sysctl -w net.ipv4.ip_forward=1 && echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf", true);
+            });
 
-            // Create start script
-            Logger::channel('deployments')->info("Generating start scripts...", ['server_id' => $this->serverId]);
-            $this->createStartScript();
-
-            // Build Docker image
-            Logger::channel('deployments')->info("Building Docker image (compiling AmneziaWG-go)...", ['server_id' => $this->serverId]);
-            $this->buildDockerImage($forceRebuild);
-
-            // Run container
-            Logger::channel('deployments')->info("Starting VPN container...", ['server_id' => $this->serverId]);
-            $this->runContainer($vpnPort);
-
-            // Allow UDP port on host
-            $this->executeCommand("iptables -A INPUT -p udp --dport {$vpnPort} -j ACCEPT 2>/dev/null || true", true);
-
-            // Enable IP forwarding on host
-            $this->executeCommand("sysctl -w net.ipv4.ip_forward=1 && echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf", true);
-
-            // Initialize server config
-            Logger::channel('deployments')->info("Initializing VPN configuration and keys...", ['server_id' => $this->serverId]);
-            $keys = $this->initializeServerConfig($vpnPort);
+            $keys = $this->runStep("Initializing VPN...", 'init_config', fn() => $this->initializeServerConfig($vpnPort));
 
             // Update database with deployment info
-            Logger::channel('deployments')->info("Finalizing server activation...", ['server_id' => $this->serverId]);
-            $stmt = $pdo->prepare('
-                UPDATE vpn_servers 
-                SET vpn_port = ?, 
-                    server_public_key = ?, 
-                    server_private_key = ?,
-                    preshared_key = ?, 
-                    awg_params = ?,
-                    status = ?,
-                    deployed_at = NOW(),
-                    error_message = NULL
-                WHERE id = ?
-            ');
+            $this->finalizeDeployment($vpnPort, $keys);
 
-            $stmt->execute([
-                $vpnPort,
-                $keys['public_key'],
-                $keys['private_key'],
-                $keys['preshared_key'],
-                json_encode($keys['awg_params']),
-                ServerStatus::ACTIVE->value,
-                $this->serverId
-            ]);
-
-            // Reload data
-            $this->load();
-
-            return [
-                'success' => true,
-                'vpn_port' => $vpnPort,
-                'public_key' => $keys['public_key']
-            ];
+            return $this->getDeploymentResult();
 
         } catch (Exception $e) {
             // Update status to error
@@ -433,10 +414,66 @@ class VpnServer
         }
     }
 
-    /**
-     * Test SSH connection to server. Throws exception with details on failure.
-     */
-    private function testConnection(): bool
+    private function stepTestConnection(): void
+    {
+        if (!$this->testConnection()) {
+            throw new Exception('SSH connection failed');
+        }
+    }
+
+    private function tryAdoptExistingConfig(): bool
+    {
+        Logger::channel('deployments')->info("Existing container detected. Initiating adoption...", ['server_id' => $this->serverId]);
+        try {
+            if ($this->detectAndImportExistingConfig()) {
+                $this->load();
+                return true;
+            }
+        } catch (Exception $e) {
+            Logger::channel('deployments')->warning("Adoption failed: " . $e->getMessage());
+        }
+        return false;
+    }
+
+    private function finalizeDeployment(int $vpnPort, array $keys): void
+    {
+        $pdo = DB::conn();
+        $stmt = $pdo->prepare('
+            UPDATE vpn_servers 
+            SET vpn_port = ?, 
+                server_public_key = ?, 
+                server_private_key = ?,
+                preshared_key = ?, 
+                awg_params = ?,
+                status = ?,
+                deployed_at = NOW(),
+                error_message = NULL
+            WHERE id = ?
+        ');
+
+        $stmt->execute([
+            $vpnPort,
+            $keys['public_key'],
+            $keys['private_key'],
+            $keys['preshared_key'],
+            json_encode($keys['awg_params']),
+            ServerStatus::ACTIVE->value,
+            $this->serverId
+        ]);
+
+        $this->load();
+    }
+
+    private function getDeploymentResult(): array
+    {
+        return [
+            'success' => true,
+            'vpn_port' => (int)($this->data['vpn_port'] ?? 0),
+            'public_key' => $this->data['server_public_key'] ?? ''
+        ];
+    }
+
+    public function testConnection(): bool
     {
         // Try to establish the multiplexed master — this validates the connection
         try {
@@ -583,6 +620,14 @@ class VpnServer
 
         if ($checkExit && $exitCode !== 0) {
             throw new Exception("Remote command failed (exit {$exitCode}): " . trim(substr($output, -500)));
+        }
+
+        // Stream output to Job if active
+        if ($this->currentJob) {
+            $this->currentJob->log($output, [
+                'command' => $loggedCommand,
+                'exit_code' => $exitCode
+            ]);
         }
 
         return $output;
@@ -1328,9 +1373,6 @@ BASH;
     {
         if (!$this->data) return null;
         $data = $this->data;
-        if ($data['status'] instanceof ServerStatus) {
-            $data['status'] = $data['status']->value;
-        }
         $data['container_name'] = $data['container_name'] ?? 'nk-awg-v2';
         return $data;
     }

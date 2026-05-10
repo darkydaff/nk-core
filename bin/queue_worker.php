@@ -11,6 +11,8 @@ require_once __DIR__ . '/../inc/VpnServer.php';
 require_once __DIR__ . '/../inc/VpnClient.php';
 require_once __DIR__ . '/../inc/ProxyServer.php';
 require_once __DIR__ . '/../inc/Translator.php';
+require_once __DIR__ . '/../inc/Job.php';
+require_once __DIR__ . '/../inc/EventBus.php';
 
 use Pheanstalk\Pheanstalk;
 use Pheanstalk\Values\TubeName;
@@ -56,6 +58,7 @@ while (true) {
                 }
                 
                 $serverId = (int)$payload['server_id'];
+                $jobId = isset($payload['job_id']) ? (int)$payload['job_id'] : null;
                 $lockName = "server:{$serverId}:deploy";
                 
                 if (!Lock::acquire($lockName, 600)) {
@@ -63,11 +66,22 @@ while (true) {
                     break;
                 }
 
+                $orchestration = $jobId ? new Job($jobId) : null;
+                
                 try {
-                    Logger::channel('deployments')->info('Starting server deployment', ['server_id' => $serverId]);
+                    if ($orchestration) $orchestration->start();
+                    
+                    Logger::channel('deployments')->info('Starting server deployment', ['server_id' => $serverId, 'job_id' => $jobId]);
                     $vpnServer = new VpnServer($serverId);
-                    $vpnServer->deploy(false);
+                    if ($orchestration) $vpnServer->setJob($orchestration);
+                    
+                    $result = $vpnServer->deploy(false);
+                    
+                    if ($orchestration) $orchestration->success($result);
                     Logger::channel('deployments')->info('Server deployment successful', ['server_id' => $serverId]);
+                } catch (\Throwable $e) {
+                    if ($orchestration) $orchestration->fail($e->getMessage());
+                    throw $e;
                 } finally {
                     Lock::release($lockName);
                 }

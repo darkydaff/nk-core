@@ -9,6 +9,17 @@ use Firebase\JWT\Key;
 
 class JWT {
     private static ?string $secretKey = null;
+
+    /**
+     * Encode a payload into a JWT token (Generic)
+     * 
+     * @param array $payload Token payload
+     * @param string $secret Secret key
+     * @return string JWT token
+     */
+    public static function encode(array $payload, string $secret): string {
+        return FirebaseJWT::encode($payload, $secret, 'HS256');
+    }
     
     /**
      * Get or generate JWT secret key

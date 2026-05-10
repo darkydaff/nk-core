@@ -26,6 +26,8 @@ require_once __DIR__ . '/../inc/VpnClient.php';
 require_once __DIR__ . '/../inc/Translator.php';
 require_once __DIR__ . '/../inc/JWT.php';
 require_once __DIR__ . '/../inc/ServerMonitoring.php';
+require_once __DIR__ . '/../inc/Job.php';
+require_once __DIR__ . '/../inc/EventBus.php';
 require_once __DIR__ . '/../inc/CSRF.php';
 
 // Load environment configuration
@@ -208,6 +210,8 @@ Router::post('/servers/{id}/deploy', ['ServerController', 'deploy']);
 Router::get('/servers/{id}/status', ['ServerController', 'getStatus']);
 Router::get('/servers/{id}/logs', ['ServerController', 'getLogs']);
 Router::get('/api/servers/{id}/deployment-logs', ['ApiController', 'getDeploymentLogs']);
+Router::get('/api/jobs/{id}/events', ['ApiController', 'getJobEvents']);
+Router::post('/api/jobs/{id}/cancel', ['ApiController', 'cancelJob']);
 Router::get('/servers/{id}', ['ServerController', 'view']);
 Router::post('/servers/{id}/sync-stats', ['ServerController', 'syncStats']);
 Router::post('/servers/sync-all', ['ServerController', 'syncAll']);

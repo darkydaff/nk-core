@@ -1,12 +1,16 @@
 <?php
 
-enum ServerStatus: string {
+enum ServerStatus: string implements JsonSerializable {
     case DEPLOYING = 'deploying';
     case DELETING = 'deleting';
     case ACTIVE = 'active';
     case STOPPED = 'stopped';
     case ERROR = 'error';
     case DELETED = 'deleted';
+
+    public function jsonSerialize(): string {
+        return $this->value;
+    }
 
     public function canTransitionTo(ServerStatus $newStatus): bool {
         return match($this) {

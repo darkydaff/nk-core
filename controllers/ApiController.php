@@ -600,21 +600,77 @@ class ApiController {
         } else { $this->respond(['error' => 'Proxy not found'], 404); }
     }
 
-    public function getDeploymentLogs($params) {
+    public function getJobEvents($params) {
         header('Content-Type: application/json');
         $user = $this->requireAnyAuth();
         if (!$user) { $this->respond(['error' => 'Unauthorized'], 401); }
         
-        $serverId = (int)$params['id'];
+        $jobId = (int)$params['id'];
         
         try {
-            $server = new VpnServer($serverId);
-            if ($server->getData()['user_id'] != $user['id'] && $user['role'] !== 'admin') {
+            $job = new Job($jobId);
+            $jobData = $job->getData();
+            
+            // Security: Ensure user owns the server associated with the job
+            $pdo = DB::conn();
+            $stmt = $pdo->prepare("SELECT user_id FROM vpn_servers WHERE id = ?");
+            $stmt->execute([$jobData['server_id']]);
+            $ownerId = $stmt->fetchColumn();
+            
+            if ($ownerId != $user['id'] && $user['role'] !== 'admin') {
                 $this->respond(['error' => 'Forbidden'], 403);
             }
             
-            $logs = Logger::getLogs('deployments', ['server_id' => $serverId], 100);
-            $this->respond(['success' => true, 'logs' => $logs]);
+            $this->respond([
+                'success' => true, 
+                'job' => [
+                    'status' => $jobData['status'],
+                    'type' => $jobData['type']
+                ],
+                'events' => $job->getEvents(100)
+            ]);
+        } catch (Exception $e) {
+            $this->respond(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function cancelJob($params) {
+        $user = $this->requireAnyAuth();
+        if (!$user) { $this->respond(['error' => 'Unauthorized'], 401); }
+        
+        $jobId = (int)$params['id'];
+        
+        try {
+            $job = new Job($jobId);
+            $jobData = $job->getData();
+            
+            // Authorization check
+            $pdo = DB::conn();
+            $stmt = $pdo->prepare("SELECT user_id FROM vpn_servers WHERE id = ?");
+            $stmt->execute([$jobData['server_id']]);
+            $ownerId = $stmt->fetchColumn();
+            
+            if ($ownerId != $user['id'] && $user['role'] !== 'admin') {
+                $this->respond(['error' => 'Forbidden'], 403);
+            }
+            
+            $job->requestCancel();
+            $this->respond(['success' => true, 'message' => 'Cancellation requested']);
+        } catch (Exception $e) {
+            $this->respond(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function getDeploymentLogs($params) {
+        $user = $this->requireAnyAuth();
+        if (!$user) { $this->respond(['error' => 'Unauthorized'], 401); }
+        
+        $jobId = (int)$params['id'];
+        try {
+            $job = new Job($jobId);
+            $this->respond([
+                'logs' => $job->getEvents(1000)
+            ]);
         } catch (Exception $e) {
             $this->respond(['error' => $e->getMessage()], 500);
         }
