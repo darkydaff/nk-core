@@ -40,7 +40,13 @@ class Queue
         try {
             $pheanstalk = self::getConnection();
             $pheanstalk->useTube(new TubeName($tube));
-            $pheanstalk->put(json_encode($payload));
+            // Use 1200s (20 mins) TTR to prevent timeout during long-running tasks like docker build
+            $pheanstalk->put(
+                json_encode($payload),
+                Pheanstalk::DEFAULT_PRIORITY,
+                Pheanstalk::DEFAULT_DELAY,
+                1200
+            );
             
             Logger::channel('control-plane')->info('Job queued', [
                 'tube' => $tube,

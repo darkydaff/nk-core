@@ -236,6 +236,8 @@ Router::post('/proxies/create', ['ProxyController', 'create']);
 Router::post('/proxies/{id}/pause', ['ProxyController', 'pause']);
 Router::post('/proxies/{id}/resume', ['ProxyController', 'resume']);
 Router::post('/proxies/{id}/delete', ['ProxyController', 'delete']);
+Router::post('/proxies/{id}/check', ['ProxyController', 'check']);
+Router::post('/proxies/sync-all', ['ProxyController', 'syncAll']);
 
 /**
  * SETTINGS ROUTES

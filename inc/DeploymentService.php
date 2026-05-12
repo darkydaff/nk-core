@@ -18,7 +18,7 @@ class DeploymentService {
         
         // 2. Run new container
         $cmd = "docker run -d --restart always --name {$containerName} {$runOptions} {$image} 2>&1";
-        $output = $server->executeCommand($cmd, true, true);
+        $output = $server->executeCommand($cmd, true, true, false, 600);
         
         // 3. Verify it's running
         sleep(2);

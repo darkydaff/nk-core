@@ -33,4 +33,12 @@ class DB {
     
     return self::$pdo;
   }
+
+  /**
+   * Drop the PDO singleton so the next conn() call opens a fresh connection.
+   * Must be called after a full DB restore so subsequent queries see the new schema.
+   */
+  public static function invalidate(): void {
+    self::$pdo = null;
+  }
 }

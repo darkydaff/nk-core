@@ -2,6 +2,8 @@
 declare(strict_types=1);
 
 class Auth {
+  private static ?array $cachedUser = null;
+  private static ?int   $cachedUserId = null;
   public static function register(string $name, string $email, string $password): bool {
     $pdo = DB::conn();
     $email = strtolower(trim($email));
@@ -18,20 +20,57 @@ class Auth {
   public static function login(string $email, string $password): bool {
     $pdo = DB::conn();
     $email = strtolower(trim($email));
-    // Local DB authentication only (LDAP removed)
-    
-    // Fallback to local DB authentication
+    $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $rateKey = 'login:' . substr(md5($email . '|' . $ip), 0, 32);
+
+    // Check rate limit (stored in settings table)
+    $rlStmt = $pdo->prepare("SELECT `value` FROM settings WHERE namespace = 'ratelimit' AND `key` = ? AND user_id IS NULL LIMIT 1");
+    $rlStmt->execute([$rateKey]);
+    $rlRow = $rlStmt->fetch();
+    if ($rlRow) {
+        $d = json_decode($rlRow['value'], true) ?? [];
+        if (!empty($d['blocked_until']) && $d['blocked_until'] > time()) {
+            sleep(3);
+            return false;
+        }
+        // Reset stale counter (window = 5 minutes)
+        if (!empty($d['last_failure']) && (time() - $d['last_failure']) > 300) {
+            $pdo->prepare("DELETE FROM settings WHERE namespace = 'ratelimit' AND `key` = ? AND user_id IS NULL")->execute([$rateKey]);
+            $rlRow = null;
+        }
+    }
+
     $stmt = $pdo->prepare('SELECT * FROM users WHERE email = ? AND deleted_at IS NULL LIMIT 1');
     $stmt->execute([$email]);
     $user = $stmt->fetch();
-    if (!$user) return false;
-    if (!password_verify($password, $user['password_hash'])) return false;
+
+    if (!$user || !password_verify($password, $user['password_hash'])) {
+        // Record failure
+        $d   = isset($rlRow) && $rlRow ? (json_decode($rlRow['value'], true) ?? []) : [];
+        $cnt = (int)($d['attempts'] ?? 0) + 1;
+        $newVal = json_encode(['attempts' => $cnt, 'last_failure' => time(), 'blocked_until' => $cnt >= 10 ? time() + 300 : 0]);
+        $pdo->prepare("INSERT INTO settings (user_id, namespace, `key`, `value`) VALUES (NULL, 'ratelimit', ?, ?) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`), updated_at = NOW()")
+            ->execute([$rateKey, $newVal]);
+        sleep(1);
+        return false;
+    }
+
+    // Clear rate limit on success
+    $pdo->prepare("DELETE FROM settings WHERE namespace = 'ratelimit' AND `key` = ? AND user_id IS NULL")->execute([$rateKey]);
+
     $_SESSION['user_id'] = (int)$user['id'];
     $pdo->prepare('UPDATE users SET last_login_at = NOW() WHERE id = ?')->execute([$user['id']]);
     return true;
   }
 
-  public static function logout(): void { unset($_SESSION['user_id']); }
+  public static function logout(): void {
+    unset($_SESSION['user_id']);
+    self::$cachedUser   = null;
+    self::$cachedUserId = null;
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_destroy();
+    }
+  }
   public static function check(): bool { return isset($_SESSION['user_id']); }
 
   public static function getUserByEmail(string $email): ?array {
@@ -45,11 +84,17 @@ class Auth {
 
   public static function user(): ?array {
     if (!self::check()) return null;
+    $uid = (int)$_SESSION['user_id'];
+    if (self::$cachedUser !== null && self::$cachedUserId === $uid) {
+        return self::$cachedUser;
+    }
     $pdo = DB::conn();
     $stmt = $pdo->prepare('SELECT * FROM users WHERE id = ? LIMIT 1');
-    $stmt->execute([$_SESSION['user_id']]);
+    $stmt->execute([$uid]);
     $u = $stmt->fetch();
-    return $u ?: null;
+    self::$cachedUser   = $u ?: null;
+    self::$cachedUserId = $uid;
+    return self::$cachedUser;
   }
 
   public static function isAdmin(): bool {

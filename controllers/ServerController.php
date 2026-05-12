@@ -235,7 +235,7 @@ class ServerController
             $connToken = EventBus::generateConnectionToken((string)$user['id']);
             
             $subToken = '';
-            if ($serverData['status'] === ServerStatus::DEPLOYING && !empty($serverData['current_job_id'])) {
+            if ($serverData['status'] === ServerStatus::DEPLOYING->value && !empty($serverData['current_job_id'])) {
                 $subToken = EventBus::generateSubscriptionToken((string)$user['id'], "job:{$serverData['current_job_id']}");
             }
 

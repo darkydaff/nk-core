@@ -51,7 +51,7 @@ class S3Lite {
         $canonicalHeaders = '';
         $signedHeaders    = '';
         foreach ($headers as $k => $v) {
-            $canonicalHeaders .= strtolower($k) . ':' . trim($v) . "\n";
+            $canonicalHeaders .= strtolower($k) . ':' . trim((string)($v ?? '')) . "\n";
             $signedHeaders    .= strtolower($k) . ';';
         }
         $signedHeaders = rtrim($signedHeaders, ';');
@@ -113,7 +113,7 @@ class S3Lite {
         ksort($headers);
         $canonicalHeaders = ''; $signedHeaders = '';
         foreach ($headers as $k => $v) {
-            $canonicalHeaders .= strtolower($k) . ':' . trim($v) . "\n";
+            $canonicalHeaders .= strtolower($k) . ':' . trim((string)($v ?? '')) . "\n";
             $signedHeaders    .= strtolower($k) . ';';
         }
         $signedHeaders = rtrim($signedHeaders, ';');
@@ -177,7 +177,7 @@ class S3Lite {
         ksort($headers);
         $canonicalHeaders = ''; $signedHeaders = '';
         foreach ($headers as $k => $v) {
-            $canonicalHeaders .= strtolower($k) . ':' . trim($v) . "\n";
+            $canonicalHeaders .= strtolower($k) . ':' . trim((string)($v ?? '')) . "\n";
             $signedHeaders    .= strtolower($k) . ';';
         }
         $signedHeaders = rtrim($signedHeaders, ';');
@@ -233,7 +233,7 @@ class S3Lite {
         ksort($headers);
         $canonicalHeaders = ''; $signedHeaders = '';
         foreach ($headers as $k => $v) {
-            $canonicalHeaders .= strtolower($k) . ':' . trim($v) . "\n";
+            $canonicalHeaders .= strtolower($k) . ':' . trim((string)($v ?? '')) . "\n";
             $signedHeaders    .= strtolower($k) . ';';
         }
         $signedHeaders = rtrim($signedHeaders, ';');

@@ -41,10 +41,17 @@ class View {
   }
 
   public static function getFlag(string $code): string {
-    $code = strtolower($code);
-    $map = ['en' => 'gb', 'uk' => 'ua'];
+    if (empty($code)) return '';
+    $code = strtoupper($code);
+    $map = ['EN' => 'GB', 'UK' => 'UA'];
     if (isset($map[$code])) $code = $map[$code];
     
-    return '<i class="twf twf-' . $code . '"></i>';
+    // Convert CC to Regional Indicator Symbols
+    $emoji = '';
+    for ($i = 0; $i < strlen($code); $i++) {
+        $emoji .= mb_chr(127397 + ord($code[$i]), 'UTF-8');
+    }
+    
+    return '<i class="twf twf-' . strtolower($code) . '" title="' . $code . '">' . $emoji . '</i>';
   }
 }

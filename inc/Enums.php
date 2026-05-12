@@ -55,3 +55,10 @@ enum ProxyType: string {
     case SOCKS5 = 'socks5';
     case HTTP = 'http';
 }
+
+enum ProxyStatus: string {
+    case ACTIVE  = 'active';
+    case PAUSED  = 'paused';
+    case ERROR   = 'error';
+    case DELETED = 'deleted';
+}

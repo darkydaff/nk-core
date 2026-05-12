@@ -140,7 +140,7 @@ class Config
             if (!is_scalar($value))
                 continue;
 
-            $pattern = "/^{$key}=.*/m";
+            $pattern = '/^' . preg_quote($key, '/') . '=.*/m';
             $replacement = "{$key}={$value}";
 
             if (preg_match($pattern, $content)) {

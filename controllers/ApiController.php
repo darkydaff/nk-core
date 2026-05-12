@@ -59,7 +59,7 @@ class ApiController {
         $user = JWT::requireAuth();
         if (!$user) return;
         
-        $stmt = DB::get()->prepare("SELECT id, name, token, expires_at, created_at, last_used_at FROM api_tokens WHERE user_id = ? AND revoked_at IS NULL ORDER BY created_at DESC");
+        $stmt = DB::conn()->prepare("SELECT id, name, token, expires_at, created_at, last_used_at FROM api_tokens WHERE user_id = ? AND revoked_at IS NULL ORDER BY created_at DESC");
         $stmt->execute([$user['id']]);
         $tokens = $stmt->fetchAll();
         
