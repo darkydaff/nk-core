@@ -62,19 +62,23 @@ class BackupManager {
         $sqlPath = $backupDir . '/db_dump.sql';
         $envPath = __DIR__ . '/../.env';
 
-        // 1. Create Local Backup
-        // Added --skip-ssl because internal Docker connections don't have trusted certs
-        // Added --single-transaction and --no-tablespaces for consistency and to avoid PROCESS privilege errors
+        // Write a temporary .cnf file so the password never appears in ps aux
+        // (MYSQL_PWD is deprecated/ignored in MariaDB 12.2+)
+        $tmpCnf = tempnam('/tmp', 'nkdb') . '.cnf';
+        file_put_contents($tmpCnf, "[client]\npassword=" . str_replace(["\n", "\r"], '', $dbPass) . "\n");
+        chmod($tmpCnf, 0600);
+
         $command = sprintf(
-            'mysqldump --skip-ssl --single-transaction --no-tablespaces -h %s -u %s --password=%s %s --result-file=%s 2>&1',
+            'mysqldump --defaults-extra-file=%s --skip-ssl --single-transaction --no-tablespaces -h %s -u %s %s --result-file=%s 2>&1',
+            escapeshellarg($tmpCnf),
             escapeshellarg($dbHost),
             escapeshellarg($dbUser),
-            escapeshellarg($dbPass),
             escapeshellarg($dbName),
             escapeshellarg($sqlPath)
         );
 
         exec($command, $output, $returnCode);
+        @unlink($tmpCnf);
 
         if ($returnCode !== 0 || !file_exists($sqlPath) || filesize($sqlPath) < 100) {
             $errorMsg = implode("\n", $output);
@@ -247,10 +251,22 @@ class BackupManager {
     }
 
     public static function restoreFromLocal($filename) {
-        $path = self::getBackupDir(false) . '/' . $filename;
+        $backupDir = self::getBackupDir(false);
+        $path = $backupDir . '/' . $filename;
         if (!file_exists($path)) {
             throw new Exception("Local backup file not found: $filename");
         }
+
+        // Verify SHA-256 checksum if the sidecar file exists
+        $checksumFile = $path . '.sha256';
+        if (file_exists($checksumFile)) {
+            $expected = trim(file_get_contents($checksumFile));
+            $actual   = hash_file('sha256', $path);
+            if ($expected !== $actual) {
+                throw new Exception("Backup integrity check FAILED for $filename.\nExpected: $expected\nActual:   $actual");
+            }
+        }
+
         if (str_ends_with($filename, '.tar.gz')) {
             return self::restoreFromTar($path);
         }
@@ -258,10 +274,36 @@ class BackupManager {
     }
 
     public static function restoreFromCloud($remoteKey) {
-        $tmpPath = sys_get_temp_dir() . '/restore_' . time() . '.sql.gz';
-        
+        $tmpDir = self::getBackupDir() . '/tmp';
+        if (!is_dir($tmpDir) && !@mkdir($tmpDir, 0755, true) && !is_dir($tmpDir)) {
+            throw new Exception("Could not create temp restore directory: $tmpDir");
+        }
+
+        // Preserve the original extension so executeSqlImport() detects gzip correctly
+        $ext     = str_ends_with($remoteKey, '.tar.gz') ? '.tar.gz' : '.sql.gz';
+        $tmpPath = $tmpDir . '/restore_' . time() . $ext;
+
         $s3 = self::getS3Client();
         $s3->getObject($remoteKey, $tmpPath);
+
+        // Download and verify the SHA-256 sidecar if it exists in cloud
+        try {
+            $tmpChecksumPath = $tmpPath . '.sha256';
+            $s3->getObject($remoteKey . '.sha256', $tmpChecksumPath);
+            $expected = trim(file_get_contents($tmpChecksumPath));
+            $actual   = hash_file('sha256', $tmpPath);
+            @unlink($tmpChecksumPath);
+            if ($expected !== $actual) {
+                throw new Exception("Cloud backup integrity check FAILED for $remoteKey.\nExpected: $expected\nActual:   $actual");
+            }
+        } catch (Exception $e) {
+            // If the .sha256 file doesn't exist in cloud yet, skip verification
+            if (strpos($e->getMessage(), 'integrity check FAILED') !== false) {
+                if (file_exists($tmpPath)) unlink($tmpPath);
+                throw $e;
+            }
+            // Otherwise, sidecar not present — proceed without checksum check
+        }
 
         try {
             if (str_ends_with($remoteKey, '.tar.gz')) {
@@ -269,38 +311,48 @@ class BackupManager {
             } else {
                 $result = self::executeSqlImport($tmpPath);
             }
-            unlink($tmpPath);
             return $result;
-        } catch (Exception $e) {
+        } finally {
             if (file_exists($tmpPath)) unlink($tmpPath);
-            throw $e;
         }
     }
 
     public static function restoreFromUpload($filePath) {
-        try {
-            if (!file_exists($filePath) || filesize($filePath) < 10) {
-                throw new Exception("Uploaded file is missing or invalid.");
-            }
-            if (str_ends_with($filePath, '.tar.gz')) {
-                return self::restoreFromTar($filePath);
-            }
-            return self::executeSqlImport($filePath);
-        } finally {
-            if (file_exists($filePath)) {
-                unlink($filePath);
-            }
+        if (!file_exists($filePath) || filesize($filePath) < 1024) {
+            @unlink($filePath);
+            throw new Exception("Uploaded file is missing or too small to be a valid backup (minimum 1 KB).");
         }
+
+        // Move the upload into the managed backup directory so it survives a failed restore.
+        // The user can then retry via restoreFromLocal() without re-uploading.
+        $backupDir = self::getBackupDir();
+        if (str_ends_with($filePath, '.tar.gz')) {
+            $ext = '.tar.gz';
+        } elseif (str_ends_with($filePath, '.sql.gz')) {
+            $ext = '.sql.gz';
+        } else {
+            $ext = '.sql';
+        }
+        $stablePath = $backupDir . '/upload_' . date('Y-m-d_H-i-s') . $ext;
+        if (!@rename($filePath, $stablePath)) {
+            // Fallback to copy if rename fails (cross-device)
+            copy($filePath, $stablePath);
+            @unlink($filePath);
+        }
+
+        // Restore — on failure the file is still in $backupDir for manual retry
+        if (str_ends_with($stablePath, '.tar.gz')) {
+            return self::restoreFromTar($stablePath);
+        }
+        return self::executeSqlImport($stablePath);
     }
 
     private static function restoreFromTar($tarPath) {
-        $backupDir = self::getBackupDir();
+        $backupDir  = self::getBackupDir();
         $extractDir = $backupDir . '/extract_' . time();
-        
-        if (!@mkdir($extractDir, 0755, true)) {
-            if (!@mkdir($extractDir, 0775, true)) {
-                throw new Exception("Failed to create temporary extraction directory: $extractDir");
-            }
+
+        if (!@mkdir($extractDir, 0755, true) && !is_dir($extractDir)) {
+            throw new Exception("Failed to create temporary extraction directory: $extractDir");
         }
         @chmod($extractDir, 0775);
 
@@ -317,20 +369,22 @@ class BackupManager {
             throw new Exception("Failed to extract tar archive: " . implode("\n", $output));
         }
 
-        // Import SQL
-        $sqlFile = $extractDir . '/db_dump.sql';
-        if (file_exists($sqlFile)) {
+        try {
+            // Import SQL — throw if dump is missing (corrupt/empty archive)
+            $sqlFile = $extractDir . '/db_dump.sql';
+            if (!file_exists($sqlFile)) {
+                throw new Exception("Archive does not contain db_dump.sql — backup may be corrupt.");
+            }
             self::executeSqlImport($sqlFile);
-        }
 
-        // Restore .env if present
-        $envFile = $extractDir . '/.env.backup';
-        if (file_exists($envFile)) {
-            copy($envFile, __DIR__ . '/../.env');
+            // Restore .env if present
+            $envFile = $extractDir . '/.env.backup';
+            if (file_exists($envFile)) {
+                copy($envFile, __DIR__ . '/../.env');
+            }
+        } finally {
+            self::recursiveRemoveDir($extractDir);
         }
-
-        // Cleanup
-        self::recursiveRemoveDir($extractDir);
 
         return true;
     }
@@ -351,33 +405,55 @@ class BackupManager {
         $dbName = Config::get('DB_DATABASE', 'amnezia_panel');
 
         $isGzipped = str_ends_with($filePath, '.gz');
-        $catCmd = $isGzipped ? 'zcat' : 'cat';
-        
-        // Filter out generated columns and all variations of DEFINER statements (including versioned comments)
-        // to prevent ERROR 3105/1419 during restore.
+        $catCmd    = $isGzipped ? 'zcat' : 'cat';
+
+        // Filter DEFINER and generated columns to prevent privilege/schema errors on restore
         $sedCmd = "sed -E 's/\\/\\*!5001[37] DEFINER=[^*]+\\*\\///g; s/DEFINER=[^ ]+ //g; s/GENERATED ALWAYS AS .* VIRTUAL/DEFAULT NULL/gi'";
 
-        // Added --skip-ssl for internal container connections
-        $command = sprintf(
-            '%s %s | %s | mysql --skip-ssl -h %s -u %s -p%s %s 2>&1',
-            $catCmd,
-            escapeshellarg($filePath),
-            $sedCmd,
-            escapeshellarg($dbHost),
-            escapeshellarg($dbUser),
-            escapeshellarg($dbPass),
-            escapeshellarg($dbName)
-        );
+        // Write temp .cnf — password never appears in ps aux or environment
+        $tmpCnf = tempnam('/tmp', 'nkdb') . '.cnf';
+        file_put_contents($tmpCnf, "[client]\npassword=" . str_replace(["\n", "\r"], '', $dbPass) . "\n");
+        chmod($tmpCnf, 0600);
 
-        exec($command, $output, $returnCode);
+        try {
+            // Pre-validate the file before touching the database.
+            // For gzipped files, run 'gzip -t' to detect corruption early.
+            // This replaces the fragile 'bash -o pipefail -c ...' approach which
+            // conflicted with the single-quoted sed pattern inside the pipeline.
+            if ($isGzipped) {
+                exec('gzip -t ' . escapeshellarg($filePath) . ' 2>&1', $gzipOut, $gzipCode);
+                if ($gzipCode !== 0) {
+                    throw new Exception("Backup file is corrupt (gzip integrity check failed): " . implode("\n", $gzipOut));
+                }
+            } elseif (!is_readable($filePath) || filesize($filePath) < 100) {
+                throw new Exception("Backup file is missing, unreadable, or too small: $filePath");
+            }
 
-        if ($returnCode !== 0) {
-            throw new Exception("Database import failed with code $returnCode: " . implode("\n", $output));
+            $command = sprintf(
+                '%s %s | %s | mysql --defaults-extra-file=%s --skip-ssl -h %s -u %s %s 2>&1',
+                $catCmd,
+                escapeshellarg($filePath),
+                $sedCmd,
+                escapeshellarg($tmpCnf),
+                escapeshellarg($dbHost),
+                escapeshellarg($dbUser),
+                escapeshellarg($dbName)
+            );
+
+            exec($command, $output, $returnCode);
+
+            if ($returnCode !== 0) {
+                throw new Exception("Database import failed with code $returnCode: " . implode("\n", $output));
+            }
+        } finally {
+            @unlink($tmpCnf);
         }
 
-        // Apply triggers to ensure active_client_ip is updated for restored old backups
+        // Force DB singleton to reconnect — PDO holds a stale connection to the old schema
+        DB::invalidate();
+
+        // Re-apply triggers (may have been wiped by the restore)
         try {
-            require_once __DIR__ . '/DB.php';
             $pdo = DB::conn();
             $pdo->exec("DROP TRIGGER IF EXISTS vpn_clients_before_insert;");
             $pdo->exec("
@@ -405,11 +481,9 @@ class BackupManager {
                     END IF;
                 END;
             ");
-            
-            // Fix any inconsistent active_client_ip data
             $pdo->exec("UPDATE vpn_clients SET active_client_ip = IF(deleted_at IS NULL, client_ip, NULL)");
         } catch (\Throwable $e) {
-            // Ignore trigger creation errors
+            // Non-fatal: triggers are best-effort after restore
         }
 
         return true;
