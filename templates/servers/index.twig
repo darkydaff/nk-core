@@ -31,8 +31,12 @@
         <div class="panel p-5 hover:border-slate-500 transition-colors server-card">
             <div class="flex items-start justify-between mb-4">
                 <div class="flex items-center">
-                    <div class="w-10 h-10 rounded-lg bg-surface-hover text-primary flex items-center justify-center mr-3">
-                        <i class="fas fa-server"></i>
+                    <div class="w-10 h-10 rounded-lg bg-surface-hover text-primary flex items-center justify-center mr-3 overflow-hidden">
+                        {% if server.country_code %}
+                            <span class="text-3xl">{{ getFlag(server.country_code)|raw }}</span>
+                        {% else %}
+                            <i class="fas fa-server"></i>
+                        {% endif %}
                     </div>
                     <div>
                         <h3 class="font-semibold">{{ server.name }}</h3>

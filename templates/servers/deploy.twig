@@ -186,7 +186,7 @@ let centrifuge = null;
 let subscription = null;
 let maxEventId = 0;
 let isUserScrolling = false;
-let currentJobId = {{ server.status.value == 'deploying' ? (server.current_job_id ?? 'null') : 'null' }};
+let currentJobId = {{ server.status == 'deploying' ? (server.current_job_id ?? 'null') : 'null' }};
 let startTime = null;
 let timerInterval = null;
 
