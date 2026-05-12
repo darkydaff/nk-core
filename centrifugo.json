@@ -1,16 +1,16 @@
 {
-  "api_key": "b7e5f3a0d2c4e6b8f1a3d583e4f7b2a9d1c5e8b4f0a2d9c1b7e5f3a0d2c4",
-  "token_hmac_secret_key": "b7e5f3a0d2c4e6b8f1a3d583e4f7b2a9d1c5e8b4f0a2d9c1b7e5f3a0d2c4",
-  "admin_password": "admin_password_123",
-  "admin_secret": "admin_secret_123",
+  "api_key": "30f6de0e0eb49872faec144857a70d4c29a1adc89f2047d7caab5fb844225a91",
+  "token_hmac_secret_key": "15ae7361833ea67fc59d8d00db111f0cace6fb8b8a3a56ef6f4daf639724861e",
+  "admin_password": "0f79a1f83fef44553029790e",
+  "admin_secret": "89bb508893ce465c5c158dc9859d76ad",
   "allowed_origins": ["*"],
   "allow_subscribe_for_client": true,
-  "publish": true,
+  "allow_publish_for_client": true,
   "namespaces": [
     {
       "name": "job",
       "allow_subscribe_for_client": true,
-      "publish": true,
+      "allow_publish_for_client": true,
       "presence": true,
       "history_size": 100,
       "history_ttl": "300s"

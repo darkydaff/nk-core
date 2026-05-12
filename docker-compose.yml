@@ -11,8 +11,6 @@ services:
       MARIADB_DATABASE: ${DB_DATABASE:-amnezia_panel}
       MARIADB_USER: ${DB_USERNAME:-amnezia}
       MARIADB_PASSWORD: ${DB_PASSWORD:-amnezia}
-    ports:
-      - "3308:3306"
     volumes:
       - db_data:/var/lib/mysql
       - ./migrations:/docker-entrypoint-initdb.d
@@ -42,9 +40,10 @@ services:
       DB_DATABASE: ${DB_DATABASE:-amnezia_panel}
       DB_USERNAME: ${DB_USERNAME:-amnezia}
       DB_PASSWORD: ${DB_PASSWORD:-amnezia}
-      CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY:-secret_api_key}
+      CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY}
       CENTRIFUGO_API_URL: http://centrifugo:8000/api
-      CENTRIFUGO_TOKEN_HMAC_SECRET: ${CENTRIFUGO_TOKEN_HMAC_SECRET:-secret_hmac}
+      CENTRIFUGO_TOKEN_HMAC_SECRET: ${CENTRIFUGO_TOKEN_HMAC_SECRET}
+      CENTRIFUGO_WS_URL: ${CENTRIFUGO_WS_URL:-ws://localhost:8000/connection/websocket}
     ports:
       - "8443:443"
     volumes:
@@ -59,8 +58,6 @@ services:
     image: schickling/beanstalkd
     container_name: nk-beanstalkd
     restart: unless-stopped
-    ports:
-      - "11300:11300"
 
   worker:
     build:
@@ -85,8 +82,9 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-amnezia}
       QUEUE_HOST: beanstalkd
       QUEUE_PORT: 11300
-      CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY:-secret_api_key}
+      CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY}
       CENTRIFUGO_API_URL: http://centrifugo:8000/api
+      CENTRIFUGO_TOKEN_HMAC_SECRET: ${CENTRIFUGO_TOKEN_HMAC_SECRET}
     volumes:
       - .:/var/www/html
       - /var/www/html/vendor
@@ -101,8 +99,6 @@ services:
     volumes:
       - ./centrifugo.json:/centrifugo/config.json
     command: centrifugo -c config.json
-    env_file:
-      - .env
     ulimits:
       nofile:
         soft: 65535

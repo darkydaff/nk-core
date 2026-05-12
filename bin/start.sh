@@ -5,6 +5,17 @@ mkdir -p /var/www/html/storage/backups
 mkdir -p /var/www/html/storage/cache/twig
 mkdir -p /var/www/html/public/css
 
+# Handle Worker Mode early — skip CSS build, SSL, nginx, cron
+if [ "$1" = "worker" ]; then
+    echo "Starting Queue Worker..."
+    mkdir -p /var/log/nk-panel
+    touch /var/log/cron.log /var/log/metrics_collector.log
+    chown -R www-data:www-data /var/log/nk-panel
+    chmod -R 777 /var/log/nk-panel
+    chown -R www-data:www-data /var/www/html/storage
+    exec php /var/www/html/bin/queue_worker.php
+fi
+
 # Build Tailwind CSS (Production)
 echo "Building production CSS..."
 cd /var/www/html && npx tailwindcss -i ./public/css/input.css -o ./public/css/output.css --minify
@@ -47,17 +58,9 @@ chmod -R 777 /var/log/nk-panel
 chown www-data:www-data /var/log/cron.log
 chown www-data:www-data /var/log/metrics_collector.log
 
-# Handle Worker Mode
-if [ "$1" = "worker" ]; then
-    echo "Starting Queue Worker..."
-    # Run worker as root to maintain access to docker.sock and ssh
-    exec php /var/www/html/bin/queue_worker.php
-fi
-
+service cron start
 # Start metrics collector in background as www-data
 su -s /bin/bash -c "php /var/www/html/bin/collect_metrics.php >> /var/log/metrics_collector.log 2>&1 &" www-data
-
-service cron start
 # Start Nginx in background
 nginx
 # Start PHP-FPM in foreground

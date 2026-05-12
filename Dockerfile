@@ -62,7 +62,7 @@ COPY opcache.ini /usr/local/etc/php/conf.d/opcache.ini
 RUN mkdir -p /var/www/html/storage/cache/twig
 
 # Build Tailwind CSS (moved to start.sh to support volume mounts)
-RUN npm install
+RUN npm install && npx update-browserslist-db@latest
 
 # Create SSH ControlMaster socket directory
 RUN mkdir -p /tmp/ssh_mux

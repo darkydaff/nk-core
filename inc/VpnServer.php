@@ -274,6 +274,53 @@ class VpnServer
     }
 
     /**
+     * Update server GeoIP information
+     */
+    public function updateGeoIp(): bool
+    {
+        if (!$this->data || empty($this->data['host'])) return false;
+
+        $ip = $this->data['host'];
+        if (!filter_var($ip, FILTER_VALIDATE_IP)) {
+            return false;
+        }
+
+        try {
+            $url = "http://ip-api.com/json/{$ip}?fields=status,message,country,countryCode,city,isp,org,query";
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+            $response = curl_exec($ch);
+
+            if (!$response) return false;
+
+            $geo = json_decode($response, true);
+            if (($geo['status'] ?? '') !== 'success') return false;
+
+            $pdo = DB::conn();
+            $stmt = $pdo->prepare('
+                UPDATE vpn_servers 
+                SET country = ?, country_code = ?, city = ?, isp = ?, org = ? 
+                WHERE id = ?
+            ');
+            
+            $stmt->execute([
+                $geo['country'] ?? null,
+                $geo['countryCode'] ?? null,
+                $geo['city'] ?? null,
+                $geo['isp'] ?? null,
+                $geo['org'] ?? null,
+                $this->serverId
+            ]);
+
+            return true;
+        } catch (\Exception $e) {
+            return false;
+        }
+    }
+
+    /**
      * Load server data from database
      */
     private function load(): void
@@ -519,7 +566,7 @@ class VpnServer
      * Uses SSH multiplexing when available for near-zero latency.
      * Throws an exception if the command exits non-zero.
      */
-    public function executeCommand(string $command, bool $sudo = false, bool $checkExit = false, bool $silent = false): string
+    public function executeCommand(string $command, bool $sudo = false, bool $checkExit = false, bool $silent = false, int $timeout = 60): string
     {
         if ($sudo && strtolower($this->data['username'] ?? '') !== 'root') {
             $command = sprintf(
@@ -558,7 +605,7 @@ class VpnServer
                     implode(' ', $this->buildSshOptions()),
                     escapeshellarg($this->data['username'] ?? 'root'),
                     escapeshellarg($this->data['host'] ?? ''),
-                    "timeout 60s sh -c " . escapeshellarg($escapedCommand)
+                    "timeout {$timeout}s sh -c " . escapeshellarg($escapedCommand)
                 );
             } else {
                 [$authPrefix, $authOpts, $keyFile] = $this->buildSshAuth();
@@ -570,7 +617,7 @@ class VpnServer
                     implode(' ', $sshOpts),
                     escapeshellarg($this->data['username'] ?? 'root'),
                     escapeshellarg($this->data['host'] ?? ''),
-                    "timeout 60s sh -c " . escapeshellarg($escapedCommand)
+                    "timeout {$timeout}s sh -c " . escapeshellarg($escapedCommand)
                 );
             }
 
@@ -650,13 +697,13 @@ class VpnServer
         // Install sudo if missing (only if we are root, otherwise we can't install it)
         $hasSudo = $this->executeCommand('which sudo');
         if (empty(trim($hasSudo)) && strtolower($this->data['username'] ?? '') === 'root') {
-            $this->executeCommand('apt-get update && apt-get install -y sudo', false);
+            $this->executeCommand('apt-get update && apt-get install -y sudo', false, false, false, 600);
         }
 
         // Install curl if missing (needed for Docker installation)
         $hasCurl = $this->executeCommand('which curl');
         if (empty(trim($hasCurl))) {
-            $this->executeCommand('apt-get update && apt-get install -y curl ca-certificates', true);
+            $this->executeCommand('apt-get update && apt-get install -y curl ca-certificates', true, false, false, 600);
         }
     }
 
@@ -667,7 +714,7 @@ class VpnServer
     {
         // Check if already loaded
         $check = $this->executeCommand('lsmod | grep -c amneziawg');
-        if (trim($check) === '1') {
+        if ((int)trim($check) > 0) {
             return; // Already loaded
         }
 
@@ -677,15 +724,14 @@ class VpnServer
             return; // Not a debian-based system, skip kernel module (will fallback to userspace)
         }
 
-        $this->executeCommand('apt-get install -y gnupg2 ca-certificates dkms', true);
+        $this->executeCommand('apt-get install -y gnupg2 ca-certificates dkms', true, false, false, 600);
 
         // Handle XanMod headers
         $uname = $this->executeCommand('uname -r');
         if (stripos($uname, 'xanmod') !== false) {
-            // Find specific xanmod headers
-            $this->executeCommand('apt-get install -y linux-headers-xanmod-edge || apt-get install -y linux-headers-xanmod-lts || apt-get install -y linux-headers-xanmod', true);
+            $this->executeCommand('apt-get install -y linux-headers-$(uname -r) || apt-get install -y linux-headers-xanmod-edge || apt-get install -y linux-headers-xanmod-lts || apt-get install -y linux-headers-xanmod', true, false, false, 600);
         } else {
-            $this->executeCommand('apt-get install -y linux-headers-$(uname -r)', true);
+            $this->executeCommand('apt-get install -y linux-headers-$(uname -r)', true, false, false, 600);
         }
 
         // Manual PPA addition (Works on both Debian and Ubuntu)
@@ -694,17 +740,17 @@ class VpnServer
         $this->executeCommand("echo \"deb {$ppaUrl}\" | tee /etc/apt/sources.list.d/amnezia.list", true);
         $this->executeCommand("echo \"deb-src {$ppaUrl}\" | tee -a /etc/apt/sources.list.d/amnezia.list", true);
 
-        $this->executeCommand('apt-get update', true);
+        $this->executeCommand('apt-get update', true, false, false, 600);
 
         // Install amneziawg (DKMS)
-        $this->executeCommand('DEBIAN_FRONTEND=noninteractive apt-get install -y amneziawg', true);
+        $this->executeCommand('DEBIAN_FRONTEND=noninteractive apt-get install -y amneziawg', true, false, false, 600);
 
         // Load module
         $this->executeCommand('modprobe amneziawg', true);
 
         // Final verify
         $checkFinal = $this->executeCommand('lsmod | grep -c amneziawg');
-        if (trim($checkFinal) !== '1') {
+        if ((int)trim($checkFinal) === 0) {
             // Log warning but don't stop deployment as userspace fallback exists
             $pdo = DB::conn();
             $pdo->prepare('UPDATE vpn_servers SET error_message = ? WHERE id = ?')
@@ -889,7 +935,7 @@ BASH;
             'docker build --no-cache --pull -t %s /opt/amnezia/nk-awg-v2 2>&1',
             $containerName
         );
-        $buildOutput = $this->executeCommand($buildCmd, true, true);
+        $buildOutput = $this->executeCommand($buildCmd, true, true, false, 900);
 
         // Verify the image was actually created
         $check = trim($this->executeCommand("docker image inspect {$containerName} --format='{{.Id}}' 2>/dev/null", true));
@@ -1257,15 +1303,15 @@ BASH;
         
         // Don't override 'deploying' or 'error' status automatically unless it's now 'active'
         $currentStatus = $this->data['status'];
-        if ($newStatus === ServerStatus::ACTIVE || ($currentStatus !== ServerStatus::DEPLOYING->value && $currentStatus !== ServerStatus::ERROR->value)) {
+        if ($newStatus === ServerStatus::ACTIVE || ($currentStatus !== ServerStatus::DEPLOYING && $currentStatus !== ServerStatus::ERROR)) {
             $pdo = DB::conn();
-            $stmt = $pdo->prepare('UPDATE vpn_servers SET status = ?, last_ping_ms = ?, last_check_at = NOW() WHERE id = ?');
-            $stmt->execute([$newStatus->value, $latency, $this->serverId]);
+            $stmt = $pdo->prepare('UPDATE vpn_servers SET status = ?, last_ping_ms = ?, last_check_at = NOW(), error_message = CASE WHEN ? = ? THEN NULL ELSE error_message END WHERE id = ?');
+            $stmt->execute([$newStatus->value, $latency, $newStatus->value, ServerStatus::ACTIVE->value, $this->serverId]);
             $this->data['status'] = ServerStatus::tryFrom($newStatus->value) ?? ServerStatus::ERROR;
             $this->data['last_ping_ms'] = $latency;
         }
         
-        return ($this->data['status'] ?? '') === ServerStatus::ACTIVE->value;
+        return ($this->data['status'] ?? '') === ServerStatus::ACTIVE;
     }
 
     /**
@@ -1373,6 +1419,9 @@ BASH;
     {
         if (!$this->data) return null;
         $data = $this->data;
+        if ($data['status'] instanceof ServerStatus) {
+            $data['status'] = $data['status']->value;
+        }
         $data['container_name'] = $data['container_name'] ?? 'nk-awg-v2';
         return $data;
     }
@@ -1789,7 +1838,8 @@ BASH;
                 preshared_key = ?, 
                 awg_params = ?,
                 status = ?,
-                deployed_at = NOW()
+                deployed_at = NOW(),
+                error_message = NULL
             WHERE id = ?
         ');
         $stmt->execute([
@@ -1912,6 +1962,16 @@ BASH;
             try {
                 $vs = new self((int) $serverId);
                 $vs->syncClientsWithServer();
+
+                // Refresh GeoIP data for servers missing it
+                if (empty($vs->getData()['country_code'])) {
+                    try {
+                        $vs->updateGeoIp();
+                    } catch (\Exception $geoE) {
+                        // Non-critical — log and continue
+                        \Logger::warning("GeoIP update failed for server $serverId: " . $geoE->getMessage());
+                    }
+                }
             } catch (Exception $e) {
                 \Logger::error("Failed to sync VPN server $serverId after restore: " . $e->getMessage());
             }
