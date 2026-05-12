@@ -231,10 +231,15 @@ while (true) {
                     $vs = new VpnServer($serverId);
                     $vs->updatePingAndStatus();
                     VpnClient::syncAllStatsForServer($serverId);
-                    
-                    $proxy = new ProxyServer($serverId);
-                    $proxy->syncUsers();
-                    $proxy->updateTrafficStats();
+
+                    // Only sync proxies if this server actually has any — avoids redundant SSH connections
+                    $pxCount = DB::conn()->prepare('SELECT COUNT(*) FROM http_proxies WHERE server_id = ? AND deleted_at IS NULL');
+                    $pxCount->execute([$serverId]);
+                    if ((int)$pxCount->fetchColumn() > 0) {
+                        $proxy = new ProxyServer($serverId);
+                        $proxy->syncUsers();
+                        $proxy->updateTrafficStats();
+                    }
                 } finally {
                     Lock::release($lockName);
                 }

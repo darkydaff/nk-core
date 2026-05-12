@@ -18,9 +18,9 @@ class ProxyServer
         $this->data = $this->server->getData();
     }
 
-    public function executeCommand(string $command, bool $sudo = false, bool $checkExit = false): string
+    public function executeCommand(string $command, bool $sudo = false, bool $checkExit = false, bool $silent = false, int $timeout = 60): string
     {
-        return $this->server->executeCommand($command, $sudo, $checkExit);
+        return $this->server->executeCommand($command, $sudo, $checkExit, $silent, $timeout);
     }
 
     /**
@@ -44,15 +44,15 @@ class ProxyServer
 
         if ($hasDocker) {
             // Pull official image
-            $this->executeCommand('docker pull 3proxy/3proxy:latest', true, true);
+            $this->executeCommand('docker pull 3proxy/3proxy:latest', true, true, false, 600);
             $this->executeCommand('mkdir -p /etc/3proxy /var/log/3proxy', true, true);
             $this->executeCommand('chmod -R 777 /var/log/3proxy', true);
             return;
         }
 
         // 2. Fallback to native installation if Docker is not present
-        $this->executeCommand('apt-get update', true, true);
-        $this->executeCommand('apt-get install -y 3proxy', true, true);
+        $this->executeCommand('apt-get update', true, true, false, 600);
+        $this->executeCommand('apt-get install -y 3proxy', true, true, false, 600);
 
         $this->executeCommand('mkdir -p /var/log/3proxy /etc/3proxy', true, true);
         $this->executeCommand('chown proxy:proxy /var/log/3proxy', true, true);

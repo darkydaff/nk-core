@@ -42,13 +42,24 @@ class ProxyController
         requireAuth();
         $pdo = DB::conn();
         
-        $proxies = $pdo->query('
-            SELECT p.*, s.name as server_name, s.host as server_host 
-            FROM http_proxies p 
-            JOIN vpn_servers s ON p.server_id = s.id 
-            WHERE p.deleted_at IS NULL
-            ORDER BY p.created_at DESC
-        ')->fetchAll();
+        try {
+            $proxies = $pdo->query('
+                SELECT p.*, s.name as server_name, s.host as server_host, s.country_code as server_country_code 
+                FROM http_proxies p 
+                JOIN vpn_servers s ON p.server_id = s.id 
+                WHERE p.deleted_at IS NULL
+                ORDER BY p.created_at DESC
+            ')->fetchAll();
+        } catch (PDOException $e) {
+            // Fallback for missing columns (migration 053 not run)
+            $proxies = $pdo->query('
+                SELECT p.*, s.name as server_name, s.host as server_host, NULL as server_country_code 
+                FROM http_proxies p 
+                JOIN vpn_servers s ON p.server_id = s.id 
+                WHERE p.deleted_at IS NULL
+                ORDER BY p.created_at DESC
+            ')->fetchAll();
+        }
 
         $servers = $pdo->prepare('SELECT id, name FROM vpn_servers WHERE status = ?');
         $servers->execute([ServerStatus::ACTIVE->value]);
@@ -85,7 +96,7 @@ class ProxyController
             $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
             $password = '';
             for ($i = 0; $i < 16; $i++) {
-                $password .= $chars[rand(0, strlen($chars) - 1)];
+                $password .= $chars[random_int(0, strlen($chars) - 1)];
             }
         }
 
@@ -101,7 +112,7 @@ class ProxyController
                 INSERT INTO http_proxies (user_id, server_id, username, password, type, port, status) 
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             ');
-            $stmt->execute([$user['id'], $serverId, $username, $password, $type, $port, ServerStatus::ACTIVE->value]);
+            $stmt->execute([$user['id'], $serverId, $username, $password, $type, $port, ProxyStatus::ACTIVE->value]);
             $proxyId = $pdo->lastInsertId();
             
             try {
@@ -130,7 +141,7 @@ class ProxyController
         $proxy = $stmt->fetch();
 
         if ($proxy) {
-            $pdo->prepare('UPDATE http_proxies SET status = ? WHERE id = ?')->execute([ServerStatus::STOPPED->value, $id]);
+            $pdo->prepare('UPDATE http_proxies SET status = ? WHERE id = ?')->execute(['paused', $id]);
             unlockSession();
             try {
                 $proxyServer = new ProxyServer($proxy['server_id']);
@@ -182,7 +193,7 @@ class ProxyController
         $proxy = $stmt->fetch();
 
         if ($proxy) {
-            $pdo->prepare('UPDATE http_proxies SET deleted_at = NOW(), status = ? WHERE id = ?')->execute([ServerStatus::ERROR->value, $id]); // Marking as error/deleted context
+            $pdo->prepare('UPDATE http_proxies SET deleted_at = NOW(), status = ? WHERE id = ?')->execute(['deleted', $id]);
             unlockSession();
             try {
                 $proxyServer = new ProxyServer($proxy['server_id']);
@@ -196,4 +207,90 @@ class ProxyController
         }
         return $this->respond(false, "Proxy not found");
     }
+
+    public function syncAll()
+    {
+        requireAuth();
+        unlockSession();
+        try {
+            ProxyServer::syncAllServers();
+            relockSession();
+            return $this->respond(true, "All proxy servers synchronized");
+        } catch (Exception $e) {
+            relockSession();
+            return $this->respond(false, "Sync failed", $e->getMessage());
+        }
+    }
+
+    public function check($params)
+    {
+        $user = requireAuth();
+        $id   = (int)$params['id'];
+
+        $pdo  = DB::conn();
+        // Also filter deleted proxies and enforce ownership (admins can check any)
+        if (Auth::isAdmin()) {
+            $stmt = $pdo->prepare('SELECT p.*, s.host AS server_host FROM http_proxies p JOIN vpn_servers s ON p.server_id = s.id WHERE p.id = ? AND p.deleted_at IS NULL');
+            $stmt->execute([$id]);
+        } else {
+            $stmt = $pdo->prepare('SELECT p.*, s.host AS server_host FROM http_proxies p JOIN vpn_servers s ON p.server_id = s.id WHERE p.id = ? AND p.user_id = ? AND p.deleted_at IS NULL');
+            $stmt->execute([$id, $user['id']]);
+        }
+        $proxy = $stmt->fetch();
+
+        if (!$proxy) return $this->respond(false, "Proxy not found");
+
+        $isSocks5 = ($proxy['type'] === 'socks5');
+        $curlType  = $isSocks5 ? CURLPROXY_SOCKS5_HOSTNAME : CURLPROXY_HTTP;
+
+        // Try multiple IP-echo services so a single outage doesn't give a false negative
+        $checkUrls = ['http://api.ipify.org', 'http://ipinfo.io/ip', 'http://ifconfig.me/ip'];
+        $result = null;
+        $httpCode = 0;
+        $error = '';
+        $errorNo = 0;
+
+        foreach ($checkUrls as $url) {
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL            => $url,
+                CURLOPT_PROXY          => $proxy['server_host'] . ':' . $proxy['port'],
+                CURLOPT_PROXYTYPE      => $curlType,
+                CURLOPT_PROXYUSERPWD   => $proxy['username'] . ':' . $proxy['password'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_CONNECTTIMEOUT => 8,
+                CURLOPT_TIMEOUT        => 12,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_USERAGENT      => 'curl/7.88',
+            ]);
+            // Only set HTTP proxy auth mode for HTTP proxies; SOCKS5 handles auth via PROXYUSERPWD
+            if (!$isSocks5) {
+                curl_setopt($ch, CURLOPT_PROXYAUTH, CURLAUTH_BASIC);
+            }
+
+            $result   = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error    = curl_error($ch);
+            $errorNo  = curl_errno($ch);
+
+            // Break as soon as we get a usable 200 response
+            if ($httpCode === 200 && !empty($result)) {
+                break;
+            }
+        }
+
+        $ip = trim((string)$result);
+        if ($httpCode === 200 && !empty($ip) && filter_var($ip, FILTER_VALIDATE_IP)) {
+            $pdo->prepare('UPDATE http_proxies SET last_sync_at = NOW() WHERE id = ?')->execute([$id]);
+            return $this->respond(true, "Proxy is working. External IP: " . $ip);
+        } else {
+            $errMsg = $error ?: "HTTP $httpCode";
+            if ($errorNo === CURLE_COULDNT_CONNECT)    $errMsg = "Could not connect to proxy server";
+            if ($errorNo === CURLE_PROXY_AUTH_FAILED)  $errMsg = "Proxy authentication failed";
+            if ($errorNo === CURLE_OPERATION_TIMEDOUT) $errMsg = "Connection timed out";
+            return $this->respond(false, "Connectivity check failed: $errMsg");
+        }
+    }
 }
+
