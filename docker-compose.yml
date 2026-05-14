@@ -43,7 +43,7 @@ services:
       CENTRIFUGO_API_KEY: ${CENTRIFUGO_API_KEY}
       CENTRIFUGO_API_URL: http://centrifugo:8000/api
       CENTRIFUGO_TOKEN_HMAC_SECRET: ${CENTRIFUGO_TOKEN_HMAC_SECRET}
-      CENTRIFUGO_WS_URL: ${CENTRIFUGO_WS_URL:-ws://localhost:8000/connection/websocket}
+      CENTRIFUGO_WS_URL: ${CENTRIFUGO_WS_URL:-ws://localhost:8001/connection/websocket}
     ports:
       - "8443:443"
     volumes:

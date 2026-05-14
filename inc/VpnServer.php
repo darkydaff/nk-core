@@ -111,16 +111,20 @@ class VpnServer
      */
     private function buildSshOptions(): array
     {
+        $port = (int)($this->data['port'] ?? 22);
+        if ($port <= 0) $port = 22;
+
         $opts = [
+            '-p ' . $port,
             '-o ConnectTimeout=15',
-            '-o ServerAliveInterval=5',
+            '-o ServerAliveInterval=15',
             '-o ServerAliveCountMax=3',
             '-o StrictHostKeyChecking=no',
             '-o UserKnownHostsFile=/dev/null',
-            '-o Ciphers=aes128-ctr,aes128-gcm@openssh.com,chacha20-poly1305@openssh.com,chacha20-poly1305@openssh.com',
+            '-o Ciphers=aes128-ctr,aes256-ctr,aes128-gcm@openssh.com,aes256-gcm@openssh.com,chacha20-poly1305@openssh.com',
             '-o MACs=hmac-sha2-256-etm@openssh.com,hmac-sha2-512-etm@openssh.com,umac-128-etm@openssh.com',
-            '-o HostKeyAlgorithms=ssh-ed25519-cert-v01@openssh.com,ssh-ed25519,ecdsa-sha2-nistp256-cert-v01@openssh.com,ecdsa-sha2-nistp256,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,rsa-sha2-512,rsa-sha2-256',
-            '-o KexAlgorithms=curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group-exchange-sha256,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512,diffie-hellman-group14-sha256'
+            '-o HostKeyAlgorithms=ssh-ed25519,ecdsa-sha2-nistp256,rsa-sha2-512,rsa-sha2-256',
+            '-o KexAlgorithms=curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521'
         ];
 
         return $opts;
@@ -179,8 +183,10 @@ class VpnServer
             @mkdir($muxDir, 0700, true);
         }
 
-        // Calculate expected socket path based on host, port and current PID
-        $socketPath = $muxDir . '/nk_' . md5(($this->data['host'] ?? '') . ':' . ($this->data['port'] ?? '')) . '_' . getmypid();
+        // Calculate socket path based on host and port.
+        // We remove getmypid() to allow multiple PHP processes (like queue workers)
+        // to share the same background master connection.
+        $socketPath = $muxDir . '/nk_' . md5(($this->data['host'] ?? '') . ':' . ($this->data['port'] ?? '22'));
 
         // If we already have a socket path set but it doesn't match current PID (shouldn't happen with getmypid() but for safety)
         // or if we have a stale file on disk from a previous crashed process with the same PID.
@@ -681,81 +687,351 @@ class VpnServer
     }
 
     /**
-     * Prepare system with basic dependencies (sudo, curl, etc)
+     * Prepare system with basic dependencies (sudo, curl, gnupg, etc)
      */
     private function prepareSystem(): void
     {
-        // Check for apt-get (Debian/Ubuntu)
-        $hasApt = $this->executeCommand('which apt-get');
-        if (empty(trim($hasApt))) {
-            return;
-        }
+        $hasApt = $this->executeCommand('which apt-get 2>/dev/null');
+        $hasDnf = $this->executeCommand('which dnf 2>/dev/null');
+        $hasYum = $this->executeCommand('which yum 2>/dev/null');
 
-        // Fix potential dpkg interruption
-        $this->executeCommand('dpkg --configure -a', true);
+        if (!empty(trim($hasApt))) {
+            // Fix potential dpkg interruption
+            $this->executeCommand('dpkg --configure -a 2>/dev/null || true', true);
 
-        // Install sudo if missing (only if we are root, otherwise we can't install it)
-        $hasSudo = $this->executeCommand('which sudo');
-        if (empty(trim($hasSudo)) && strtolower($this->data['username'] ?? '') === 'root') {
-            $this->executeCommand('apt-get update && apt-get install -y sudo', false, false, false, 600);
-        }
+            // Install sudo if missing
+            $hasSudo = $this->executeCommand('which sudo 2>/dev/null');
+            if (empty(trim($hasSudo)) && strtolower($this->data['username'] ?? '') === 'root') {
+                $this->executeCommand('apt-get update && apt-get install -y sudo', false, false, false, 600);
+            }
 
-        // Install curl if missing (needed for Docker installation)
-        $hasCurl = $this->executeCommand('which curl');
-        if (empty(trim($hasCurl))) {
-            $this->executeCommand('apt-get update && apt-get install -y curl ca-certificates', true, false, false, 600);
+            // Install curl and gnupg if missing (needed for Docker and PPA key import).
+            // Use { } grouping to avoid && / || precedence issues.
+            $this->executeCommand(
+                '{ apt-get install -y curl ca-certificates gnupg2; } 2>/dev/null || ' .
+                '{ apt-get update -q && apt-get install -y curl ca-certificates gnupg2; }',
+                true, false, false, 600
+            );
+        } elseif (!empty(trim($hasDnf)) || !empty(trim($hasYum))) {
+            $mgr = !empty(trim($hasDnf)) ? 'dnf' : 'yum';
+
+            // Install sudo/curl on RPM-based systems
+            $this->executeCommand("{$mgr} install -y sudo curl ca-certificates 2>/dev/null || true", true, false, false, 300);
         }
     }
 
     /**
-     * Install AmneziaWG kernel module on remote host (Ubuntu/Debian)
+     * Install AmneziaWG kernel module — supports Ubuntu, Debian, RHEL/CentOS/Fedora.
+     * Falls back gracefully to userspace amneziawg-go if kernel module cannot be installed.
      */
     private function installKernelModule(): void
     {
-        // Check if already loaded
-        $check = $this->executeCommand('lsmod | grep -c amneziawg');
+        // Check if module is already loaded
+        $check = $this->executeCommand('lsmod | grep -c amneziawg 2>/dev/null || echo 0');
         if ((int)trim($check) > 0) {
-            return; // Already loaded
+            return;
         }
 
-        // Check for apt-get (Debian/Ubuntu)
-        $hasApt = $this->executeCommand('which apt-get');
-        if (empty(trim($hasApt))) {
-            return; // Not a debian-based system, skip kernel module (will fallback to userspace)
-        }
+        // Gather distro/kernel info in one SSH round-trip
+        $env = $this->detectRemoteEnvironment();
 
-        $this->executeCommand('apt-get install -y gnupg2 ca-certificates dkms', true, false, false, 600);
+        Logger::channel('deployments')->info('Installing AmneziaWG kernel module', [
+            'server_id'   => $this->serverId,
+            'kernel'      => $env['kernel'],
+            'arch'        => $env['arch'],
+            'distro_id'   => $env['distro_id'],
+            'codename'    => $env['codename'],
+            'pkg_manager' => $env['pkg_manager'],
+        ]);
 
-        // Handle XanMod headers
-        $uname = $this->executeCommand('uname -r');
-        if (stripos($uname, 'xanmod') !== false) {
-            $this->executeCommand('apt-get install -y linux-headers-$(uname -r) || apt-get install -y linux-headers-xanmod-edge || apt-get install -y linux-headers-xanmod-lts || apt-get install -y linux-headers-xanmod', true, false, false, 600);
+        $installed = false;
+        if ($env['pkg_manager'] === 'apt') {
+            $installed = $this->installKernelModuleApt($env);
+        } elseif (in_array($env['pkg_manager'], ['dnf', 'yum'], true)) {
+            $installed = $this->installKernelModuleDnf($env);
         } else {
-            $this->executeCommand('apt-get install -y linux-headers-$(uname -r)', true, false, false, 600);
+            Logger::channel('deployments')->warning('Unsupported package manager — skipping kernel module, will use userspace fallback', [
+                'server_id'   => $this->serverId,
+                'pkg_manager' => $env['pkg_manager'],
+            ]);
+            return;
         }
 
-        // Manual PPA addition (Works on both Debian and Ubuntu)
-        $this->executeCommand('apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 57290828', true);
-        $ppaUrl = "https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu focal main";
-        $this->executeCommand("echo \"deb {$ppaUrl}\" | tee /etc/apt/sources.list.d/amnezia.list", true);
-        $this->executeCommand("echo \"deb-src {$ppaUrl}\" | tee -a /etc/apt/sources.list.d/amnezia.list", true);
-
-        $this->executeCommand('apt-get update', true, false, false, 600);
-
-        // Install amneziawg (DKMS)
-        $this->executeCommand('DEBIAN_FRONTEND=noninteractive apt-get install -y amneziawg', true, false, false, 600);
-
-        // Load module
-        $this->executeCommand('modprobe amneziawg', true);
-
-        // Final verify
-        $checkFinal = $this->executeCommand('lsmod | grep -c amneziawg');
-        if ((int)trim($checkFinal) === 0) {
-            // Log warning but don't stop deployment as userspace fallback exists
+        if (!$installed) {
             $pdo = DB::conn();
             $pdo->prepare('UPDATE vpn_servers SET error_message = ? WHERE id = ?')
-                ->execute(['Warning: AmneziaWG kernel module failed to install/load. Using slow userspace fallback.', $this->serverId]);
+                ->execute([
+                    'Warning: AmneziaWG kernel module failed to install/load. Using slower userspace fallback (amneziawg-go).',
+                    $this->serverId
+                ]);
         }
+    }
+
+    /**
+     * Gather kernel/distro/architecture info from the remote host in a single SSH call.
+     */
+    private function detectRemoteEnvironment(): array
+    {
+        // Each statement is terminated with ; so that || / && chains cannot bleed
+        // across logical blocks. Without this, a failing os-release source would
+        // cause the || to fire into the PKG_MGR detection, running it only on failure.
+        $script =
+            'echo "KERNEL=$(uname -r)"; ' .
+            'echo "ARCH=$(uname -m)"; ' .
+            'DPKG=$(dpkg --print-architecture 2>/dev/null || echo unknown); echo "DPKG_ARCH=${DPKG}"; ' .
+            '{ . /etc/os-release 2>/dev/null && echo "DISTRO_ID=${ID}" && echo "CODENAME=${VERSION_CODENAME:-${UBUNTU_CODENAME:-unknown}}"; } || true; ' .
+            '{ which apt-get >/dev/null 2>&1 && echo "PKG_MGR=apt"; } || ' .
+            '{ which dnf >/dev/null 2>&1 && echo "PKG_MGR=dnf"; } || ' .
+            '{ which yum >/dev/null 2>&1 && echo "PKG_MGR=yum"; } || ' .
+            'echo "PKG_MGR=unknown";';
+
+        $output = $this->executeCommand($script, false, false, false, 15);
+
+        $env = [
+            'kernel'      => '',
+            'arch'        => 'x86_64',
+            'dpkg_arch'   => 'amd64',
+            'distro_id'   => 'unknown',
+            'codename'    => 'unknown',
+            'pkg_manager' => 'unknown',
+        ];
+
+        foreach (explode("\n", $output) as $line) {
+            $line = trim($line);
+            if (preg_match('/^KERNEL=(.+)$/', $line, $m))    $env['kernel']      = trim($m[1]);
+            if (preg_match('/^ARCH=(.+)$/', $line, $m))      $env['arch']        = trim($m[1]);
+            if (preg_match('/^DPKG_ARCH=(.+)$/', $line, $m)) $env['dpkg_arch']   = trim($m[1]);
+            if (preg_match('/^DISTRO_ID=(.+)$/', $line, $m)) $env['distro_id']   = strtolower(trim($m[1]));
+            if (preg_match('/^CODENAME=(.+)$/', $line, $m))  $env['codename']    = strtolower(trim($m[1]));
+            if (preg_match('/^PKG_MGR=(.+)$/', $line, $m))   $env['pkg_manager'] = strtolower(trim($m[1]));
+        }
+
+        return $env;
+    }
+
+    /**
+     * Install AmneziaWG on apt-based systems (Ubuntu, Debian, Linux Mint).
+     * Ubuntu: uses add-apt-repository (auto-resolves codename).
+     * Debian/other: uses manual focal PPA per official amnezia docs.
+     */
+    private function installKernelModuleApt(array $env): bool
+    {
+        $kernel   = $env['kernel'];
+        $isUbuntu = in_array($env['distro_id'], ['ubuntu', 'linuxmint'], true);
+        $isXanmod = stripos($kernel, 'xanmod') !== false;
+
+        // Step 1: Prerequisites (build tools + DKMS + PPA helpers)
+        // Run apt-get update first to avoid stale-cache failures, then install.
+        // Using { cmd1; cmd2; } grouping to avoid && / || precedence bugs.
+        $this->executeCommand(
+            '{ DEBIAN_FRONTEND=noninteractive apt-get install -y ' .
+            'software-properties-common python3-launchpadlib gnupg2 ca-certificates ' .
+            'build-essential dkms; } 2>/dev/null || ' .
+            '{ apt-get update -q && DEBIAN_FRONTEND=noninteractive apt-get install -y ' .
+            'software-properties-common python3-launchpadlib gnupg2 ca-certificates build-essential dkms; }',
+            true, false, false, 600
+        );
+
+        // Step 2: Kernel headers — waterfall fallback chain
+        $this->installKernelHeadersApt($kernel, $env['dpkg_arch'], $isXanmod);
+
+        // Step 3: Add Amnezia PPA
+        if ($isUbuntu) {
+            // Ubuntu & Mint: add-apt-repository handles codename automatically
+            $this->executeCommand('add-apt-repository -y ppa:amnezia/ppa', true, false, false, 120);
+        } else {
+            // Debian (bookworm, bullseye, etc.) — per official amnezia docs, use focal PPA
+            $this->setupAmneziaRepoDeb($env['dpkg_arch']);
+        }
+
+        // Step 4: Update index and install
+        $this->executeCommand('apt-get update', true, false, false, 300);
+        $this->executeCommand('DEBIAN_FRONTEND=noninteractive apt-get install -y amneziawg', true, false, false, 600);
+
+        // Step 5: Load module
+        $this->executeCommand('modprobe amneziawg 2>/dev/null || true', true);
+
+        // Verify
+        $check = $this->executeCommand('lsmod | grep -c amneziawg 2>/dev/null || echo 0');
+        $loaded = (int)trim($check) > 0;
+
+        Logger::channel('deployments')->info('AmneziaWG kernel module (apt) install result', [
+            'server_id' => $this->serverId,
+            'loaded'    => $loaded,
+        ]);
+
+        return $loaded;
+    }
+
+    /**
+     * Install kernel headers using a waterfall fallback chain.
+     * We already know the kernel string from detectRemoteEnvironment(),
+     * so we interpolate it directly — no remote shell expansion needed.
+     *
+     *  1. Exact versioned headers  (e.g. linux-headers-5.15.0-112-generic)
+     *  2. Flavor meta-package      (e.g. linux-headers-generic, linux-headers-cloud-amd64)
+     *  3. linux-headers-generic    (universal Ubuntu fallback)
+     *  4. XanMod chain             (only when xanmod detected)
+     */
+    private function installKernelHeadersApt(string $kernel, string $dpkgArch, bool $isXanmod): void
+    {
+        // Guard: if kernel string is empty (SSH failure during detection) skip silently.
+        if (empty($kernel)) {
+            Logger::channel('deployments')->warning('Empty kernel string — skipping header install, userspace fallback will be used', [
+                'server_id' => $this->serverId,
+            ]);
+            return;
+        }
+
+        // Attempt 1 — exact versioned match (most reliable on standard kernels)
+        $this->executeCommand("apt-get install -y linux-headers-{$kernel} 2>/dev/null || true", true, false, false, 300);
+
+        $headersExist = $this->executeCommand(
+            "test -d /usr/src/linux-headers-{$kernel} && echo yes || echo no", true
+        );
+        if (trim($headersExist) === 'yes') {
+            return;
+        }
+
+        // Attempt 2 — derive the kernel flavor from the release string and install its meta-package.
+        // e.g. "5.15.0-112-generic" → "generic", "6.1.0-21-cloud-amd64" → "cloud-amd64".
+        // Skipped for XanMod: xanmod flavor strings ("xanmod1", "xanmod1-x64v3") are not valid
+        // meta-package names and would produce a useless apt error.
+        $flavor = '';
+        if (preg_match('/^\d+\.\d+\.\d+-\d+-(.+)$/', $kernel, $m)) {
+            $flavor = $m[1];
+        }
+
+        if ($flavor && !$isXanmod) {
+            $this->executeCommand("apt-get install -y linux-headers-{$flavor} 2>/dev/null || true", true, false, false, 300);
+            $headersExist = $this->executeCommand(
+                "test -d /usr/src/linux-headers-{$kernel} && echo yes || echo no", true
+            );
+            if (trim($headersExist) === 'yes') {
+                return;
+            }
+        }
+
+        if ($isXanmod) {
+            // Attempt 3 (XanMod) — XanMod-specific meta-package chain.
+            // Do NOT install linux-headers-generic on XanMod: it installs headers for the
+            // stock kernel version which won't match the running XanMod kernel, causing
+            // DKMS to build against the wrong tree.
+            $this->executeCommand(
+                'apt-get install -y linux-headers-xanmod-edge 2>/dev/null || ' .
+                'apt-get install -y linux-headers-xanmod-lts 2>/dev/null || ' .
+                'apt-get install -y linux-headers-xanmod 2>/dev/null || true',
+                true, false, false, 300
+            );
+        } else {
+            // Attempt 3 (standard) — generic meta-package, works on most Ubuntu/Debian servers.
+            $this->executeCommand('apt-get install -y linux-headers-generic 2>/dev/null || true', true, false, false, 300);
+        }
+
+        // Final check — if headers still aren't present log and continue gracefully.
+        // The Docker container's userspace amneziawg-go handles the case where DKMS fails.
+        $headersExist = $this->executeCommand(
+            "test -d /usr/src/linux-headers-{$kernel} && echo yes || echo no", true
+        );
+        if (trim($headersExist) !== 'yes') {
+            Logger::channel('deployments')->warning('Could not install kernel headers — DKMS may fail, userspace fallback will be used', [
+                'server_id' => $this->serverId,
+                'kernel'    => $kernel,
+                'dpkg_arch' => $dpkgArch,
+                'xanmod'    => $isXanmod,
+            ]);
+        }
+    }
+
+    /**
+     * Add the Amnezia PPA on Debian systems.
+     * Per official amnezia docs, Debian always uses the "focal" Ubuntu codename.
+     * Uses modern gpg --dearmor (signed-by) where available; falls back to apt-key.
+     */
+    private function setupAmneziaRepoDeb(string $dpkgArch): void
+    {
+        $ppaUrl   = 'https://ppa.launchpadcontent.net/amnezia/ppa/ubuntu focal main';
+        $keyring  = '/usr/share/keyrings/amnezia-archive-keyring.gpg';
+
+        // Try modern signed-by method (Debian 12+ / Ubuntu 22.04+).
+        // We use an explicit exit-code probe rather than a string sentinel to avoid
+        // false positives from gpg's verbose output containing the word "failed".
+        $gpgImport = implode(' && ', [
+            'mkdir -p /usr/share/keyrings',
+            'gpg --batch --keyserver keyserver.ubuntu.com --recv-keys 57290828',
+            "gpg --batch --yes --export 57290828 | gpg --batch --yes --dearmor -o {$keyring}",
+            "test -s {$keyring}",   // verify the file is non-empty
+        ]);
+
+        $exitCode = $this->executeCommand(
+            "{$gpgImport} && echo GPG_OK || echo GPG_FAIL",
+            true, false, false, 60
+        );
+
+        if (strpos($exitCode, 'GPG_OK') !== false) {
+            // Modern: arch-pinned repo with signed-by
+            $signedBy = "[arch={$dpkgArch} signed-by={$keyring}]";
+            $this->executeCommand("echo \"deb {$signedBy} {$ppaUrl}\" | tee /etc/apt/sources.list.d/amnezia.list", true);
+            $this->executeCommand("echo \"deb-src {$signedBy} {$ppaUrl}\" | tee -a /etc/apt/sources.list.d/amnezia.list", true);
+        } else {
+            // Fallback: deprecated apt-key (still functional on Debian 10/11 and Ubuntu 20.04)
+            Logger::channel('deployments')->info('GPG dearmor failed — falling back to apt-key', ['server_id' => $this->serverId]);
+            $this->executeCommand('apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 57290828', true, false, false, 60);
+            $this->executeCommand("echo \"deb {$ppaUrl}\" | tee /etc/apt/sources.list.d/amnezia.list", true);
+            $this->executeCommand("echo \"deb-src {$ppaUrl}\" | tee -a /etc/apt/sources.list.d/amnezia.list", true);
+        }
+    }
+
+    /**
+     * Install AmneziaWG on RPM-based systems (RHEL, CentOS, Fedora, SUSE).
+     * Uses the official amneziavpn COPR repository.
+     */
+    private function installKernelModuleDnf(array $env): bool
+    {
+        $mgr = $env['pkg_manager']; // 'dnf' or 'yum'
+
+        // Install EPEL (provides DKMS on RHEL/CentOS variants; harmless no-op on Fedora)
+        $this->executeCommand("{$mgr} install -y epel-release 2>/dev/null || true", true, false, false, 300);
+
+        // Ensure the COPR plugin is available.
+        // On old CentOS 7 yum doesn't ship 'copr' subcommand out of the box.
+        // On dnf systems dnf-plugins-core provides it; on yum systems yum-plugin-copr does.
+        if ($mgr === 'yum') {
+            $this->executeCommand('yum install -y yum-plugin-copr 2>/dev/null || true', true, false, false, 120);
+        } else {
+            $this->executeCommand('dnf install -y dnf-plugins-core 2>/dev/null || true', true, false, false, 120);
+        }
+
+        // Enable the official Amnezia COPR repository
+        $coprResult = $this->executeCommand(
+            "{$mgr} copr enable -y amneziavpn/amneziawg && echo COPR_OK || echo COPR_FAIL",
+            true, false, false, 120
+        );
+
+        if (strpos($coprResult, 'COPR_OK') === false) {
+            Logger::channel('deployments')->warning('Failed to enable Amnezia COPR repository', [
+                'server_id' => $this->serverId,
+                'output'    => substr($coprResult, 0, 500),
+            ]);
+            return false;
+        }
+
+        // Install amneziawg-dkms + tools
+        $this->executeCommand("{$mgr} install -y amneziawg-dkms amneziawg-tools 2>/dev/null || true", true, false, false, 600);
+
+        // Load module
+        $this->executeCommand('modprobe amneziawg 2>/dev/null || true', true);
+
+        // Verify
+        $check = $this->executeCommand('lsmod | grep -c amneziawg 2>/dev/null || echo 0');
+        $loaded = (int)trim($check) > 0;
+
+        Logger::channel('deployments')->info('AmneziaWG kernel module (dnf/yum) install result', [
+            'server_id' => $this->serverId,
+            'loaded'    => $loaded,
+        ]);
+
+        return $loaded;
     }
 
     /**
@@ -849,10 +1125,19 @@ DOCKERFILE;
     private function createStartScript(): void
     {
         $subnet = $this->data['vpn_subnet'] ?? '10.8.1.0/24';
+        $vpnPort = (int)($this->data['vpn_port'] ?? 0);
+
         $script = <<<BASH
 #!/bin/bash
 ################# старт файла start.sh
 echo "Container startup"
+
+# Detect default interface for routing
+DEFAULT_IF=$(ip route | grep '^default' | awk '{print $5}' | head -n1)
+if [ -z "\$DEFAULT_IF" ]; then
+    DEFAULT_IF="eth0"
+fi
+echo "Using default interface: \$DEFAULT_IF"
 
 # Wait for config if not exists yet
 for i in {1..30}; do
@@ -888,17 +1173,20 @@ iptables -A INPUT -i wg0 -j ACCEPT 2>/dev/null || true
 iptables -A FORWARD -i wg0 -j ACCEPT 2>/dev/null || true
 iptables -A OUTPUT -o wg0 -j ACCEPT 2>/dev/null || true
 
+# Explicitly allow the UDP port on the host interface (REQUIRED for --network host mode)
+if [ "{$vpnPort}" != "0" ]; then
+    iptables -I INPUT -p udp --dport {$vpnPort} -j ACCEPT 2>/dev/null || true
+fi
+
 # Allow forwarding traffic only from the VPN
 sysctl -w net.ipv4.ip_forward=1 || echo 'Notice: sysctl ip_forward failed, check host config'
-iptables -A FORWARD -i wg0 -o eth0 -s {$subnet} -j ACCEPT 2>/dev/null || true
-iptables -A FORWARD -i wg0 -o eth1 -s {$subnet} -j ACCEPT 2>/dev/null || true
+iptables -A FORWARD -i wg0 -o "\$DEFAULT_IF" -s {$subnet} -j ACCEPT 2>/dev/null || true
 
 # State tracking rules
 iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || true
 
-# NAT rules
-iptables -t nat -A POSTROUTING -s {$subnet} -o eth0 -j MASQUERADE 2>/dev/null || true
-iptables -t nat -A POSTROUTING -s {$subnet} -o eth1 -j MASQUERADE 2>/dev/null || true
+# NAT rules using detected interface
+iptables -t nat -A POSTROUTING -s {$subnet} -o "\$DEFAULT_IF" -j MASQUERADE 2>/dev/null || true
 
 # MSS Clamping - CRITICAL for websites loading via VPN
 iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || true
@@ -952,10 +1240,12 @@ BASH;
         require_once __DIR__ . '/DeploymentService.php';
         
         $containerName = $this->data['container_name'];
+        
+        // Using --network host to bypass Docker's bridge overhead.
+        // This provides zero-latency network performance but requires 
+        // the internal ListenPort to match the intended host port.
         $runOptions = sprintf(
-            '--privileged --cap-add=NET_ADMIN --cap-add=SYS_MODULE -p %d:%d/udp -v /lib/modules:/lib/modules -e WG_THREADS=4',
-            $vpnPort,
-            $vpnPort
+            '--privileged --network host --cap-add=NET_ADMIN --cap-add=SYS_MODULE -v /lib/modules:/lib/modules -e WG_THREADS=4'
         );
 
         DeploymentService::deployDockerContainer($this, $containerName, $containerName, $runOptions);

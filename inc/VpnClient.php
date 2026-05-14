@@ -292,15 +292,38 @@ class VpnClient {
         }
         
         // Add AWG parameters (V1 + V2.0)
-        $keys = ['Jc', 'Jmin', 'Jmax', 'S1', 'S2', 'S3', 'S4', 'H1', 'H2', 'H3', 'H4', 'I1', 'I2', 'I3', 'I4', 'I5'];
-        foreach ($keys as $key) {
-            if (isset($awgParams[$key]) && $awgParams[$key] !== '' && $awgParams[$key] !== null) {
-                $val = $awgParams[$key];
-                // S1-S4 should never be 0 (as per user requirement)
-                if (in_array($key, ['S1', 'S2', 'S3', 'S4']) && (int)$val === 0) {
-                    $val = 1;
+        // We use lowercase keys (jc, jmin, i1, i2, etc.) to match the XanMod 
+        // kernel module's expected format and ensure cross-client compatibility.
+        $keys = [
+            'Jc' => ['Jc', 'jc'],
+            'Jmin' => ['Jmin', 'jmin'],
+            'Jmax' => ['Jmax', 'jmax'],
+            'S1' => ['S1', 's1'],
+            'S2' => ['S2', 's2'],
+            'S3' => ['S3', 's3'],
+            'S4' => ['S4', 's4'],
+            'H1' => ['H1', 'h1'],
+            'H2' => ['H2', 'h2'],
+            'H3' => ['H3', 'h3'],
+            'H4' => ['H4', 'h4'],
+            'i1' => ['I1', 'i1'],
+            'i2' => ['I2', 'i2'],
+            'i3' => ['I3', 'i3'],
+            'i4' => ['I4', 'i4'],
+            'i5' => ['I5', 'i5']
+        ];
+
+        foreach ($keys as $outputKey => $sourceKeys) {
+            foreach ($sourceKeys as $src) {
+                if (isset($awgParams[$src]) && $awgParams[$src] !== '' && $awgParams[$src] !== null) {
+                    $val = $awgParams[$src];
+                    // S1-S4 should never be 0
+                    if (in_array($outputKey, ['S1', 'S2', 'S3', 'S4']) && (int)$val === 0) {
+                        $val = 1;
+                    }
+                    $config .= "{$outputKey} = {$val}\n";
+                    break;
                 }
-                $config .= "{$key} = {$val}\n";
             }
         }
         
