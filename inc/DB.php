@@ -1,14 +1,20 @@
 <?php
 class DB {
   private static ?PDO $pdo = null;
+  private static int $lastPing = 0;
 
   public static function conn(): PDO {
     if (self::$pdo) {
-      // Verify connection is still alive (handles long-running processes)
-      try {
-        self::$pdo->query('SELECT 1');
-      } catch (\Throwable $e) {
-        self::$pdo = null; // Force reconnect
+      $now = time();
+      // Verify connection is still alive, but throttle pings to at most once per 5 seconds
+      // (handles long-running processes like queue workers without spamming the database)
+      if ($now - self::$lastPing > 5) {
+        try {
+          self::$pdo->query('SELECT 1');
+          self::$lastPing = $now;
+        } catch (\Throwable $e) {
+          self::$pdo = null; // Force reconnect
+        }
       }
     }
     if (self::$pdo) return self::$pdo;
@@ -31,6 +37,7 @@ class DB {
     self::$pdo->exec("SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci");
     self::$pdo->exec("SET time_zone = '+03:00'");
     
+    self::$lastPing = time();
     return self::$pdo;
   }
 
