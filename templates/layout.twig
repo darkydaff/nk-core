@@ -403,7 +403,7 @@
                         <span class="text-xs font-bold text-sidebar-text truncate block">{{ user.name }}</span>
                         <span class="text-[10px] opacity-50 uppercase tracking-widest">{{ user.role }}</span>
                     </div>
-                    <a href="/logout" class="ml-2 text-sidebar-text/50 hover:text-red-400 p-2 transition-colors" title="{{ t('auth.logout')|default('Logout') }}">
+                    <a href="/logout" class="ml-2 text-sidebar-text/50 hover:text-red-400 p-2 transition-colors" title="{{ t('auth.logout')|default('Logout') }}" aria-label="{{ t('auth.logout')|default('Logout') }}">
                         <i class="fas fa-sign-out-alt"></i>
                     </a>
                 </div>
@@ -416,7 +416,7 @@
         {% if user %}
         <header class="top-bar">
             <div class="flex items-center">
-                <button onclick="toggleSidebar()" class="lg:hidden p-2 text-secondary mr-2">
+                <button onclick="toggleSidebar()" class="lg:hidden p-2 text-secondary mr-2" aria-label="Toggle Sidebar" title="Toggle Sidebar">
                     <i class="fas fa-bars text-xl"></i>
                 </button>
                 <div class="hidden sm:block">
@@ -430,13 +430,13 @@
 
             <div class="flex items-center space-x-4">
                 <div class="flex items-center bg-base rounded-xl p-1 border border-default">
-                    <button onclick="globalSyncAll(this)" class="p-2 text-secondary hover:text-primary transition-colors global-sync-btn" title="{{ t('menu.sync_all') }}">
+                    <button onclick="globalSyncAll(this)" class="p-2 text-secondary hover:text-primary transition-colors global-sync-btn" title="{{ t('menu.sync_all') }}" aria-label="{{ t('menu.sync_all') }}">
                         <i class="fas fa-sync-alt"></i>
                     </button>
                 </div>
 
                 <div class="relative">
-                    <button onclick="toggleLanguageDropdown()" class="flex items-center px-3 py-2 rounded-xl hover:bg-surface-hover transition-colors">
+                    <button onclick="toggleLanguageDropdown()" class="flex items-center px-3 py-2 rounded-xl hover:bg-surface-hover transition-colors" title="{{ t('menu.change_language')|default('Change Language') }}" aria-label="{{ t('menu.change_language')|default('Change Language') }}">
                         {% for lang in languages %}
                             {% if lang.code == current_language %}
                                 <span class="flag-emoji text-xl">{{ getFlag(lang.code)|raw }}</span>
@@ -459,7 +459,7 @@
                     </div>
                 </div>
 
-                <button onclick="toggleTheme()" class="w-10 h-10 rounded-xl bg-base border border-default flex items-center justify-center text-secondary hover:text-primary transition-all">
+                <button onclick="toggleTheme()" class="w-10 h-10 rounded-xl bg-base border border-default flex items-center justify-center text-secondary hover:text-primary transition-all" title="Toggle Theme" aria-label="Toggle Theme">
                     <i class="fas fa-moon dark:fa-sun" id="themeIcon"></i>
                 </button>
             </div>
