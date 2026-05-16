@@ -234,6 +234,7 @@ const Dashboard = {
 
             const highlightedName = NK.highlightMatch(c.name, query);
             const highlightedIp = NK.highlightMatch(c.external_ip || 'No IP', query);
+            const highlightedServer = NK.highlightMatch(c.server_name, query);
 
             html += `
                 <tr class="group hover:bg-surface-hover/30 transition-colors animate-in fade-in duration-300">
@@ -251,7 +252,7 @@ const Dashboard = {
                                 </div>
                                 <div class="text-[10px] text-muted font-mono uppercase tracking-widest flex items-center gap-1.5 mt-0.5 opacity-60">
                                     <i class="fas fa-server text-[9px]"></i>
-                                    ${c.server_name}
+                                    ${highlightedServer}
                                 </div>
                             </div>
                         </div>
