@@ -133,8 +133,10 @@ window.NK = {
             } else {
                 this.toast(result.error || 'Action failed', 'error');
             }
+            return result;
         } catch (error) {
             this.toast('Network error: ' + error.message, 'error');
+            return { success: false, error: error.message };
         }
     },
 
@@ -214,6 +216,13 @@ window.NK = {
         } catch (err) {
             this.toast('Failed to copy', 'error');
         }
+    },
+
+    highlightMatch: function(text, query) {
+        if (!query || !text) return text;
+        const escapedQuery = query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const regex = new RegExp(`(${escapedQuery})`, 'gi');
+        return text.replace(regex, '<mark class="bg-primary/20 text-primary border border-primary/30 rounded px-0.5 font-bold">$1</mark>');
     }
 };
 

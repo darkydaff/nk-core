@@ -415,9 +415,9 @@ class VpnServer
     {
         $pdo = DB::conn();
         $stmt = $pdo->prepare('
-            SELECT s.*, COUNT(CASE WHEN c.deleted_at IS NULL THEN 1 END) as client_count 
+            SELECT s.*, COUNT(c.id) as client_count 
             FROM vpn_servers s 
-            LEFT JOIN vpn_clients c ON s.id = c.server_id 
+            LEFT JOIN vpn_clients c ON s.id = c.server_id AND c.deleted_at IS NULL
             WHERE s.user_id = ? AND s.deleted_at IS NULL
             GROUP BY s.id 
             ORDER BY s.created_at DESC
@@ -433,10 +433,10 @@ class VpnServer
     {
         $pdo = DB::conn();
         $stmt = $pdo->query('
-            SELECT s.*, MAX(u.email) as user_email, COUNT(CASE WHEN c.deleted_at IS NULL THEN 1 END) as client_count 
+            SELECT s.*, MAX(u.email) as user_email, COUNT(c.id) as client_count 
             FROM vpn_servers s 
             LEFT JOIN users u ON s.user_id = u.id 
-            LEFT JOIN vpn_clients c ON s.id = c.server_id 
+            LEFT JOIN vpn_clients c ON s.id = c.server_id AND c.deleted_at IS NULL
             WHERE s.deleted_at IS NULL
             GROUP BY s.id 
             ORDER BY s.created_at DESC

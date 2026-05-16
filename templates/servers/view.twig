@@ -429,7 +429,7 @@
 		<!-- Backdrop -->
 		<div class="absolute inset-0 bg-black/80" onclick="window.serverView.closeLogsModal()"></div>
 		<!-- Panel -->
-		<div class="relative w-full max-w-4xl flex flex-col rounded-xl overflow-hidden shadow-2xl border border-slate-700/60" style="max-height:85vh;">
+		<div class="relative w-full max-w-4xl h-[75vh] max-h-[600px] flex flex-col rounded-xl overflow-hidden shadow-2xl border border-slate-700/60">
 			<!-- Terminal chrome -->
 			<div class="flex items-center gap-2 px-4 py-3 bg-[#1e1e2e] border-b border-slate-700/50 flex-shrink-0">
 				<div class="flex gap-1.5">
@@ -449,7 +449,7 @@
 				</div>
 			</div>
 			<!-- Log body -->
-			<div id="logsBody" class="flex-1 overflow-y-auto bg-[#13131f] font-mono text-xs leading-relaxed px-4 py-3" style="min-height:350px;">
+			<div id="logsBody" class="flex-1 overflow-y-auto bg-[#13131f] font-mono text-xs leading-relaxed px-4 py-3">
 				<p class="text-slate-500 italic">{{ t('common.loading_logs') }}</p>
 			</div>
 			<!-- Footer -->

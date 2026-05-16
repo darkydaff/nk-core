@@ -207,6 +207,9 @@ const Dashboard = {
             return;
         }
 
+        const queryInput = document.getElementById('fleetSearch');
+        const query = queryInput ? queryInput.value.trim() : '';
+
         let html = `
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
@@ -215,7 +218,7 @@ const Dashboard = {
                             <th class="px-5 py-3 w-10">
                                 <input type="checkbox" id="selectAllClients" onchange="NK_Dashboard.toggleSelectAll(this)" class="rounded border-default bg-base text-primary focus:ring-primary/20 cursor-pointer">
                             </th>
-                            <th class="px-5 py-3 font-bold">${this.labels.client || 'Client'}</th>
+                            <th class="px-5 py-3 font-bold w-full">${this.labels.client || 'Client'}</th>
                             <th class="px-5 py-3 font-bold text-left">${this.labels.status || 'Status'} / IP</th>
                             <th class="px-5 py-3 font-bold text-right">${this.labels.traffic || 'Traffic'} / ${this.labels.lastSeenLabel || 'Seen'}</th>
                             <th class="px-5 py-3 font-bold text-right">${this.labels.actions || 'Actions'}</th>
@@ -229,6 +232,9 @@ const Dashboard = {
             const dbStatus = c.db_status || c.status;
             const isRevoked = dbStatus === 'disabled' || dbStatus === 'revoked';
 
+            const highlightedName = NK.highlightMatch(c.name, query);
+            const highlightedIp = NK.highlightMatch(c.external_ip || 'No IP', query);
+
             html += `
                 <tr class="group hover:bg-surface-hover/30 transition-colors animate-in fade-in duration-300">
                     <td class="px-5 py-4">
@@ -241,7 +247,7 @@ const Dashboard = {
                             </div>
                             <div>
                                 <div class="text-sm font-bold ${isRevoked ? 'text-muted line-through' : 'text-primary'} flex items-center gap-2">
-                                    ${c.name}
+                                    ${highlightedName}
                                 </div>
                                 <div class="text-[10px] text-muted font-mono uppercase tracking-widest flex items-center gap-1.5 mt-0.5 opacity-60">
                                     <i class="fas fa-server text-[9px]"></i>
@@ -253,7 +259,7 @@ const Dashboard = {
                     <td class="px-5 py-4 text-left">
                         <div class="flex flex-col gap-1">
                             ${NK.renderStatusBadge(dbStatus, c.connection_status, this.labels)}
-                            <code class="text-[10px] text-secondary font-mono">${c.external_ip || 'No IP'}</code>
+                            <code class="text-[10px] text-secondary font-mono">${highlightedIp}</code>
                         </div>
                     </td>
                     <td class="px-5 py-4 text-right">
@@ -279,13 +285,13 @@ const Dashboard = {
                     </td>
                     <td class="px-5 py-4 text-right">
                         <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onclick="NK.handleAjaxAction('/clients/${c.id}/sync-stats', {}, 'Sync stats for ${c.name}?')" class="p-1.5 text-muted hover:text-cyan-400 transition-colors" title="${this.labels.sync}">
+                            <button onclick="NK_Dashboard.clientAction(${c.id}, 'sync-stats', 'Sync stats for ${c.name}?')" class="p-1.5 text-muted hover:text-cyan-400 transition-colors" title="${this.labels.sync}">
                                 <i class="fa-solid fa-rotate text-[11px]"></i>
                             </button>
-                            <button onclick="NK.handleAjaxAction('/clients/${c.id}/${isRevoked ? 'restore' : 'revoke'}', {}, '${isRevoked ? 'Restore' : 'Revoke'} client ${c.name}?')" class="p-1.5 ${isRevoked ? 'text-green-500 hover:text-green-400' : 'text-muted hover:text-orange-400'} transition-colors" title="${isRevoked ? this.labels.restore : this.labels.revoke}">
+                            <button onclick="NK_Dashboard.clientAction(${c.id}, '${isRevoked ? 'restore' : 'revoke'}', '${isRevoked ? 'Restore' : 'Revoke'} client ${c.name}?')" class="p-1.5 ${isRevoked ? 'text-green-500 hover:text-green-400' : 'text-muted hover:text-orange-400'} transition-colors" title="${isRevoked ? this.labels.restore : this.labels.revoke}">
                                 <i class="fas ${isRevoked ? 'fa-user-check' : 'fa-user-slash'} text-xs"></i>
                             </button>
-                            <button onclick="NK.handleAjaxAction('/clients/${c.id}/delete', {}, 'Delete client ${c.name}?')" class="p-1.5 text-muted hover:text-red-500 transition-colors" title="${this.labels.delete}">
+                            <button onclick="NK_Dashboard.clientAction(${c.id}, 'delete', 'Delete client ${c.name}?')" class="p-1.5 text-muted hover:text-red-500 transition-colors" title="${this.labels.delete}">
                                 <i class="fas fa-trash-alt text-xs"></i>
                             </button>
                             <a href="/clients/${c.id}" class="ml-2 text-[10px] bg-panel hover:bg-primary text-secondary hover:text-white px-2 py-1 rounded border border-default uppercase font-bold tracking-wider transition-all shadow-sm">
@@ -324,6 +330,26 @@ const Dashboard = {
         } else {
             bar.classList.add('hidden');
             bar.classList.remove('flex');
+        }
+    },
+
+    clientAction: async function(id, action, confirmMsg = null) {
+        const result = await NK.handleAjaxAction(`/clients/${id}/${action}`, {}, confirmMsg);
+        if (result && result.success) {
+            this.performSearch(true);
+        }
+    },
+
+    handleBatchAction: async function(action) {
+        const selectedIds = Array.from(document.querySelectorAll('.client-checkbox:checked')).map(cb => cb.value);
+        if (selectedIds.length === 0) return;
+
+        const confirmMsg = action === 'delete' ? this.labels.confirmDelete : null;
+        if (confirmMsg && !confirm(confirmMsg)) return;
+
+        const result = await NK.handleAjaxAction('/clients/batch', { ids: selectedIds, action: action }, null);
+        if (result && result.success) {
+            this.performSearch(true);
         }
     },
 

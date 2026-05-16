@@ -161,6 +161,7 @@ class ServerView {
             return;
         }
 
+        const query = this.searchInput ? this.searchInput.value.trim() : '';
         const isMobile = window.innerWidth < 768;
         let html = '';
 
@@ -168,6 +169,8 @@ class ServerView {
             html = `<div class="grid grid-cols-1 gap-4 p-4">`;
             results.forEach(client => {
                 const isDisabled = (client.db_status === 'disabled');
+                const highlightedName = NK.highlightMatch(client.name, query);
+                const highlightedIp = NK.highlightMatch(client.external_ip || 'No IP', query);
                 html += `
                     <div class="panel p-4 space-y-4 relative group" id="client-card-${client.id}">
                         <div class="flex items-center justify-between">
@@ -175,7 +178,7 @@ class ServerView {
                                 <input type="checkbox" name="client_ids[]" value="${client.id}" class="client-checkbox rounded border-default bg-base text-primary focus:ring-primary/20 cursor-pointer" onchange="window.serverView.updateBatchBar()">
                                 <div class="w-10 h-10 rounded-lg bg-surface-hover flex items-center justify-center text-2xl">${client.flag}</div>
                                 <div>
-                                    <span class="text-sm font-bold ${isDisabled ? 'text-muted line-through' : ''} block">${client.name}</span>
+                                    <span class="text-sm font-bold ${isDisabled ? 'text-muted line-through' : ''} block">${highlightedName}</span>
                                 </div>
                             </div>
                             <div class="flex items-center gap-1.5">
@@ -197,7 +200,7 @@ class ServerView {
                             </div>
                         </div>
                         <div class="flex items-center justify-between pt-2 border-t border-default/50">
-                            <code class="text-[10px] text-secondary font-mono">${client.external_ip || 'No IP'}</code>
+                            <code class="text-[10px] text-secondary font-mono">${highlightedIp}</code>
                             <div class="flex items-center gap-1">
                                 <button onclick="window.serverView.clientAction(${client.id}, 'sync-stats', this)" class="p-2 text-muted hover:text-cyan-400"><i class="fas fa-sync-alt"></i></button>
                                 <button onclick="window.serverView.clientAction(${client.id}, '${isDisabled ? 'restore' : 'revoke'}', this)" class="p-2 ${isDisabled ? 'text-green-500' : 'text-muted hover:text-orange-400'}"><i class="fas ${isDisabled ? 'fa-user-check' : 'fa-user-slash'}"></i></button>
@@ -212,13 +215,13 @@ class ServerView {
         } else {
             html = `
                 <div class="table-wrapper">
-                    <table class="min-w-full">
+                    <table class="w-full min-w-full text-left border-collapse">
                         <thead>
                             <tr class="bg-panel/50">
                                 <th class="px-5 py-3 text-left w-10">
                                     <input type="checkbox" id="selectAll" class="rounded border-default bg-base text-primary focus:ring-primary/20 cursor-pointer">
                                 </th>
-                                <th class="px-5 py-3 text-left text-[10px] uppercase tracking-widest text-muted font-bold">${this.labels.clientServer}</th>
+                                <th class="px-5 py-3 text-left text-[10px] uppercase tracking-widest text-muted font-bold w-full">${this.labels.clientServer}</th>
                                 <th class="px-5 py-3 text-left text-[10px] uppercase tracking-widest text-muted font-bold">${this.labels.statusIp}</th>
                                 <th class="px-5 py-3 text-left text-[10px] uppercase tracking-widest text-muted font-bold">${this.labels.trafficSeen}</th>
                                 <th class="px-5 py-3 text-right text-[10px] uppercase tracking-widest text-muted font-bold">${this.labels.actions}</th>
@@ -229,6 +232,8 @@ class ServerView {
 
             results.forEach(client => {
                 const isDisabled = (client.db_status === 'disabled');
+                const highlightedName = NK.highlightMatch(client.name, query);
+                const highlightedIp = NK.highlightMatch(client.external_ip || 'No IP', query);
                 html += `
                     <tr class="hover:bg-surface-hover/50 transition-colors group" id="client-row-${client.id}">
                         <td class="px-5 py-4">
@@ -240,14 +245,14 @@ class ServerView {
                                     ${client.flag}
                                 </div>
                                 <div>
-                                    <span class="text-sm font-medium ${isDisabled ? 'text-muted line-through' : ''} block">${client.name}</span>
+                                    <span class="text-sm font-medium ${isDisabled ? 'text-muted line-through' : ''} block">${highlightedName}</span>
                                 </div>
                             </div>
                         </td>
                         <td class="px-5 py-4">
                             <div class="flex flex-col gap-1">
                                 ${NK.renderStatusBadge(client.db_status, client.connection_status, this.labels)}
-                                <code class="text-[10px] text-secondary font-mono">${client.external_ip || 'No IP'}</code>
+                                <code class="text-[10px] text-secondary font-mono">${highlightedIp}</code>
                             </div>
                         </td>
                         <td class="px-5 py-4 font-mono text-xs">
@@ -306,19 +311,25 @@ class ServerView {
         }
     }
 
-    handleBatchAction(action) {
+    async handleBatchAction(action) {
         const selected = Array.from(document.querySelectorAll('.client-checkbox:checked')).map(cb => cb.value);
         if (selected.length === 0) return;
 
         const confirmMsg = action === 'delete' ? this.labels.confirmDelete : null;
         if (confirmMsg && !confirm(confirmMsg)) return;
 
-        NK.handleAjaxAction('/clients/batch', { ids: selected, action: action }, null);
+        const result = await NK.handleAjaxAction('/clients/batch', { ids: selected, action: action }, null);
+        if (result && result.success) {
+            this.performSearch(true);
+        }
     }
 
-    clientAction(id, action, btn) {
+    async clientAction(id, action, btn) {
         const confirmMsg = action === 'delete' ? this.labels.confirmDelete : null;
-        NK.handleAjaxAction(`/clients/${id}/${action}`, {}, confirmMsg);
+        const result = await NK.handleAjaxAction(`/clients/${id}/${action}`, {}, confirmMsg);
+        if (result && result.success) {
+            this.performSearch(true);
+        }
     }
 
     handleDeleteServer(serverId, serverName) {
@@ -334,8 +345,11 @@ class ServerView {
         }
     }
 
-    syncStats(serverId) {
-        NK.handleAjaxAction(`/servers/${serverId}/sync-stats`);
+    async syncStats(serverId) {
+        const result = await NK.handleAjaxAction(`/servers/${serverId}/sync-stats`);
+        if (result && result.success) {
+            this.performSearch(true);
+        }
     }
 
     initBeszel() {

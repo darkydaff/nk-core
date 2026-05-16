@@ -2,7 +2,6 @@
 const Settings = {
     init: function() {
         this.initTabs();
-        this.initFileUpload();
     },
 
     initTabs: function() {
