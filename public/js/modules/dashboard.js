@@ -209,6 +209,71 @@ const Dashboard = {
 
         const queryInput = document.getElementById('fleetSearch');
         const query = queryInput ? queryInput.value.trim() : '';
+        const isMobile = window.innerWidth < 768;
+        let html = '';
+
+        if (isMobile) {
+            html = `<div class="grid grid-cols-1 gap-4 p-4">`;
+            results.forEach(c => {
+                const isOnline = c.connection_status === 'online';
+                const dbStatus = c.db_status || c.status;
+                const isRevoked = dbStatus === 'disabled' || dbStatus === 'revoked';
+
+                const highlightedName = NK.highlightMatch(c.name, query);
+                const highlightedIp = NK.highlightMatch(c.external_ip || 'No IP', query);
+                const highlightedServer = NK.highlightMatch(c.server_name, query);
+
+                html += `
+                    <div class="panel p-4 space-y-4 relative group" id="client-card-${c.id}">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <input type="checkbox" name="client_ids[]" value="${c.id}" onchange="NK_Dashboard.updateBatchUI()" class="client-checkbox rounded border-default bg-base text-primary focus:ring-primary/20 cursor-pointer">
+                                <div class="w-10 h-10 rounded-lg bg-base border border-default flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden leading-none">
+                                    ${c.flag || '<i class="fas fa-user text-xs text-muted"></i>'}
+                                </div>
+                                <div>
+                                    <span class="text-sm font-bold ${isRevoked ? 'text-muted line-through' : 'text-primary'} block">${highlightedName}</span>
+                                    <span class="text-[10px] text-muted font-mono uppercase tracking-widest flex items-center gap-1 mt-0.5 opacity-60">
+                                        <i class="fas fa-server text-[9px]"></i> ${highlightedServer}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                ${NK.renderStatusBadge(dbStatus, c.connection_status, this.labels)}
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between text-[10px] bg-panel/50 rounded p-2">
+                            <div class="flex flex-col">
+                                <span class="text-muted uppercase font-bold tracking-tighter">${this.labels.traffic || 'Traffic'}</span>
+                                <span class="font-mono font-medium">${c.total_traffic || '0.00 MB'}</span>
+                                ${isOnline ? `
+                                    <div class="flex gap-1.5 mt-1">
+                                        <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[9px] font-bold leading-none"><i class="fas fa-arrow-down mr-1 opacity-70"></i>${c.speed_down}</span>
+                                        <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20 text-[9px] font-bold leading-none"><i class="fas fa-arrow-up mr-1 opacity-70"></i>${c.speed_up}</span>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            <div class="flex flex-col text-right">
+                                <span class="text-muted uppercase font-bold tracking-tighter">${this.labels.lastSeenLabel || 'Seen'}</span>
+                                <span class="font-mono font-medium">${c.last_seen || 'Never'}</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between pt-2 border-t border-default/50">
+                            <code class="text-[10px] text-secondary font-mono">${highlightedIp}</code>
+                            <div class="flex items-center gap-1">
+                                <button onclick="NK_Dashboard.clientAction(${c.id}, 'sync-stats')" class="p-2 text-muted hover:text-cyan-400" title="${this.labels.sync || 'Sync'}"><i class="fas fa-sync-alt"></i></button>
+                                <button onclick="NK_Dashboard.clientAction(${c.id}, '${isRevoked ? 'restore' : 'revoke'}')" class="p-2 ${isRevoked ? 'text-green-500' : 'text-muted hover:text-orange-400'}" title="${isRevoked ? this.labels.restore || 'Restore' : this.labels.revoke || 'Revoke'}"><i class="fas ${isRevoked ? 'fa-user-check' : 'fa-user-slash'}"></i></button>
+                                <button onclick="NK_Dashboard.clientAction(${c.id}, 'delete', 'Delete client ${c.name}?')" class="p-2 text-muted hover:text-red-500" title="${this.labels.delete || 'Delete'}"><i class="fas fa-trash-alt"></i></button>
+                                <a href="/clients/${c.id}" class="ml-2 text-[10px] bg-primary text-white px-3 py-1.5 rounded-lg uppercase font-bold tracking-wider hover:bg-primary-hover transition-all shadow-sm">${this.labels.edit || 'Edit'}</a>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+            container.innerHTML = html;
+            return;
+        }
 
         // Live DOM diffing & patching on auto refresh to prevent visual flashing/checkbox resets
         if (isAutoRefresh && container.querySelector('table')) {
