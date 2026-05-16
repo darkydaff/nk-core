@@ -133,7 +133,7 @@ const Dashboard = {
         try {
             const response = await fetch(`/api/search-clients?q=${encodeURIComponent(q)}&status=${status}&traffic=${traffic}&sort=${sort}`);
             const data = await response.json();
-            this.renderResults(data.results);
+            this.renderResults(data.results, isAutoRefresh);
             
             // Update Summary Cards if present
             if (data.summary) {
@@ -198,7 +198,7 @@ const Dashboard = {
         this.chart.update('none');
     },
 
-    renderResults: function(results) {
+    renderResults: function(results, isAutoRefresh = false) {
         const container = document.getElementById('searchResults');
         if (!container) return;
 
@@ -207,6 +207,179 @@ const Dashboard = {
                 <i class="fas fa-search text-4xl mb-4"></i>
                 <p class="text-sm font-medium tracking-tight">${this.labels.noMatches || 'No matches found'}</p>
             </div>`;
+            return;
+        }
+
+        const queryInput = document.getElementById('fleetSearch');
+        const query = queryInput ? queryInput.value.trim() : '';
+
+        // Live DOM diffing & patching on auto refresh to prevent visual flashing/checkbox resets
+        if (isAutoRefresh && container.querySelector('table')) {
+            const tbody = container.querySelector('tbody');
+            if (tbody) {
+                const newIds = results.map(c => String(c.id));
+
+                // 1. Remove stale rows
+                Array.from(tbody.querySelectorAll('tr[id^="client-row-"]')).forEach(tr => {
+                    const rowId = tr.id.replace('client-row-', '');
+                    if (!newIds.includes(rowId)) {
+                        tr.remove();
+                    }
+                });
+
+                // 2. Update existing rows or insert new ones in place
+                results.forEach((c, index) => {
+                    const isOnline = c.connection_status === 'online';
+                    const dbStatus = c.db_status || c.status;
+                    const isRevoked = dbStatus === 'disabled' || dbStatus === 'revoked';
+
+                    const highlightedName = NK.highlightMatch(c.name, query);
+                    const highlightedIp = NK.highlightMatch(c.external_ip || 'No IP', query);
+                    const highlightedServer = NK.highlightMatch(c.server_name, query);
+
+                    let row = document.getElementById(`client-row-${c.id}`);
+                    if (row) {
+                        // Update Status badge & IP cell
+                        const statusCell = row.querySelector('.cell-status');
+                        if (statusCell) {
+                            const statusHtml = `
+                                <div class="flex flex-col gap-1">
+                                    ${NK.renderStatusBadge(dbStatus, c.connection_status, this.labels)}
+                                    <code class="text-[10px] text-secondary font-mono">${highlightedIp}</code>
+                                </div>
+                            `;
+                            if (statusCell.innerHTML !== statusHtml) statusCell.innerHTML = statusHtml;
+                        }
+
+                        // Update Traffic, speeds, and last seen
+                        const trafficCell = row.querySelector('.cell-traffic');
+                        if (trafficCell) {
+                            const trafficHtml = `
+                                <div class="flex flex-col items-end gap-1">
+                                    <div class="flex flex-col items-end font-mono">
+                                        <div class="flex items-center gap-2 text-[11px] font-bold text-primary">
+                                            <i class="fas fa-exchange-alt text-[9px] opacity-40"></i>
+                                            ${c.total_traffic || '0.00 MB'}
+                                        </div>
+                                        ${isOnline ? `
+                                            <div class="flex items-center gap-1.5 text-[9px] mt-1">
+                                                <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-bold leading-none">
+                                                    <i class="fas fa-arrow-down mr-1 opacity-70"></i> ${c.speed_down}
+                                                </span>
+                                                <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20 font-bold leading-none">
+                                                    <i class="fas fa-arrow-up mr-1 opacity-70"></i> ${c.speed_up}
+                                                </span>
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                    <span class="text-[10px] text-muted uppercase tracking-tighter font-medium">${c.last_seen || '-'}</span>
+                                </div>
+                            `;
+                            if (trafficCell.innerHTML !== trafficHtml) trafficCell.innerHTML = trafficHtml;
+                        }
+
+                        // Update actions cell
+                        const actionsCell = row.querySelector('.cell-actions');
+                        if (actionsCell) {
+                            const actionsHtml = `
+                                <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onclick="NK_Dashboard.clientAction(${c.id}, 'sync-stats', 'Sync stats for ${c.name}?')" class="p-1.5 text-muted hover:text-cyan-400 transition-colors" title="${this.labels.sync}">
+                                        <i class="fa-solid fa-rotate text-[11px]"></i>
+                                    </button>
+                                    <button onclick="NK_Dashboard.clientAction(${c.id}, '${isRevoked ? 'restore' : 'revoke'}', '${isRevoked ? 'Restore' : 'Revoke'} client ${c.name}?')" class="p-1.5 ${isRevoked ? 'text-green-500 hover:text-green-400' : 'text-muted hover:text-orange-400'} transition-colors" title="${isRevoked ? this.labels.restore : this.labels.revoke}">
+                                        <i class="fas ${isRevoked ? 'fa-user-check' : 'fa-user-slash'} text-xs"></i>
+                                    </button>
+                                    <button onclick="NK_Dashboard.clientAction(${c.id}, 'delete', 'Delete client ${c.name}?')" class="p-1.5 text-muted hover:text-red-500 transition-colors" title="${this.labels.delete}">
+                                        <i class="fas fa-trash-alt text-xs"></i>
+                                    </button>
+                                    <a href="/clients/${c.id}" class="ml-2 text-[10px] bg-panel hover:bg-primary text-secondary hover:text-white px-2 py-1 rounded border border-default uppercase font-bold tracking-wider transition-all shadow-sm">
+                                        ${this.labels.edit || 'Edit'}
+                                    </a>
+                                </div>
+                            `;
+                            if (actionsCell.innerHTML !== actionsHtml) actionsCell.innerHTML = actionsHtml;
+                        }
+
+                        // Sync visual rows ordering
+                        const childRows = Array.from(tbody.querySelectorAll('tr[id^="client-row-"]'));
+                        const currentIndex = childRows.indexOf(row);
+                        if (currentIndex !== index) {
+                            tbody.insertBefore(row, tbody.children[index] || null);
+                        }
+                    } else {
+                        // Create and insert newly arrived row
+                        const tempDiv = document.createElement('tbody');
+                        tempDiv.innerHTML = `
+                            <tr class="group hover:bg-surface-hover/30 transition-colors animate-in fade-in duration-300" id="client-row-${c.id}">
+                                <td class="px-5 py-4">
+                                    <input type="checkbox" name="client_ids[]" value="${c.id}" onchange="NK_Dashboard.updateBatchUI()" class="client-checkbox rounded border-default bg-base text-primary focus:ring-primary/20 cursor-pointer">
+                                </td>
+                                <td class="px-5 py-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-10 h-10 rounded-lg bg-base border border-default flex items-center justify-center text-2xl group-hover:bg-primary/5 transition-colors shadow-sm flex-shrink-0 overflow-hidden leading-none">
+                                            ${c.flag || '<i class="fas fa-user text-xs text-muted"></i>'}
+                                        </div>
+                                        <div>
+                                            <div class="text-sm font-bold ${isRevoked ? 'text-muted line-through' : 'text-primary'} flex items-center gap-2">
+                                                ${highlightedName}
+                                            </div>
+                                            <div class="text-[10px] text-muted font-mono uppercase tracking-widest flex items-center gap-1.5 mt-0.5 opacity-60">
+                                                <i class="fas fa-server text-[9px]"></i>
+                                                ${highlightedServer}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-5 py-4 text-left whitespace-nowrap cell-status">
+                                    <div class="flex flex-col gap-1">
+                                        ${NK.renderStatusBadge(dbStatus, c.connection_status, this.labels)}
+                                        <code class="text-[10px] text-secondary font-mono">${highlightedIp}</code>
+                                    </div>
+                                </td>
+                                <td class="px-5 py-4 text-right whitespace-nowrap cell-traffic">
+                                    <div class="flex flex-col items-end gap-1">
+                                        <div class="flex flex-col items-end font-mono">
+                                            <div class="flex items-center gap-2 text-[11px] font-bold text-primary">
+                                                <i class="fas fa-exchange-alt text-[9px] opacity-40"></i>
+                                                ${c.total_traffic || '0.00 MB'}
+                                            </div>
+                                            ${isOnline ? `
+                                                <div class="flex items-center gap-1.5 text-[9px] mt-1">
+                                                    <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-bold leading-none">
+                                                        <i class="fas fa-arrow-down mr-1 opacity-70"></i> ${c.speed_down}
+                                                    </span>
+                                                    <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20 font-bold leading-none">
+                                                        <i class="fas fa-arrow-up mr-1 opacity-70"></i> ${c.speed_up}
+                                                    </span>
+                                                </div>
+                                            ` : ''}
+                                        </div>
+                                        <span class="text-[10px] text-muted uppercase tracking-tighter font-medium">${c.last_seen || '-'}</span>
+                                    </div>
+                                </td>
+                                <td class="px-5 py-4 text-right whitespace-nowrap cell-actions">
+                                    <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onclick="NK_Dashboard.clientAction(${c.id}, 'sync-stats', 'Sync stats for ${c.name}?')" class="p-1.5 text-muted hover:text-cyan-400 transition-colors" title="${this.labels.sync}">
+                                            <i class="fa-solid fa-rotate text-[11px]"></i>
+                                        </button>
+                                        <button onclick="NK_Dashboard.clientAction(${c.id}, '${isRevoked ? 'restore' : 'revoke'}', '${isRevoked ? 'Restore' : 'Revoke'} client ${c.name}?')" class="p-1.5 ${isRevoked ? 'text-green-500 hover:text-green-400' : 'text-muted hover:text-orange-400'} transition-colors" title="${isRevoked ? this.labels.restore : this.labels.revoke}">
+                                            <i class="fas ${isRevoked ? 'fa-user-check' : 'fa-user-slash'} text-xs"></i>
+                                        </button>
+                                        <button onclick="NK_Dashboard.clientAction(${c.id}, 'delete', 'Delete client ${c.name}?')" class="p-1.5 text-muted hover:text-red-500 transition-colors" title="${this.labels.delete}">
+                                            <i class="fas fa-trash-alt text-xs"></i>
+                                        </button>
+                                        <a href="/clients/${c.id}" class="ml-2 text-[10px] bg-panel hover:bg-primary text-secondary hover:text-white px-2 py-1 rounded border border-default uppercase font-bold tracking-wider transition-all shadow-sm">
+                                            ${this.labels.edit || 'Edit'}
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                        const newRow = tempDiv.firstElementChild;
+                        tbody.insertBefore(newRow, tbody.children[index] || null);
+                    }
+                });
+            }
             return;
         }
 
@@ -240,7 +413,7 @@ const Dashboard = {
             const highlightedServer = NK.highlightMatch(c.server_name, query);
 
             html += `
-                <tr class="group hover:bg-surface-hover/30 transition-colors animate-in fade-in duration-300">
+                <tr class="group hover:bg-surface-hover/30 transition-colors animate-in fade-in duration-300" id="client-row-${c.id}">
                     <td class="px-5 py-4">
                         <input type="checkbox" name="client_ids[]" value="${c.id}" onchange="NK_Dashboard.updateBatchUI()" class="client-checkbox rounded border-default bg-base text-primary focus:ring-primary/20 cursor-pointer">
                     </td>
@@ -260,13 +433,13 @@ const Dashboard = {
                             </div>
                         </div>
                     </td>
-                    <td class="px-5 py-4 text-left whitespace-nowrap">
+                    <td class="px-5 py-4 text-left whitespace-nowrap cell-status">
                         <div class="flex flex-col gap-1">
                             ${NK.renderStatusBadge(dbStatus, c.connection_status, this.labels)}
                             <code class="text-[10px] text-secondary font-mono">${highlightedIp}</code>
                         </div>
                     </td>
-                    <td class="px-5 py-4 text-right whitespace-nowrap">
+                    <td class="px-5 py-4 text-right whitespace-nowrap cell-traffic">
                         <div class="flex flex-col items-end gap-1">
                             <div class="flex flex-col items-end font-mono">
                                 <div class="flex items-center gap-2 text-[11px] font-bold text-primary">
@@ -287,7 +460,7 @@ const Dashboard = {
                             <span class="text-[10px] text-muted uppercase tracking-tighter font-medium">${c.last_seen || '-'}</span>
                         </div>
                     </td>
-                    <td class="px-5 py-4 text-right whitespace-nowrap">
+                    <td class="px-5 py-4 text-right whitespace-nowrap cell-actions">
                         <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onclick="NK_Dashboard.clientAction(${c.id}, 'sync-stats', 'Sync stats for ${c.name}?')" class="p-1.5 text-muted hover:text-cyan-400 transition-colors" title="${this.labels.sync}">
                                 <i class="fa-solid fa-rotate text-[11px]"></i>

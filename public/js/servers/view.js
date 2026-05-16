@@ -117,7 +117,7 @@ class ServerView {
             .then(response => response.json())
             .then(data => {
                 if (data.error) throw new Error(data.error);
-                this.renderResults(data.results);
+                this.renderResults(data.results, isAutoRefresh);
                 
                 document.querySelectorAll('.client-checkbox').forEach(cb => {
                     if (selectedIds.includes(cb.value)) cb.checked = true;
@@ -150,7 +150,7 @@ class ServerView {
             });
     }
 
-    renderResults(results) {
+    renderResults(results, isAutoRefresh = false) {
         if (!results || results.length === 0) {
             this.resultsContainer.innerHTML = `
                 <div class="flex flex-col items-center justify-center h-64 text-center p-10">
@@ -213,6 +213,145 @@ class ServerView {
             });
             html += `</div>`;
         } else {
+            // Desktop Table View (Supports live DOM diffing on updates)
+            if (isAutoRefresh && this.resultsContainer.querySelector('table')) {
+                const tbody = this.resultsContainer.querySelector('tbody');
+                if (tbody) {
+                    const newIds = results.map(c => String(c.id));
+
+                    // Remove stale rows
+                    Array.from(tbody.querySelectorAll('tr[id^="client-row-"]')).forEach(tr => {
+                        const rowId = tr.id.replace('client-row-', '');
+                        if (!newIds.includes(rowId)) {
+                            tr.remove();
+                        }
+                    });
+
+                    // Update existing or add new rows in place
+                    results.forEach((client, index) => {
+                        const isDisabled = (client.db_status === 'disabled');
+                        const highlightedName = NK.highlightMatch(client.name, query);
+                        const highlightedIp = NK.highlightMatch(client.external_ip || 'No IP', query);
+
+                        let row = document.getElementById(`client-row-${client.id}`);
+                        if (row) {
+                            // 1. Update status/IP cell
+                            const statusCell = row.querySelector('.cell-status');
+                            if (statusCell) {
+                                const statusHtml = `
+                                    <div class="flex flex-col gap-1">
+                                        ${NK.renderStatusBadge(client.db_status, client.connection_status, this.labels)}
+                                        <code class="text-[10px] text-secondary font-mono">${highlightedIp}</code>
+                                    </div>
+                                `;
+                                if (statusCell.innerHTML !== statusHtml) statusCell.innerHTML = statusHtml;
+                            }
+
+                            // 2. Update traffic/speed cell
+                            const trafficCell = row.querySelector('.cell-traffic');
+                            if (trafficCell) {
+                                const trafficHtml = `
+                                    <div class="flex flex-col">
+                                        <span class="font-medium">${client.total_traffic}</span>
+                                        <div class="flex gap-1.5 mt-1">
+                                            <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[9px] font-bold leading-none"><i class="fas fa-arrow-down mr-1 opacity-70"></i>${client.speed_down}</span>
+                                            <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20 text-[9px] font-bold leading-none"><i class="fas fa-arrow-up mr-1 opacity-70"></i>${client.speed_up}</span>
+                                        </div>
+                                        <span class="text-[10px] text-muted uppercase tracking-tighter">${client.last_seen}</span>
+                                    </div>
+                                `;
+                                if (trafficCell.innerHTML !== trafficHtml) trafficCell.innerHTML = trafficHtml;
+                            }
+
+                            // 3. Update actions cell
+                            const actionsCell = row.querySelector('.cell-actions');
+                            if (actionsCell) {
+                                const actionsHtml = `
+                                    <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button onclick="window.serverView.clientAction(${client.id}, 'sync-stats', this)" class="p-1.5 text-muted hover:text-cyan-400" title="${this.labels.sync}">
+                                            <i class="fa-solid fa-rotate text-[10px]"></i>
+                                        </button>
+                                        <button onclick="window.serverView.clientAction(${client.id}, '${isDisabled ? 'restore' : 'revoke'}', this)" class="p-1.5 ${isDisabled ? 'text-green-500 hover:text-green-400' : 'text-muted hover:text-orange-400'}" title="${isDisabled ? this.labels.restore : this.labels.revoke}">
+                                            <i class="fas ${isDisabled ? 'fa-user-check' : 'fa-user-slash'} text-xs"></i>
+                                        </button>
+                                        <button onclick="window.serverView.clientAction(${client.id}, 'delete', this)" class="p-1.5 text-muted hover:text-red-500" title="${this.labels.delete}">
+                                            <i class="fas fa-trash-alt text-xs"></i>
+                                        </button>
+                                        <a href="/clients/${client.id}" class="ml-2 text-[10px] bg-panel hover:bg-primary text-secondary hover:text-white px-2 py-1 rounded border border-default uppercase font-bold tracking-wider transition-all">
+                                            ${this.labels.edit}
+                                        </a>
+                                    </div>
+                                `;
+                                if (actionsCell.innerHTML !== actionsHtml) actionsCell.innerHTML = actionsHtml;
+                            }
+
+                            // 4. Ensure visual ordering
+                            const childRows = Array.from(tbody.querySelectorAll('tr[id^="client-row-"]'));
+                            const currentIndex = childRows.indexOf(row);
+                            if (currentIndex !== index) {
+                                tbody.insertBefore(row, tbody.children[index] || null);
+                            }
+                        } else {
+                            // Insert a newly created row in place
+                            const tempDiv = document.createElement('tbody');
+                            tempDiv.innerHTML = `
+                                <tr class="hover:bg-surface-hover/50 transition-colors group" id="client-row-${client.id}">
+                                    <td class="px-5 py-4">
+                                        <input type="checkbox" name="client_ids[]" value="${client.id}" class="client-checkbox rounded border-default bg-base text-primary focus:ring-primary/20 cursor-pointer" onchange="window.serverView.updateBatchBar()">
+                                    </td>
+                                    <td class="px-5 py-4">
+                                        <div class="flex items-center">
+                                            <div class="w-10 h-10 rounded-lg bg-surface-hover flex items-center justify-center mr-3 text-2xl">
+                                                ${client.flag}
+                                            </div>
+                                            <div>
+                                                <span class="text-sm font-medium ${isDisabled ? 'text-muted line-through' : ''} block">${highlightedName}</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-5 py-4 whitespace-nowrap cell-status">
+                                        <div class="flex flex-col gap-1">
+                                            ${NK.renderStatusBadge(client.db_status, client.connection_status, this.labels)}
+                                            <code class="text-[10px] text-secondary font-mono">${highlightedIp}</code>
+                                        </div>
+                                    </td>
+                                    <td class="px-5 py-4 font-mono text-xs whitespace-nowrap cell-traffic">
+                                        <div class="flex flex-col">
+                                            <span class="font-medium">${client.total_traffic}</span>
+                                            <div class="flex gap-1.5 mt-1">
+                                                <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[9px] font-bold leading-none"><i class="fas fa-arrow-down mr-1 opacity-70"></i>${client.speed_down}</span>
+                                                <span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20 text-[9px] font-bold leading-none"><i class="fas fa-arrow-up mr-1 opacity-70"></i>${client.speed_up}</span>
+                                            </div>
+                                            <span class="text-[10px] text-muted uppercase tracking-tighter">${client.last_seen}</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-5 py-4 text-right whitespace-nowrap cell-actions">
+                                        <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onclick="window.serverView.clientAction(${client.id}, 'sync-stats', this)" class="p-1.5 text-muted hover:text-cyan-400" title="${this.labels.sync}">
+                                                <i class="fa-solid fa-rotate text-[10px]"></i>
+                                            </button>
+                                            <button onclick="window.serverView.clientAction(${client.id}, '${isDisabled ? 'restore' : 'revoke'}', this)" class="p-1.5 ${isDisabled ? 'text-green-500 hover:text-green-400' : 'text-muted hover:text-orange-400'}" title="${isDisabled ? this.labels.restore : this.labels.revoke}">
+                                                <i class="fas ${isDisabled ? 'fa-user-check' : 'fa-user-slash'} text-xs"></i>
+                                            </button>
+                                            <button onclick="window.serverView.clientAction(${client.id}, 'delete', this)" class="p-1.5 text-muted hover:text-red-500" title="${this.labels.delete}">
+                                                <i class="fas fa-trash-alt text-xs"></i>
+                                            </button>
+                                            <a href="/clients/${client.id}" class="ml-2 text-[10px] bg-panel hover:bg-primary text-secondary hover:text-white px-2 py-1 rounded border border-default uppercase font-bold tracking-wider transition-all">
+                                                ${this.labels.edit}
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `;
+                            const newRow = tempDiv.firstElementChild;
+                            tbody.insertBefore(newRow, tbody.children[index] || null);
+                        }
+                    });
+                }
+                return;
+            }
+
+            // Otherwise, render full table on initial load/manual filter
             html = `
                 <div class="table-wrapper">
                     <table class="w-full min-w-full text-left border-collapse">
@@ -249,13 +388,13 @@ class ServerView {
                                 </div>
                             </div>
                         </td>
-                        <td class="px-5 py-4 whitespace-nowrap">
+                        <td class="px-5 py-4 whitespace-nowrap cell-status">
                             <div class="flex flex-col gap-1">
                                 ${NK.renderStatusBadge(client.db_status, client.connection_status, this.labels)}
                                 <code class="text-[10px] text-secondary font-mono">${highlightedIp}</code>
                             </div>
                         </td>
-                        <td class="px-5 py-4 font-mono text-xs whitespace-nowrap">
+                        <td class="px-5 py-4 font-mono text-xs whitespace-nowrap cell-traffic">
                             <div class="flex flex-col">
                                 <span class="font-medium">${client.total_traffic}</span>
                                 <div class="flex gap-1.5 mt-1">
@@ -265,7 +404,7 @@ class ServerView {
                                 <span class="text-[10px] text-muted uppercase tracking-tighter">${client.last_seen}</span>
                             </div>
                         </td>
-                        <td class="px-5 py-4 text-right whitespace-nowrap">
+                        <td class="px-5 py-4 text-right whitespace-nowrap cell-actions">
                             <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button onclick="window.serverView.clientAction(${client.id}, 'sync-stats', this)" class="p-1.5 text-muted hover:text-cyan-400" title="${this.labels.sync}">
                                     <i class="fa-solid fa-rotate text-[10px]"></i>
@@ -286,7 +425,7 @@ class ServerView {
             });
             html += `</tbody></table></div>`;
         }
-        
+
         this.resultsContainer.innerHTML = html;
 
         const selectAll = document.getElementById('selectAll');
