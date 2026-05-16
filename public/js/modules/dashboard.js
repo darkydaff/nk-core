@@ -218,10 +218,10 @@ const Dashboard = {
                             <th class="px-5 py-3 w-10">
                                 <input type="checkbox" id="selectAllClients" onchange="NK_Dashboard.toggleSelectAll(this)" class="rounded border-default bg-base text-primary focus:ring-primary/20 cursor-pointer">
                             </th>
-                            <th class="px-5 py-3 font-bold w-full">${this.labels.client || 'Client'}</th>
-                            <th class="px-5 py-3 font-bold text-left">${this.labels.status || 'Status'} / IP</th>
-                            <th class="px-5 py-3 font-bold text-right">${this.labels.traffic || 'Traffic'} / ${this.labels.lastSeenLabel || 'Seen'}</th>
-                            <th class="px-5 py-3 font-bold text-right">${this.labels.actions || 'Actions'}</th>
+                            <th class="px-5 py-3 font-bold">${this.labels.client || 'Client'}</th>
+                            <th class="px-5 py-3 font-bold text-left whitespace-nowrap">${this.labels.status || 'Status'} / IP</th>
+                            <th class="px-5 py-3 font-bold text-right whitespace-nowrap">${this.labels.traffic || 'Traffic'} / ${this.labels.lastSeenLabel || 'Seen'}</th>
+                            <th class="px-5 py-3 font-bold text-right whitespace-nowrap">${this.labels.actions || 'Actions'}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-default/30">
@@ -256,13 +256,13 @@ const Dashboard = {
                             </div>
                         </div>
                     </td>
-                    <td class="px-5 py-4 text-left">
+                    <td class="px-5 py-4 text-left whitespace-nowrap">
                         <div class="flex flex-col gap-1">
                             ${NK.renderStatusBadge(dbStatus, c.connection_status, this.labels)}
                             <code class="text-[10px] text-secondary font-mono">${highlightedIp}</code>
                         </div>
                     </td>
-                    <td class="px-5 py-4 text-right">
+                    <td class="px-5 py-4 text-right whitespace-nowrap">
                         <div class="flex flex-col items-end gap-1">
                             <div class="flex flex-col items-end font-mono">
                                 <div class="flex items-center gap-2 text-[11px] font-bold text-primary">
@@ -283,7 +283,7 @@ const Dashboard = {
                             <span class="text-[10px] text-muted uppercase tracking-tighter font-medium">${c.last_seen || '-'}</span>
                         </div>
                     </td>
-                    <td class="px-5 py-4 text-right">
+                    <td class="px-5 py-4 text-right whitespace-nowrap">
                         <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onclick="NK_Dashboard.clientAction(${c.id}, 'sync-stats', 'Sync stats for ${c.name}?')" class="p-1.5 text-muted hover:text-cyan-400 transition-colors" title="${this.labels.sync}">
                                 <i class="fa-solid fa-rotate text-[11px]"></i>

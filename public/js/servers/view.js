@@ -221,10 +221,10 @@ class ServerView {
                                 <th class="px-5 py-3 text-left w-10">
                                     <input type="checkbox" id="selectAll" class="rounded border-default bg-base text-primary focus:ring-primary/20 cursor-pointer">
                                 </th>
-                                <th class="px-5 py-3 text-left text-[10px] uppercase tracking-widest text-muted font-bold w-full">${this.labels.clientServer}</th>
-                                <th class="px-5 py-3 text-left text-[10px] uppercase tracking-widest text-muted font-bold">${this.labels.statusIp}</th>
-                                <th class="px-5 py-3 text-left text-[10px] uppercase tracking-widest text-muted font-bold">${this.labels.trafficSeen}</th>
-                                <th class="px-5 py-3 text-right text-[10px] uppercase tracking-widest text-muted font-bold">${this.labels.actions}</th>
+                                <th class="px-5 py-3 text-left text-[10px] uppercase tracking-widest text-muted font-bold">${this.labels.clientServer}</th>
+                                <th class="px-5 py-3 text-left text-[10px] uppercase tracking-widest text-muted font-bold whitespace-nowrap">${this.labels.statusIp}</th>
+                                <th class="px-5 py-3 text-left text-[10px] uppercase tracking-widest text-muted font-bold whitespace-nowrap">${this.labels.trafficSeen}</th>
+                                <th class="px-5 py-3 text-right text-[10px] uppercase tracking-widest text-muted font-bold whitespace-nowrap">${this.labels.actions}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-700/50">
@@ -249,13 +249,13 @@ class ServerView {
                                 </div>
                             </div>
                         </td>
-                        <td class="px-5 py-4">
+                        <td class="px-5 py-4 whitespace-nowrap">
                             <div class="flex flex-col gap-1">
                                 ${NK.renderStatusBadge(client.db_status, client.connection_status, this.labels)}
                                 <code class="text-[10px] text-secondary font-mono">${highlightedIp}</code>
                             </div>
                         </td>
-                        <td class="px-5 py-4 font-mono text-xs">
+                        <td class="px-5 py-4 font-mono text-xs whitespace-nowrap">
                             <div class="flex flex-col">
                                 <span class="font-medium">${client.total_traffic}</span>
                                 <div class="flex gap-1.5 mt-1">
@@ -265,7 +265,7 @@ class ServerView {
                                 <span class="text-[10px] text-muted uppercase tracking-tighter">${client.last_seen}</span>
                             </div>
                         </td>
-                        <td class="px-5 py-4 text-right">
+                        <td class="px-5 py-4 text-right whitespace-nowrap">
                             <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button onclick="window.serverView.clientAction(${client.id}, 'sync-stats', this)" class="p-1.5 text-muted hover:text-cyan-400" title="${this.labels.sync}">
                                     <i class="fa-solid fa-rotate text-[10px]"></i>

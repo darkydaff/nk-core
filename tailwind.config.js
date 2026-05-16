@@ -2,7 +2,8 @@ module.exports = {
   content: [
     "./templates/**/*.twig",
     "./public/**/*.php",
-    "./inc/**/*.php"
+    "./inc/**/*.php",
+    "./public/js/**/*.js"
   ],
   darkMode: 'class',
   theme: {
