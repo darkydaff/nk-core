@@ -9,6 +9,7 @@ const Dashboard = {
         this.initChart();
         this.initSearch();
         this.startPolling();
+        this.initVisibilityListener();
     },
 
     initChart: function() {
@@ -158,13 +159,9 @@ const Dashboard = {
         } finally {
             // Schedule next refresh
             if (this.pollTimer) clearTimeout(this.pollTimer);
-            this.pollTimer = setTimeout(() => {
-                if (document.visibilityState === 'visible') {
-                    this.performSearch(true);
-                } else {
-                    this.pollTimer = setTimeout(() => this.performSearch(true), 30000);
-                }
-            }, 10000);
+            if (document.visibilityState === 'visible') {
+                this.pollTimer = NK.registerTimeout(() => this.performSearch(true), 10000);
+            }
         }
     },
 
@@ -531,8 +528,10 @@ const Dashboard = {
     },
 
     startPolling: function() {
-        // performSearch handles its own polling via hardened timeout loop
-        setInterval(() => {
+        if (this.fleetInterval) clearInterval(this.fleetInterval);
+        
+        const pollTask = () => {
+            if (document.visibilityState !== 'visible') return;
             NK_Monitoring.pollFleetHealth((serverStatuses) => {
                 Object.entries(serverStatuses).forEach(([id, status]) => {
                     const card = document.querySelector(`[data-server-id="${id}"]`);
@@ -546,7 +545,27 @@ const Dashboard = {
                     }
                 });
             });
-        }, 15000);
+        };
+
+        this.fleetInterval = NK.registerInterval(pollTask, 15000);
+    },
+
+    initVisibilityListener: function() {
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                this.performSearch(true);
+                this.startPolling();
+            } else {
+                if (this.pollTimer) {
+                    clearTimeout(this.pollTimer);
+                    this.pollTimer = null;
+                }
+                if (this.fleetInterval) {
+                    clearInterval(this.fleetInterval);
+                    this.fleetInterval = null;
+                }
+            }
+        });
     }
 };
 

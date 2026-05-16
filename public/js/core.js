@@ -223,11 +223,101 @@ window.NK = {
         const escapedQuery = query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
         const regex = new RegExp(`(${escapedQuery})`, 'gi');
         return text.replace(regex, '<mark class="bg-primary/20 text-primary border border-primary/30 rounded px-0.5 font-bold">$1</mark>');
+    },
+
+    // Senior-Grade Modal Accessibility Focus Trap System
+    _focusTrapListener: null,
+    _previousActiveElement: null,
+
+    initFocusTrap: function(modalEl) {
+        if (!modalEl) return;
+        
+        // Save previously focused element to return focus on close
+        this._previousActiveElement = document.activeElement;
+
+        const focusableSelectors = 'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+        const focusableElements = modalEl.querySelectorAll(focusableSelectors);
+        
+        if (focusableElements.length === 0) return;
+
+        const firstFocusable = focusableElements[0];
+        const lastFocusable = focusableElements[focusableElements.length - 1];
+
+        // Shift focus to the first focusable element or the input field (if present)
+        const initialFocus = modalEl.querySelector('input:not([type="hidden"]), select, textarea') || firstFocusable;
+        setTimeout(() => initialFocus.focus(), 50);
+
+        // Remove any existing listener to prevent duplicate binding
+        if (this._focusTrapListener) {
+            modalEl.removeEventListener('keydown', this._focusTrapListener);
+        }
+
+        this._focusTrapListener = (e) => {
+            if (e.key === 'Tab') {
+                if (e.shiftKey) {
+                    if (document.activeElement === firstFocusable) {
+                        e.preventDefault();
+                        lastFocusable.focus();
+                    }
+                } else {
+                    if (document.activeElement === lastFocusable) {
+                        e.preventDefault();
+                        firstFocusable.focus();
+                    }
+                }
+            }
+        };
+
+        modalEl.addEventListener('keydown', this._focusTrapListener);
+    },
+
+    destroyFocusTrap: function(modalEl) {
+        if (this._focusTrapListener && modalEl) {
+            modalEl.removeEventListener('keydown', this._focusTrapListener);
+            this._focusTrapListener = null;
+        }
+        
+        // Restore focus to original trigger element
+        if (this._previousActiveElement && typeof this._previousActiveElement.focus === 'function') {
+            this._previousActiveElement.focus();
+            this._previousActiveElement = null;
+        }
+    },
+
+    // Global Active Timer Registry for Hardened Resource Management
+    _registeredTimers: [],
+
+    registerTimeout: function(fn, delay) {
+        const timerId = setTimeout(fn, delay);
+        this._registeredTimers.push({ id: timerId, type: 'timeout' });
+        return timerId;
+    },
+
+    registerInterval: function(fn, delay) {
+        const timerId = setInterval(fn, delay);
+        this._registeredTimers.push({ id: timerId, type: 'interval' });
+        return timerId;
+    },
+
+    clearAllTimers: function() {
+        this._registeredTimers.forEach(timer => {
+            if (timer.type === 'timeout') clearTimeout(timer.id);
+            if (timer.type === 'interval') clearInterval(timer.id);
+        });
+        this._registeredTimers = [];
     }
 };
+
+// Auto-cleanup on tab unload to defend against memory leaks and orphan threads
+window.addEventListener('beforeunload', () => {
+    if (window.NK && typeof window.NK.clearAllTimers === 'function') {
+        window.NK.clearAllTimers();
+    }
+});
 
 // Legacy compatibility aliases
 window.handleAjaxAction = (url, data, msg) => NK.handleAjaxAction(url, data, msg);
 window.handleAjaxForm = (event, url, file) => NK.handleAjaxForm(event, url, file);
 window.showToast = (msg, type) => NK.toast(msg, type);
 window.copyToClipboard = (text, btn) => NK.copyToClipboard(text, btn);
+

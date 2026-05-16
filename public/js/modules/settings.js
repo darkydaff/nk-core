@@ -26,11 +26,15 @@ const Settings = {
     confirmRestore: function(key, type) {
         document.getElementById('restoreKeyInput').value = key;
         document.getElementById('restoreTypeInput').value = type;
-        document.getElementById('restoreModal').classList.remove('hidden');
+        const modal = document.getElementById('restoreModal');
+        modal.classList.remove('hidden');
+        NK.initFocusTrap(modal);
     },
 
     closeRestoreModal: function() {
-        document.getElementById('restoreModal').classList.add('hidden');
+        const modal = document.getElementById('restoreModal');
+        modal.classList.add('hidden');
+        NK.destroyFocusTrap(modal);
     },
 
     updateFileName: function(input) {

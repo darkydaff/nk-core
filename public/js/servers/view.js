@@ -38,12 +38,18 @@ class ServerView {
         requestAnimationFrame(() => {
             this.performSearch();
             this.initBeszel();
-            setInterval(() => this.initBeszel(), 15000);
+            this.beszelInterval = NK.registerInterval(() => {
+                if (document.visibilityState === 'visible') {
+                    this.initBeszel();
+                }
+            }, 15000);
         });
 
         if (this.serverStatus === 'deploying' && this.currentJobId) {
             this.initCentrifugo();
         }
+
+        this.initVisibilityListener();
     }
 
     cacheElements() {
@@ -139,14 +145,9 @@ class ServerView {
                 }
             })
             .finally(() => {
-                const refreshDelay = 10000;
-                this.transitionPoll = setTimeout(() => {
-                    if (document.visibilityState === 'visible') {
-                        this.performSearch(true);
-                    } else {
-                        this.transitionPoll = setTimeout(() => this.performSearch(true), 30000);
-                    }
-                }, refreshDelay);
+                if (document.visibilityState === 'visible') {
+                    this.transitionPoll = NK.registerTimeout(() => this.performSearch(true), 10000);
+                }
             });
     }
 
@@ -710,8 +711,10 @@ class ServerView {
 
     startPolling() {
         if (this.serverStatus !== 'deploying') return;
+        if (this.pollTimer) clearInterval(this.pollTimer);
 
         const pollStatus = () => {
+            if (document.visibilityState !== 'visible') return;
             fetch(`/servers/${this.serverId}/status`, {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
@@ -725,7 +728,7 @@ class ServerView {
             })
             .catch(() => {});
         };
-        this.pollTimer = setInterval(pollStatus, 2500);
+        this.pollTimer = NK.registerInterval(pollStatus, 2500);
     }
 
     openLogsModal() {
@@ -736,6 +739,7 @@ class ServerView {
         this.logsModal.classList.remove('hidden');
         document.body.style.overflow = 'hidden';
         this.fetchLogs();
+        NK.initFocusTrap(this.logsModal);
     }
 
     closeLogsModal() {
@@ -745,6 +749,7 @@ class ServerView {
             clearTimeout(this.logsRefreshTimer);
             this.logsRefreshTimer = null;
         }
+        NK.destroyFocusTrap(this.logsModal);
     }
 
     refreshLogs() {
@@ -762,14 +767,43 @@ class ServerView {
         .then(r => r.json())
         .then(data => {
             this.renderLogs(data.logs || []);
-            if (this.logsModal && !this.logsModal.classList.contains('hidden')) {
-                this.logsRefreshTimer = setTimeout(() => this.fetchLogs(), 5000);
+            if (this.logsModal && !this.logsModal.classList.contains('hidden') && document.visibilityState === 'visible') {
+                this.logsRefreshTimer = NK.registerTimeout(() => this.fetchLogs(), 5000);
             }
         })
         .catch(err => {
             this.logsBody.innerHTML = `<p class="text-red-400">${this.labels.logsFailed}: ${err.message}</p>`;
-            if (this.logsModal && !this.logsModal.classList.contains('hidden')) {
-                this.logsRefreshTimer = setTimeout(() => this.fetchLogs(), 8000);
+            if (this.logsModal && !this.logsModal.classList.contains('hidden') && document.visibilityState === 'visible') {
+                this.logsRefreshTimer = NK.registerTimeout(() => this.fetchLogs(), 8000);
+            }
+        });
+    }
+
+    initVisibilityListener() {
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                this.performSearch(true);
+                this.initBeszel();
+                if (this.serverStatus === 'deploying') {
+                    this.startPolling();
+                }
+            } else {
+                if (this.transitionPoll) {
+                    clearTimeout(this.transitionPoll);
+                    this.transitionPoll = null;
+                }
+                if (this.pollTimer) {
+                    clearInterval(this.pollTimer);
+                    this.pollTimer = null;
+                }
+                if (this.logsRefreshTimer) {
+                    clearTimeout(this.logsRefreshTimer);
+                    this.logsRefreshTimer = null;
+                }
+                if (this.beszelInterval) {
+                    clearInterval(this.beszelInterval);
+                    this.beszelInterval = null;
+                }
             }
         });
     }
