@@ -48,8 +48,7 @@
     </button>
 {% endmacro %}
 
-{# 3. Standard UI Panels (Cards) #}
-{% macro panel(title = null, subtitle = null, class = '', padding = 'p-6') %}
+{% macro panel(content, title = null, subtitle = null, class = '', padding = 'p-6') %}
     <div class="panel overflow-hidden transition-all {{ padding }} {{ class }}">
         {% if title %}
             <div class="mb-4 border-b border-surface-border/40 pb-3">
@@ -60,7 +59,7 @@
             </div>
         {% endif %}
         <div class="panel-body leading-relaxed text-sm text-secondary">
-            {{ caller() }}
+            {{ content|raw }}
         </div>
     </div>
 {% endmacro %}
