@@ -73,31 +73,31 @@ window.NK = {
         let statusText = labels.offline || 'Offline';
 
         if (isRevoked) {
-            badgeClass = 'bg-amber-500/10 border-amber-500/20 text-amber-500';
+            badgeClass = 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400';
             dotClass = 'bg-amber-500';
             statusText = labels.revoked || 'Revoked';
         } else if (isDeleting) {
-            badgeClass = 'bg-red-500/10 border-red-500/20 text-red-500';
+            badgeClass = 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400';
             dotClass = 'bg-red-500 animate-pulse';
             statusText = labels.deleting || 'Deleting';
         } else if (isProvisioning) {
-            badgeClass = 'bg-sky-500/10 border-sky-500/20 text-sky-500';
+            badgeClass = 'bg-sky-500/10 border-sky-500/20 text-sky-600 dark:text-sky-400';
             dotClass = 'bg-sky-500 animate-pulse';
             statusText = labels.provisioning || 'Provisioning';
         } else if (isVerifying) {
-            badgeClass = 'bg-sky-500/10 border-sky-500/20 text-sky-500';
+            badgeClass = 'bg-sky-500/10 border-sky-500/20 text-sky-600 dark:text-sky-400';
             dotClass = 'bg-sky-500 animate-pulse';
             statusText = labels.verifying || 'Verifying';
         } else if (isError) {
-            badgeClass = 'bg-red-500/10 border-red-500/20 text-red-500';
+            badgeClass = 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400';
             dotClass = 'bg-red-600';
             statusText = labels.error || 'Error';
         } else if (isOnline) {
-            badgeClass = 'bg-sky-500/10 border-sky-500/20 text-sky-500';
+            badgeClass = 'bg-sky-500/10 border-sky-500/20 text-sky-600 dark:text-sky-400';
             dotClass = 'bg-sky-500 animate-pulse';
             statusText = labels.online || 'Online';
         } else if (isNever) {
-            badgeClass = 'bg-slate-500/10 border-slate-500/20 text-slate-500';
+            badgeClass = 'bg-slate-500/10 border-slate-500/20 text-slate-600 dark:text-slate-400';
             dotClass = 'bg-slate-400';
             statusText = labels.never || 'Never';
         }

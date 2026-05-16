@@ -177,12 +177,21 @@
             box-shadow: 0 4px 12px -2px rgba(99, 102, 241, 0.3);
         }
 
-        .bg-primary { background-color: var(--color-primary); }
-        .bg-base, .bg-surface { background-color: var(--color-surface-base); }
-        .bg-panel, .bg-surface-panel { background-color: var(--color-surface-panel); }
-        .bg-status-active { background-color: var(--color-status-active); }
-        .text-primary { color: var(--color-primary); }
-        .text-status-active { color: var(--color-status-active); }
+        .bg-primary { background-color: var(--color-primary) !important; }
+        .bg-base, .bg-surface, .bg-surface-base { background-color: var(--color-surface-base) !important; }
+        .bg-panel, .bg-surface-panel { background-color: var(--color-surface-panel) !important; }
+        .bg-surface-hover { background-color: var(--color-surface-hover) !important; }
+        .hover\:bg-surface-hover:hover { background-color: var(--color-surface-hover) !important; }
+        
+        .border-default, .border-surface-border { border-color: var(--color-surface-border) !important; }
+        .hover\:border-slate-500:hover { border-color: #94a3b8 !important; }
+        .dark .hover\:border-slate-500:hover { border-color: #475569 !important; }
+        
+        .bg-status-active { background-color: var(--color-status-active) !important; }
+        .text-primary { color: var(--color-primary) !important; }
+        .text-secondary, .text-content-secondary { color: var(--color-content-secondary) !important; }
+        .text-muted, .text-content-muted { color: var(--color-content-muted) !important; }
+        .text-status-active { color: var(--color-status-active) !important; }
 
         .btn-secondary {
             background: var(--color-surface-base);
@@ -192,6 +201,28 @@
             border-radius: 0.75rem;
             font-weight: 500;
             transition: all 0.2s ease;
+        }
+
+        .badge-active {
+            background-color: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            color: #059669;
+        }
+        .dark .badge-active {
+            background-color: rgba(16, 185, 129, 0.15);
+            border-color: rgba(16, 185, 129, 0.25);
+            color: #34d399;
+        }
+
+        .badge-error {
+            background-color: rgba(244, 63, 94, 0.1);
+            border: 1px solid rgba(244, 63, 94, 0.2);
+            color: #e11d48;
+        }
+        .dark .badge-error {
+            background-color: rgba(244, 63, 94, 0.15);
+            border-color: rgba(244, 63, 94, 0.25);
+            color: #fb7185;
         }
 
         .btn-secondary:hover {

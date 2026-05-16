@@ -159,7 +159,7 @@
 					<div class="flex items-center gap-6">
 						<div class="text-right">
 							<p class="text-[10px] text-muted uppercase font-bold tracking-tighter">{{ t('monitoring.load_avg') }}</p>
-							<p class="text-xs font-mono bg-panel/50 px-2 py-0.5 rounded" id="beszel-load">0.00 0.00 0.00</p>
+							<p class="text-xs font-mono bg-slate-100 dark:bg-panel/50 px-2 py-0.5 rounded border border-slate-200/60 dark:border-surface-border/30" id="beszel-load">0.00 0.00 0.00</p>
 						</div>
 						{% if beszel_config.url %}
 							<a href="{{ beszel_config.url }}" target="_blank" class="w-8 h-8 rounded-full bg-surface-hover flex items-center justify-center text-amber-500 hover:bg-amber-500 hover:text-white transition-all shadow-sm" title="{{ t('monitoring.open_hub') }}">
@@ -177,7 +177,7 @@
 							<span class="text-muted">{{ t('monitoring.cpu_usage') }}</span>
 							<span id="beszel-cpu-val">0%</span>
 						</div>
-						<div class="h-2 w-full bg-surface-hover rounded-full overflow-hidden">
+						<div class="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
 							<div id="beszel-cpu-bar" class="h-full bg-amber-500 transition-all duration-500" style="width: 0%"></div>
 						</div>
 						<p id="beszel-cpu-info" class="text-[9px] text-muted italic">{{ t('common.loading') }}</p>
@@ -189,7 +189,7 @@
 							<span class="text-muted">{{ t('monitoring.memory_usage') }}</span>
 							<span id="beszel-ram-val">0%</span>
 						</div>
-						<div class="h-2 w-full bg-surface-hover rounded-full overflow-hidden">
+						<div class="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
 							<div id="beszel-ram-bar" class="h-full bg-cyan-500 transition-all duration-500" style="width: 0%"></div>
 						</div>
 						<p id="beszel-ram-info" class="text-[9px] text-muted italic">{{ t('common.loading') }}</p>
@@ -201,7 +201,7 @@
 							<span class="text-muted">{{ t('monitoring.disk_usage') }}</span>
 							<span id="beszel-disk-val">0%</span>
 						</div>
-						<div class="h-2 w-full bg-surface-hover rounded-full overflow-hidden">
+						<div class="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
 							<div id="beszel-disk-bar" class="h-full bg-purple-500 transition-all duration-500" style="width: 0%"></div>
 						</div>
 						<p id="beszel-disk-info" class="text-[9px] text-muted italic">{{ t('common.loading') }}</p>
@@ -213,15 +213,15 @@
 							<span class="text-muted">{{ t('monitoring.bandwidth') }}</span>
 							<span id="beszel-bw-total" class="font-bold">0 {{ t('common.mbps') }}</span>
 						</div>
-						<div class="flex justify-between items-center bg-surface-hover/50 rounded-lg px-3 py-2">
+						<div class="flex justify-between items-center bg-slate-50 dark:bg-surface-hover/30 rounded-lg px-3 py-2 border border-slate-100 dark:border-surface-border/30">
 							<div class="flex flex-col">
-								<span class="text-[9px] text-muted uppercase font-bold opacity-50">{{ t('monitoring.download') }}</span>
+								<span class="text-[9px] dark:text-slate-400 text-slate-500 uppercase font-bold tracking-wider">{{ t('monitoring.download') }}</span>
 								<span id="beszel-bw-rx" class="text-xs dark:text-emerald-400 text-emerald-600 font-mono">0 {{ t('common.mbps') }}</span>
 							</div>
-							<div class="w-px h-6 bg-surface-border"></div>
+							<div class="w-px h-6 bg-slate-200 dark:bg-surface-border/50"></div>
 							<div class="flex flex-col text-right">
-								<span class="text-[9px] text-muted uppercase font-bold opacity-50">{{ t('monitoring.upload') }}</span>
-								<span id="beszel-bw-tx" class="text-xs text-primary font-mono">0 {{ t('common.mbps') }}</span>
+								<span class="text-[9px] dark:text-slate-400 text-slate-500 uppercase font-bold tracking-wider">{{ t('monitoring.upload') }}</span>
+								<span id="beszel-bw-tx" class="text-xs dark:text-sky-400 text-sky-600 font-mono">0 {{ t('common.mbps') }}</span>
 							</div>
 						</div>
 					</div>
