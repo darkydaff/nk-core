@@ -445,7 +445,7 @@ const Dashboard = {
             return;
         }
 
-        let html = `
+        html = `
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                     <thead>
