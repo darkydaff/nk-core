@@ -188,9 +188,7 @@
 
             <div id="searchResults" class="min-h-[300px]">
                 <!-- Results injected here -->
-                <div class="flex items-center justify-center py-20 opacity-30">
-                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                </div>
+                {{ ui.skeleton_loader(5, 'h-16') }}
             </div>
         </div>
     </div>
@@ -232,6 +230,7 @@
         // Legacy Beszel polling for metrics (CPU/RAM)
         // We'll keep this until we have a batch metrics API
         function updateMetrics() {
+            if (document.visibilityState !== 'visible') return;
             document.querySelectorAll('[data-server-ip]').forEach(card => {
                 const ip = card.dataset.serverIp;
                 NK_Monitoring.fetchServerDetails(ip).then(res => {
@@ -247,7 +246,21 @@
             });
         }
         updateMetrics();
-        setInterval(updateMetrics, 15000);
+        let metricsInterval = NK.registerInterval(updateMetrics, 15000);
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                updateMetrics();
+                if (!metricsInterval) {
+                    metricsInterval = NK.registerInterval(updateMetrics, 15000);
+                }
+            } else {
+                if (metricsInterval) {
+                    clearInterval(metricsInterval);
+                    metricsInterval = null;
+                }
+            }
+        });
     });
 </script>
 {% endblock %}

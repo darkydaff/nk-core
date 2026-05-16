@@ -154,7 +154,14 @@
         <p class="text-xs text-secondary mt-1.5 max-w-sm leading-relaxed">{{ message }}</p>
         {% if buttonLabel and buttonAction %}
             <div class="mt-5">
-                {{ _self.button(buttonLabel, buttonAction, 'button', 'primary', buttonIcon) }}
+                <button 
+                    type="button" 
+                    onclick="{{ buttonAction }}"
+                    class="btn-primary px-4 py-2 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 transition-all"
+                >
+                    {% if buttonIcon %}<i class="fas {{ buttonIcon }} text-xs opacity-90"></i>{% endif %}
+                    {{ buttonLabel }}
+                </button>
             </div>
         {% endif %}
     </div>
