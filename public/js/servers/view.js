@@ -269,16 +269,16 @@ class ServerView {
                             if (actionsCell) {
                                 const actionsHtml = `
                                     <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onclick="window.serverView.clientAction(${client.id}, 'sync-stats', this)" class="p-1.5 text-muted hover:text-cyan-400" title="${this.labels.sync}">
+                                        <button onclick="window.serverView.clientAction(${client.id}, 'sync-stats', this)" class="p-1.5 btn-action btn-action-sync" title="${this.labels.sync}">
                                             <i class="fa-solid fa-rotate text-[10px]"></i>
                                         </button>
-                                        <button onclick="window.serverView.clientAction(${client.id}, '${isDisabled ? 'restore' : 'revoke'}', this)" class="p-1.5 ${isDisabled ? 'text-green-500 hover:text-green-400' : 'text-muted hover:text-orange-400'}" title="${isDisabled ? this.labels.restore : this.labels.revoke}">
+                                        <button onclick="window.serverView.clientAction(${client.id}, '${isDisabled ? 'restore' : 'revoke'}', this)" class="p-1.5 btn-action ${isDisabled ? 'btn-action-restore' : 'btn-action-revoke'}" title="${isDisabled ? this.labels.restore : this.labels.revoke}">
                                             <i class="fas ${isDisabled ? 'fa-user-check' : 'fa-user-slash'} text-xs"></i>
                                         </button>
-                                        <button onclick="window.serverView.clientAction(${client.id}, 'delete', this)" class="p-1.5 text-muted hover:text-red-500" title="${this.labels.delete}">
+                                        <button onclick="window.serverView.clientAction(${client.id}, 'delete', this)" class="p-1.5 btn-action btn-action-delete" title="${this.labels.delete}">
                                             <i class="fas fa-trash-alt text-xs"></i>
                                         </button>
-                                        <a href="/clients/${client.id}" class="ml-2 text-[10px] bg-panel hover:bg-primary text-secondary hover:text-white px-2 py-1 rounded border border-default uppercase font-bold tracking-wider transition-all">
+                                        <a href="/clients/${client.id}" class="ml-2 btn-edit">
                                             ${this.labels.edit}
                                         </a>
                                     </div>
@@ -328,16 +328,16 @@ class ServerView {
                                     </td>
                                     <td class="px-5 py-4 text-right whitespace-nowrap cell-actions">
                                         <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button onclick="window.serverView.clientAction(${client.id}, 'sync-stats', this)" class="p-1.5 text-muted hover:text-cyan-400" title="${this.labels.sync}">
+                                            <button onclick="window.serverView.clientAction(${client.id}, 'sync-stats', this)" class="p-1.5 btn-action btn-action-sync" title="${this.labels.sync}">
                                                 <i class="fa-solid fa-rotate text-[10px]"></i>
                                             </button>
-                                            <button onclick="window.serverView.clientAction(${client.id}, '${isDisabled ? 'restore' : 'revoke'}', this)" class="p-1.5 ${isDisabled ? 'text-green-500 hover:text-green-400' : 'text-muted hover:text-orange-400'}" title="${isDisabled ? this.labels.restore : this.labels.revoke}">
+                                            <button onclick="window.serverView.clientAction(${client.id}, '${isDisabled ? 'restore' : 'revoke'}', this)" class="p-1.5 btn-action ${isDisabled ? 'btn-action-restore' : 'btn-action-revoke'}" title="${isDisabled ? this.labels.restore : this.labels.revoke}">
                                                 <i class="fas ${isDisabled ? 'fa-user-check' : 'fa-user-slash'} text-xs"></i>
                                             </button>
-                                            <button onclick="window.serverView.clientAction(${client.id}, 'delete', this)" class="p-1.5 text-muted hover:text-red-500" title="${this.labels.delete}">
+                                            <button onclick="window.serverView.clientAction(${client.id}, 'delete', this)" class="p-1.5 btn-action btn-action-delete" title="${this.labels.delete}">
                                                 <i class="fas fa-trash-alt text-xs"></i>
                                             </button>
-                                            <a href="/clients/${client.id}" class="ml-2 text-[10px] bg-panel hover:bg-primary text-secondary hover:text-white px-2 py-1 rounded border border-default uppercase font-bold tracking-wider transition-all">
+                                            <a href="/clients/${client.id}" class="ml-2 btn-edit">
                                                 ${this.labels.edit}
                                             </a>
                                         </div>
