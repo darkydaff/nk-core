@@ -1,47 +1,111 @@
 /* public/css/tokens.css */
+
 :root {
-    /* Color Palette - Tactical Intelligence Core (Dark) */
-    --color-bg-base: #0c0e17;
-    --color-bg-panel: #11131c;
-    --color-bg-surface: #1a1c26;
-    --color-bg-hover: #232530;
+    /* ─── SYSTEM CONFIGURATION ─── */
+    --sidebar-width: 260px;
 
-    /* Brand Colors - Sky Blue */
-    --color-primary: #0ea5e9;
-    --color-primary-hover: #0284c7;
-    --color-primary-muted: rgba(14, 165, 233, 0.15);
+    /* ─── LIGHT THEME DEFAULT TOKENS ─── */
+    --color-surface-base:      #f8fafc; /* Slate 50 */
+    --color-surface-panel:     #ffffff; /* Pure White */
+    --color-surface-hover:     #f1f5f9; /* Slate 100 */
+    --color-surface-border:    #e2e8f0; /* Slate 200 */
+    
+    --color-sidebar:           #ffffff;
+    --color-sidebar-text:      #0f172a; /* Slate 900 */
+    --color-sidebar-border:    #e2e8f0;
+    --color-sidebar-hover:     rgba(15, 23, 42, 0.05);
+    --color-sidebar-active-bg: rgba(14, 165, 233, 0.08);
+    --color-sidebar-active-txt:#0ea5e9;
 
-    /* Content Colors */
-    --color-text-primary: #f8fafc;
-    --color-text-secondary: #94a3b8;
-    --color-text-muted: #475569;
+    --color-content-primary:   #0f172a; /* Slate 900 */
+    --color-content-secondary: #475569; /* Slate 600 */
+    --color-content-muted:     #94a3b8; /* Slate 400 */
+    --color-placeholder:       #cbd5e1; /* Slate 300 */
 
-    /* Status Colors */
-    --color-success: #10b981;
-    --color-warning: #f59e0b;
-    --color-danger: #f43f5e;
-    --color-info: #0ea5e9;
+    /* Core Action Mappings */
+    --color-primary:           #0ea5e9; /* Sky 500 */
+    --color-primary-hover:     #0284c7; /* Sky 600 */
+    --color-primary-light:     rgba(14, 165, 233, 0.1);
 
-    /* Spacing System */
-    --space-1: 0.25rem;
-    --space-2: 0.5rem;
-    --space-3: 0.75rem;
-    --space-4: 1rem;
-    --space-6: 1.5rem;
-    --space-8: 2rem;
+    /* Semantic Status Color Mappings */
+    --color-status-active:     #10b981; /* Emerald 500 */
+    --color-status-warning:    #f59e0b; /* Amber 500 */
+    --color-status-error:      #f43f5e; /* Rose 500 */
+    --color-status-info:       #0ea5e9; /* Sky 500 */
 
-    /* Typography */
-    --font-size-xs: 0.75rem;   /* 12px */
-    --font-size-sm: 0.875rem;  /* 14px */
-    --font-size-base: 1rem;    /* 16px */
-    --font-size-lg: 1.125rem;  /* 18px */
-    --font-size-xl: 1.25rem;   /* 20px */
-    --font-size-2xl: 1.5rem;   /* 24px */
+    /* Shadows & Elevations - Light */
+    --shadow-sm:    0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md:    0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
+    --shadow-lg:    0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+    --shadow-modal: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 
-    /* Shadows & Borders - Solid Tactical */
-    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
-    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
-    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-    --border-radius: 0.75rem;
-    --border-color: #232530;
+    /* ─── TYPOGRAPHY HIERARCHY ─── */
+    --font-size-xs:   0.75rem;   /* 12px */
+    --font-size-sm:   0.875rem;  /* 14px */
+    --font-size-base: 1rem;      /* 16px */
+    --font-size-lg:   1.125rem;  /* 18px */
+    --font-size-xl:   1.25rem;   /* 20px */
+    --font-size-2xl:  1.5rem;    /* 24px */
+    --font-size-3xl:  1.875rem;  /* 30px */
+
+    /* ─── SPACING SCALE ─── */
+    --space-1:  0.25rem;
+    --space-2:  0.5rem;
+    --space-3:  0.75rem;
+    --space-4:  1.0rem;
+    --space-5:  1.25rem;
+    --space-6:  1.5rem;
+    --space-8:  2.0rem;
+    --space-10: 2.5rem;
+    --space-12: 3.0rem;
+    --space-16: 4.0rem;
+
+    /* ─── BORDER RADII ─── */
+    --radius-sm: 0.375rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --radius-xl: 1.0rem;
+
+    /* ─── Z-INDEX LAYERING SCALE ─── */
+    --z-index-map:            10;
+    --z-index-dropdown:       100;
+    --z-index-sticky:         200;
+    --z-index-sidebar:        500;
+    --z-index-modal-backdrop: 1000;
+    --z-index-modal:          1010;
+    --z-index-toast:          10000;
+
+    /* ─── TRANSITIONS & ANIMATIONS ─── */
+    --transition-fast:   100ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-normal: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-slow:   300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+html.dark {
+    /* ─── DARK THEME OVERRIDE TOKENS ─── */
+    --color-surface-base:      #0c0e17; /* Cyber Black */
+    --color-surface-panel:     #11131c; /* Deep Panel Slate */
+    --color-surface-hover:     #1a1c26; /* Hover Slate */
+    --color-surface-border:    #232530; /* Fine Border Slate */
+    
+    --color-sidebar:           #0c0e17;
+    --color-sidebar-text:      #f8fafc;
+    --color-sidebar-border:    #232530;
+    --color-sidebar-hover:     rgba(255, 255, 255, 0.04);
+    --color-sidebar-active-bg: rgba(14, 165, 233, 0.08);
+    --color-sidebar-active-txt:#0ea5e9;
+
+    --color-content-primary:   #f8fafc; /* Cyber Soft White */
+    --color-content-secondary: #94a3b8; /* Cool Grey */
+    --color-content-muted:     #475569; /* Deep Muted Slate */
+    --color-placeholder:       #334155; /* Slate 700 */
+
+    /* Core Action Mappings - Dark Muted Focus */
+    --color-primary-light:     rgba(14, 165, 233, 0.15);
+
+    /* Shadows & Elevations - Dark Accentuated Depth */
+    --shadow-sm:    0 1px 2px 0 rgba(0, 0, 0, 0.5);
+    --shadow-md:    0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+    --shadow-lg:    0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+    --shadow-modal: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
 }

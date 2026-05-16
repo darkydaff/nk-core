@@ -89,7 +89,7 @@
         {% if user %}
         <header class="top-bar">
             <div class="flex items-center">
-                <button onclick="toggleSidebar()" class="lg:hidden p-2 text-secondary mr-2">
+                <button onclick="toggleSidebar()" class="lg:hidden p-2 text-secondary mr-2" aria-label="Toggle Sidebar Menu" aria-expanded="false" aria-controls="sidebar">
                     <i class="fas fa-bars text-xl"></i>
                 </button>
                 <div class="hidden sm:block">
@@ -103,13 +103,13 @@
 
             <div class="flex items-center space-x-4">
                 <div class="flex items-center bg-base rounded-xl p-1 border border-default">
-                    <button onclick="globalSyncAll(this)" class="p-2 text-secondary hover:text-primary transition-colors global-sync-btn" title="{{ t('menu.sync_all') }}">
+                    <button onclick="globalSyncAll(this)" class="p-2 text-secondary hover:text-primary transition-colors global-sync-btn" title="{{ t('menu.sync_all') }}" aria-label="{{ t('menu.sync_all') }}">
                         <i class="fas fa-sync-alt"></i>
                     </button>
                 </div>
 
                 <div class="relative">
-                    <button onclick="toggleLanguageDropdown()" class="flex items-center px-3 py-2 rounded-xl hover:bg-surface-hover transition-colors">
+                    <button id="lang-trigger" onclick="toggleLanguageDropdown()" class="flex items-center px-3 py-2 rounded-xl hover:bg-surface-hover transition-colors" aria-haspopup="listbox" aria-expanded="false" aria-controls="languageDropdown" aria-label="Select Language">
                         {% for lang in languages %}
                             {% if lang.code == current_language %}
                                 <span class="flag-emoji text-xl">{{ getFlag(lang.code)|raw }}</span>
@@ -117,13 +117,13 @@
                         {% endfor %}
                         <i class="fas fa-chevron-down ml-2 text-[10px] opacity-50"></i>
                     </button>
-                    <div id="languageDropdown" class="hidden absolute right-0 mt-2 w-48 panel shadow-xl p-1 z-50">
+                    <div id="languageDropdown" class="hidden absolute right-0 mt-2 w-48 panel shadow-xl p-1 z-50" role="listbox" aria-labelledby="lang-trigger">
                         {% for lang in languages %}
                         <form method="POST" action="/language/change" class="block">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <input type="hidden" name="language" value="{{ lang.code }}">
                             <input type="hidden" name="redirect" value="{{ current_uri }}">
-                            <button type="submit" class="w-full text-left px-4 py-2.5 text-sm text-secondary hover:text-primary hover:bg-surface-hover rounded-lg flex items-center transition-colors {% if lang.code == current_language %}bg-surface-hover text-primary font-medium{% endif %}">
+                            <button type="submit" role="option" aria-selected="{% if lang.code == current_language %}true{% else %}false{% endif %}" class="w-full text-left px-4 py-2.5 text-sm text-secondary hover:text-primary hover:bg-surface-hover rounded-lg flex items-center transition-colors {% if lang.code == current_language %}bg-surface-hover text-primary font-medium{% endif %}">
                                 <span class="mr-3 text-xl">{{ getFlag(lang.code)|raw }}</span>
                                 <span>{{ lang.name }}</span>
                             </button>
@@ -132,7 +132,7 @@
                     </div>
                 </div>
 
-                <button onclick="toggleTheme()" class="w-10 h-10 rounded-xl bg-base border border-default flex items-center justify-center text-secondary hover:text-primary transition-all">
+                <button onclick="toggleTheme()" class="w-10 h-10 rounded-xl bg-base border border-default flex items-center justify-center text-secondary hover:text-primary transition-all" id="theme-toggle" aria-label="Toggle dark and light themes">
                     <i class="fas fa-moon dark:fa-sun" id="themeIcon"></i>
                 </button>
             </div>
