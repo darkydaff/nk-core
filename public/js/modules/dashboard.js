@@ -261,9 +261,9 @@ const Dashboard = {
                         <div class="flex items-center justify-between pt-2 border-t border-default/50">
                             <code class="text-[10px] text-secondary font-mono">${highlightedIp}</code>
                             <div class="flex items-center gap-1">
-                                <button onclick="NK_Dashboard.clientAction(${c.id}, 'sync-stats')" class="p-2 text-muted hover:text-cyan-400" title="${this.labels.sync || 'Sync'}"><i class="fas fa-sync-alt"></i></button>
-                                <button onclick="NK_Dashboard.clientAction(${c.id}, '${isRevoked ? 'restore' : 'revoke'}')" class="p-2 ${isRevoked ? 'text-green-500' : 'text-muted hover:text-orange-400'}" title="${isRevoked ? this.labels.restore || 'Restore' : this.labels.revoke || 'Revoke'}"><i class="fas ${isRevoked ? 'fa-user-check' : 'fa-user-slash'}"></i></button>
-                                <button onclick="NK_Dashboard.clientAction(${c.id}, 'delete', 'Delete client ${c.name}?')" class="p-2 text-muted hover:text-red-500" title="${this.labels.delete || 'Delete'}"><i class="fas fa-trash-alt"></i></button>
+                                <button onclick="NK_Dashboard.clientAction(${c.id}, 'sync-stats')" class="p-2 text-muted hover:text-cyan-400 transition-all duration-200" title="${this.labels.sync || 'Sync'}"><i class="fas fa-sync-alt"></i></button>
+                                <button onclick="NK_Dashboard.clientAction(${c.id}, '${isRevoked ? 'restore' : 'revoke'}')" class="p-2 ${isRevoked ? 'text-green-500 hover:text-green-400' : 'text-muted hover:text-orange-400'} transition-all duration-200" title="${isRevoked ? this.labels.restore || 'Restore' : this.labels.revoke || 'Revoke'}"><i class="fas ${isRevoked ? 'fa-user-check' : 'fa-user-slash'}"></i></button>
+                                <button onclick="NK_Dashboard.clientAction(${c.id}, 'delete', 'Delete client ${c.name}?')" class="p-2 text-muted hover:text-red-500 transition-all duration-200" title="${this.labels.delete || 'Delete'}"><i class="fas fa-trash-alt"></i></button>
                                 <a href="/clients/${c.id}" class="ml-2 text-[10px] bg-primary text-white px-3 py-1.5 rounded-lg uppercase font-bold tracking-wider hover:bg-primary-hover transition-all shadow-sm">${this.labels.edit || 'Edit'}</a>
                             </div>
                         </div>
