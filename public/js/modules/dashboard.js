@@ -380,9 +380,6 @@ const Dashboard = {
             return;
         }
 
-        const queryInput = document.getElementById('fleetSearch');
-        const query = queryInput ? queryInput.value.trim() : '';
-
         let html = `
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
