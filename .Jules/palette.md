@@ -1,0 +1,3 @@
+## 2024-05-16 - Add ARIA Labels to Icon-Only Buttons
+**Learning:** Found several icon-only buttons across `templates/servers/view.twig` and `templates/dashboard.twig` that lack accessible names (ARIA labels). Relying solely on a `title` attribute isn't universally supported by screen readers, particularly on mobile devices or certain browser/AT combinations. Additionally, there are grid views where these icon buttons have neither `title` nor `aria-label`.
+**Action:** Always provide an `aria-label` attribute on buttons that convey meaning solely through iconography (like FontAwesome icons) to ensure screen readers can announce the button's purpose clearly. Added accessible ARIA labels to the client action buttons (sync, restore/revoke, delete) in grid and list views.

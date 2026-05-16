@@ -553,9 +553,9 @@ function renderResults(results) {
                     <div class="flex items-center justify-between pt-2 border-t border-default/50">
                         <code class="text-[10px] text-secondary font-mono">${client.external_ip || 'No IP'}</code>
                         <div class="flex items-center gap-1">
-                            <button onclick="clientAction(${client.id}, 'sync-stats', this)" class="p-2 text-muted hover:text-cyan-400"><i class="fas fa-sync-alt"></i></button>
-                            <button onclick="clientAction(${client.id}, '${isDisabled ? 'restore' : 'revoke'}', this)" class="p-2 ${isDisabled ? 'text-green-500' : 'text-muted hover:text-orange-400'}"><i class="fas ${isDisabled ? 'fa-user-check' : 'fa-user-slash'}"></i></button>
-                            <button onclick="clientAction(${client.id}, 'delete', this)" class="p-2 text-muted hover:text-red-500"><i class="fas fa-trash-alt"></i></button>
+                            <button onclick="clientAction(${client.id}, 'sync-stats', this)" class="p-2 text-muted hover:text-cyan-400" aria-label="${labels.sync}"><i class="fas fa-sync-alt"></i></button>
+                            <button onclick="clientAction(${client.id}, '${isDisabled ? 'restore' : 'revoke'}', this)" class="p-2 ${isDisabled ? 'text-green-500' : 'text-muted hover:text-orange-400'}" aria-label="${isDisabled ? labels.restore : labels.revoke}"><i class="fas ${isDisabled ? 'fa-user-check' : 'fa-user-slash'}"></i></button>
+                            <button onclick="clientAction(${client.id}, 'delete', this)" class="p-2 text-muted hover:text-red-500" aria-label="${labels.delete}"><i class="fas fa-trash-alt"></i></button>
                             <a href="/clients/${client.id}" class="ml-2 text-[10px] bg-primary text-white px-3 py-1.5 rounded-lg uppercase font-bold tracking-wider hover:bg-primary-hover transition-all">${labels.edit}</a>
                         </div>
                     </div>
@@ -623,14 +623,14 @@ function renderResults(results) {
                     </td>
                     <td class="px-5 py-4 text-right">
                         <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onclick="clientAction(${client.id}, 'sync-stats', this)" class="p-1.5 text-muted hover:text-cyan-400" title="${labels.sync}">
+                            <button onclick="clientAction(${client.id}, 'sync-stats', this)" class="p-1.5 text-muted hover:text-cyan-400" title="${labels.sync}" aria-label="${labels.sync}">
                                 <i class="fa-solid fa-rotate text-[10px]"></i>
                                 {{ t('common.refresh') }}
                             </button>
-                            <button onclick="clientAction(${client.id}, '${isDisabled ? 'restore' : 'revoke'}', this)" class="p-1.5 ${isDisabled ? 'text-green-500 hover:text-green-400' : 'text-muted hover:text-orange-400'}" title="${isDisabled ? labels.restore : labels.revoke}">
+                            <button onclick="clientAction(${client.id}, '${isDisabled ? 'restore' : 'revoke'}', this)" class="p-1.5 ${isDisabled ? 'text-green-500 hover:text-green-400' : 'text-muted hover:text-orange-400'}" title="${isDisabled ? labels.restore : labels.revoke}" aria-label="${isDisabled ? labels.restore : labels.revoke}">
                                 <i class="fas ${isDisabled ? 'fa-user-check' : 'fa-user-slash'} text-xs"></i>
                             </button>
-                            <button onclick="clientAction(${client.id}, 'delete', this)" class="p-1.5 text-muted hover:text-red-500" title="${labels.delete}">
+                            <button onclick="clientAction(${client.id}, 'delete', this)" class="p-1.5 text-muted hover:text-red-500" title="${labels.delete}" aria-label="${labels.delete}">
                                 <i class="fas fa-trash-alt text-xs"></i>
                             </button>
                             <a href="/clients/${client.id}" class="ml-2 text-[10px] bg-panel hover:bg-primary text-secondary hover:text-white px-2 py-1 rounded border border-default uppercase font-bold tracking-wider transition-all">
