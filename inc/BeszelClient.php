@@ -106,17 +106,27 @@ class BeszelClient {
      * Get monitoring data for a specific IP
      */
     public function getSystemByIp(string $ip): ?array {
-        $systems = $this->getSystems();
-        foreach ($systems as $system) {
-            if (($system['host'] ?? '') === $ip) {
-                // Fetch extra stats (for m, d, etc.)
-                $stats = $this->getLatestStats($system['id']);
-                if ($stats) {
-                    $system['stats'] = $stats;
-                }
-                return $system;
-            }
+        $token = $this->getToken();
+        if (!$token) return null;
+
+        // Search by host field in PocketBase (should match IP)
+        $url = "{$this->baseUrl}/api/collections/systems/records?filter=(host='{$ip}')";
+        
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer {$token}"]);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+        $response = curl_exec($ch);
+        $result = json_decode($response, true);
+        $items = $result['items'] ?? [];
+
+        if (!empty($items)) {
+            $system = $items[0];
+            $stats = $this->getLatestStats($system['id']);
+            if ($stats) $system['stats'] = $stats;
+            return $system;
         }
+
         return null;
     }
 

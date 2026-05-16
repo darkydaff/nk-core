@@ -69,7 +69,7 @@ class Job
             self::STATUS_RUNNING => [self::STATUS_SUCCESS, self::STATUS_ERROR, self::STATUS_CANCELLING],
             self::STATUS_CANCELLING => [self::STATUS_CANCELLED, self::STATUS_ERROR],
             self::STATUS_SUCCESS => [],
-            self::STATUS_ERROR => [],
+            self::STATUS_ERROR => [self::STATUS_RUNNING],
             self::STATUS_CANCELLED => [],
         ];
 

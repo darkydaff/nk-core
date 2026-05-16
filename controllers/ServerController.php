@@ -198,9 +198,11 @@ class ServerController
                 return;
             }
 
-            // Safety Check: Verify server name from POST
-            $confirmName = $_POST['confirm_name'] ?? '';
-            if (empty($confirmName) || $confirmName !== $serverData['name']) {
+            // Safety Check: Verify server name from POST (trim both for robustness)
+            $confirmName = trim($_POST['confirm_name'] ?? '');
+            $actualName  = trim($serverData['name']);
+            
+            if (empty($confirmName) || $confirmName !== $actualName) {
                 return $this->respond(false, 'Deletion failed', 'Confirmation name did not match or was empty.');
             }
 
@@ -349,13 +351,24 @@ class ServerController
 
             $summary = $this->getServerSummaryStats($serverId, $clients);
 
+            $user = Auth::user();
+            $connToken = EventBus::generateConnectionToken((string)$user['id']);
+            
+            $subToken = '';
+            if ($serverData['status'] === ServerStatus::DEPLOYING->value && !empty($serverData['current_job_id'])) {
+                $subToken = EventBus::generateSubscriptionToken((string)$user['id'], "job:{$serverData['current_job_id']}");
+            }
+
             View::render('servers/view.twig', [
                 'server' => $serverData,
                 'clients' => $clients,
                 'stats_summary' => $summary,
                 'beszel_config' => [
                     'url' => Config::get('BESZEL_URL')
-                ]
+                ],
+                'centrifugo_url' => getenv('CENTRIFUGO_WS_URL') ?: 'ws://localhost:8000/connection/websocket',
+                'connection_token' => $connToken,
+                'subscription_token' => $subToken
             ]);
         } catch (Exception $e) {
             \Logger::error('Server view error: ' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
@@ -385,6 +398,7 @@ class ServerController
             }
 
             $server->updatePingAndStatus();
+            $server->updateGeoIp();
             $synced = VpnClient::syncAllStatsForServer($serverId);
             echo json_encode(['success' => true, 'synced' => $synced]);
         } catch (Exception $e) {
@@ -609,6 +623,40 @@ class ServerController
             }
 
             echo json_encode(['status' => $row['status']]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * GET /api/servers/health-batch
+     * Returns status and basic metrics for all active servers.
+     */
+    public function getHealthBatch()
+    {
+        requireAuth();
+        header('Content-Type: application/json');
+
+        $user = Auth::user();
+        unlockSession();
+
+        try {
+            $pdo = DB::conn();
+            $sql = Auth::isAdmin() 
+                ? "SELECT id, status FROM vpn_servers WHERE deleted_at IS NULL"
+                : "SELECT id, status FROM vpn_servers WHERE deleted_at IS NULL AND user_id = ?";
+            
+            $stmt = $pdo->prepare($sql);
+            Auth::isAdmin() ? $stmt->execute() : $stmt->execute([$user['id']]);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $results = [];
+            foreach ($rows as $row) {
+                $results[$row['id']] = $row['status'];
+            }
+
+            echo json_encode(['servers' => $results]);
         } catch (Exception $e) {
             http_response_code(500);
             echo json_encode(['error' => $e->getMessage()]);

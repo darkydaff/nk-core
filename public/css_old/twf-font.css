@@ -1,0 +1,17 @@
+@font-face {
+    font-family: 'Twemoji Country Flags';
+    src: url('/fonts/TwemojiCountryFlags.woff2') format('woff2');
+    font-display: swap;
+}
+
+.twf {
+    font-family: 'Twemoji Country Flags', 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', 'Android Emoji', 'EmojiSymbols';
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    vertical-align: baseline;
+    font-style: normal;
+    width: 1em;
+    height: 1em;
+}

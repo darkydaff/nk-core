@@ -1,4 +1,5 @@
 {% extends "layout.twig" %}
+{% import "macros/ui.twig" as ui %}
 
 {% block title %}
     {{ t('menu.dashboard') }} - {{ app_name }}
@@ -37,7 +38,7 @@
                     <div class="flex items-baseline gap-2">
                         <span class="text-2xl font-bold">{{ servers|length }}</span>
                     </div>
-                    <p class="text-[10px] font-bold text-muted uppercase tracking-widest mt-1">{{ t('dashboard.active_nodes', [], 'Nodes across regions') }}</p>
+                    <p class="text-xs font-bold text-muted uppercase tracking-widest mt-1">{{ t('dashboard.active_nodes', [], 'Nodes across regions') }}</p>
                 </div>
             </div>
 
@@ -48,13 +49,10 @@
                 </div>
                 <div>
                     <div class="flex items-center gap-3">
-                        <span class="text-3xl font-bold tracking-tighter">{{ summary.total_clients }}</span>
-                        <div class="flex items-center px-2 py-0.5 rounded-full bg-status-active/10 border border-status-active/20">
-                            <span class="w-1.5 h-1.5 rounded-full bg-status-active animate-pulse mr-1.5"></span>
-                            <span class="text-[10px] font-bold text-status-active uppercase tracking-wider">{{ summary.active_clients }} {{ t('status.online') }}</span>
-                        </div>
+                        <span class="text-3xl font-bold tracking-tighter" id="summary-total-clients">{{ summary.total_clients }}</span>
+                        {{ ui.status_badge('online', summary.active_clients ~ ' ' ~ t('status.online'), 'summary-active-clients') }}
                     </div>
-                    <p class="text-[10px] font-bold text-muted uppercase tracking-widest mt-1">{{ t('dashboard.provisioned_access', [], 'Access Keys') }}</p>
+                    <p class="text-xs font-bold text-muted uppercase tracking-widest mt-1">{{ t('dashboard.provisioned_access', [], 'Access Keys') }}</p>
                 </div>
             </div>
 
@@ -64,8 +62,8 @@
                     <i class="fas fa-arrow-down text-xl"></i>
                 </div>
                 <div>
-                    <span class="text-2xl font-bold">{{ (summary.total_download / 1024 / 1024 / 1024)|number_format(2) }} GB</span>
-                    <p class="text-[10px] font-bold text-muted uppercase tracking-widest mt-1">{{ t('dashboard.total_ingress', [], 'Total Inbound') }}</p>
+                    <span class="text-2xl font-bold" id="summary-total-download">{{ (summary.total_download / 1024 / 1024 / 1024)|number_format(2) }} GB</span>
+                    <p class="text-xs font-bold text-muted uppercase tracking-widest mt-1">{{ t('dashboard.total_ingress', [], 'Total Inbound') }}</p>
                 </div>
             </div>
 
@@ -75,8 +73,8 @@
                     <i class="fas fa-arrow-up text-xl"></i>
                 </div>
                 <div>
-                    <span class="text-2xl font-bold">{{ (summary.total_upload / 1024 / 1024 / 1024)|number_format(2) }} GB</span>
-                    <p class="text-[10px] font-bold text-muted uppercase tracking-widest mt-1">{{ t('dashboard.total_egress', [], 'Total Outbound') }}</p>
+                    <span class="text-2xl font-bold" id="summary-total-upload">{{ (summary.total_upload / 1024 / 1024 / 1024)|number_format(2) }} GB</span>
+                    <p class="text-xs font-bold text-muted uppercase tracking-widest mt-1">{{ t('dashboard.total_egress', [], 'Total Outbound') }}</p>
                 </div>
             </div>
         </div>
@@ -87,8 +85,8 @@
                 <div class="flex items-center justify-between mb-8">
                     <h2 class="text-xs font-bold text-primary uppercase tracking-widest opacity-70">{{ t('dashboard.traffic_analytics', [], 'Traffic Analytics') }}</h2>
                     <div class="flex items-center gap-4">
-                        <span class="flex items-center gap-1.5 text-[10px] font-bold text-muted uppercase tracking-wider"><span class="w-2 h-2 rounded-full bg-status-active"></span>{{ t('common.download', [], 'Download') }}</span>
-                        <span class="flex items-center gap-1.5 text-[10px] font-bold text-muted uppercase tracking-wider"><span class="w-2 h-2 rounded-full bg-primary"></span>{{ t('common.upload', [], 'Upload') }}</span>
+                        <span class="flex items-center gap-1.5 text-xs font-bold text-muted uppercase tracking-wider"><span class="w-2 h-2 rounded-full bg-status-active"></span>{{ t('common.download', [], 'Download') }}</span>
+                        <span class="flex items-center gap-1.5 text-xs font-bold text-muted uppercase tracking-wider"><span class="w-2 h-2 rounded-full bg-primary"></span>{{ t('common.upload', [], 'Upload') }}</span>
                     </div>
                 </div>
                 <div class="flex-grow min-h-[300px] relative">
@@ -103,22 +101,25 @@
                 </div>
                 <div class="p-4 pr-2 grid grid-cols-1 xl:grid-cols-2 gap-3 max-h-[380px] overflow-y-auto custom-scrollbar">
                     {% for server in servers %}
-                        <a href="/servers/{{ server.id }}" class="flex items-center p-3 rounded-xl border border-default hover:border-primary transition-all group" data-server-ip="{{ server.host }}">
-                            <div class="w-8 h-8 rounded-lg bg-base border border-default flex items-center justify-center mr-3 group-hover:bg-primary/5 overflow-hidden">
+                        <a href="/servers/{{ server.id }}" class="flex items-center p-3 rounded-xl border border-default hover:border-primary transition-all group" data-server-ip="{{ server.host }}" data-server-id="{{ server.id }}">
+                            <div class="w-8 h-8 rounded-lg bg-base border border-default flex items-center justify-center mr-3 group-hover:bg-primary/5 overflow-hidden flex-shrink-0 leading-none">
                                 {% if server.country_code %}
-                                    <span class="text-2xl leading-none">{{ getFlag(server.country_code)|raw }}</span>
+                                    <span class="text-2xl leading-none flex items-center justify-center">{{ getFlag(server.country_code)|raw }}</span>
                                 {% else %}
                                     <i class="fas fa-server text-[10px] text-muted group-hover:text-primary"></i>
                                 {% endif %}
                             </div>
-                            <div class="flex-grow">
-                                <div class="flex items-center justify-between mb-1">
-                                    <span class="text-xs font-bold text-primary">{{ server.name }}</span>
-                                    <span class="text-[9px] text-muted server-bw-val">- Mbps</span>
+                            <div class="flex-grow min-w-0">
+                                <div class="flex items-center justify-between mb-1.5 gap-2">
+                                    <div class="flex items-center gap-1.5 min-w-0">
+                                        <div class="server-status-dot w-2 h-2 rounded-full flex-shrink-0 {% if server.status == 'active' or server.status == 'online' %}bg-emerald-500 animate-pulse{% else %}bg-red-500{% endif %}"></div>
+                                        <span class="text-xs font-bold text-primary truncate" title="{{ server.name }}">{{ server.name }}</span>
+                                    </div>
+                                    <span class="text-[10px] font-mono text-muted server-bw-val flex-shrink-0">- Mbps</span>
                                 </div>
-                                <div class="grid grid-cols-2 gap-2">
+                                <div class="grid grid-cols-2 gap-2.5">
                                     <div class="flex flex-col gap-1">
-                                        <div class="flex justify-between text-[8px] font-bold uppercase opacity-50">
+                                        <div class="flex justify-between text-[10px] font-bold uppercase opacity-50 tracking-tight">
                                             <span>CPU</span>
                                             <span class="server-cpu-val">-</span>
                                         </div>
@@ -127,7 +128,7 @@
                                         </div>
                                     </div>
                                     <div class="flex flex-col gap-1">
-                                        <div class="flex justify-between text-[8px] font-bold uppercase opacity-50">
+                                        <div class="flex justify-between text-[10px] font-bold uppercase opacity-50 tracking-tight">
                                             <span>RAM</span>
                                             <span class="server-ram-val">-</span>
                                         </div>
@@ -196,418 +197,57 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="/js/modules/monitoring.js"></script>
+<script src="/js/modules/dashboard.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const searchInput = document.getElementById('fleetSearch');
-        const resultsContainer = document.getElementById('searchResults');
-        let searchTimeout;
-
-        const labels = {
-            edit: "{{ t('common.edit') }}",
-            online: "{{ t('status.online') }}",
-            offline: "{{ t('status.offline') }}",
-            revoked: "{{ t('status.revoked', [], 'Revoked') }}",
-            never: "{{ t('status.never', [], 'Never Connected') }}",
-            confirmDelete: "{{ t('common.confirm_delete') }}",
-            selected: "{{ t('common.selected_count', [], '%s selected') }}",
-            statusIp: "{{ t('common.status', [], 'Status') }}/ IP",
-            trafficSeen: "{{ t('common.traffic', [], 'Traffic') }}/ {{ t('clients.last_seen', [], 'Last seen') }}",
-            clientServer: "{{ t('clients.list', [], 'Client / Server') }}",
-            actions: "{{ t('servers.actions', [], 'Actions') }}",
-            traffic: "{{ t('common.traffic') }}",
-            lastSeenLabel: "{{ t('common.last_seen') }}",
-            searching: "{{ t('common.searching') }}",
-            noMatches: "{{ t('common.no_matches') }}",
-            download: "{{ t('common.download', [], 'Download') }}",
-            upload: "{{ t('common.upload', [], 'Upload') }}",
-            provisioning: "{{ t('status.provisioning', [], 'Provisioning') }}",
-            deleting: "{{ t('status.deleting', [], 'Deleting') }}",
-            error: "{{ t('status.error', [], 'Error') }}",
-            verifying: "{{ t('status.verifying', [], 'Verifying') }}"
-        };
-
-        // --- Chart Configuration ---
-        let trafficChart;
-        function initChart() {
-            const ctx = document.getElementById('trafficChart').getContext('2d');
-            const gradientDown = ctx.createLinearGradient(0, 0, 0, 300);
-            gradientDown.addColorStop(0, 'rgba(16, 185, 129, 0.2)');
-            gradientDown.addColorStop(1, 'rgba(16, 185, 129, 0)');
-
-            const gradientUp = ctx.createLinearGradient(0, 0, 0, 300);
-            gradientUp.addColorStop(0, 'rgba(43, 89, 255, 0.2)');
-            gradientUp.addColorStop(1, 'rgba(43, 89, 255, 0)');
-
-            function getThemeColors() {
-                const isDark = document.documentElement.classList.contains('dark');
-                return {
-                    grid: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
-                    text: isDark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.5)',
-                    tooltipBg: isDark ? '#111421' : '#ffffff',
-                    tooltipText: isDark ? '#f8fafc' : '#1c1917',
-                    tooltipBorder: isDark ? '#23293d' : '#e6e1d6'
-                };
+    document.addEventListener('DOMContentLoaded', () => {
+        NK_Dashboard.init({
+            labels: {
+                client: "{{ t('clients.list', [], 'Client') }}",
+                status: "{{ t('common.status', [], 'Status') }}",
+                traffic: "{{ t('common.traffic', [], 'Traffic') }}",
+                actions: "{{ t('common.actions') }}",
+                download: "{{ t('common.download') }}",
+                upload: "{{ t('common.upload') }}",
+                online: "{{ t('status.online') }}",
+                offline: "{{ t('status.offline') }}",
+                revoked: "{{ t('status.revoked') }}",
+                never: "{{ t('status.never') }}",
+                confirmDelete: "{{ t('common.confirm_delete') }}",
+                sync: "{{ t('common.sync') }}",
+                restore: "{{ t('common.restore') }}",
+                revoke: "{{ t('common.revoke') }}",
+                delete: "{{ t('common.delete') }}",
+                edit: "{{ t('common.edit') }}",
+                noMatches: "{{ t('common.no_matches') }}",
+                provisioning: "{{ t('status.provisioning') }}",
+                deleting: "{{ t('status.deleting') }}",
+                verifying: "{{ t('status.verifying') }}",
+                error: "{{ t('status.error') }}",
+                lastSeenLabel: "{{ t('clients.last_seen') }}",
+                selected: "{{ t('common.selected_count', [], '%s items selected') }}"
             }
+        });
 
-            const colors = getThemeColors();
-
-            trafficChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: [],
-                    datasets: [
-                        {
-                            label: labels.download,
-                            data: [],
-                            borderColor: '#10b981',
-                            backgroundColor: gradientDown,
-                            fill: true,
-                            tension: 0.4,
-                            borderWidth: 2,
-                            pointRadius: 0,
-                            pointHoverRadius: 4
-                        },
-                        {
-                            label: labels.upload,
-                            data: [],
-                            borderColor: '#2b59ff',
-                            backgroundColor: gradientUp,
-                            fill: true,
-                            tension: 0.4,
-                            borderWidth: 2,
-                            pointRadius: 0,
-                            pointHoverRadius: 4
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { 
-                        legend: { display: false },
-                        tooltip: {
-                            enabled: true,
-                            mode: 'index',
-                            intersect: false,
-                            backgroundColor: colors.tooltipBg,
-                            titleColor: colors.tooltipText,
-                            bodyColor: colors.tooltipText,
-                            borderColor: colors.tooltipBorder,
-                            borderWidth: 1,
-                            padding: 12,
-                            cornerRadius: 8,
-                            titleFont: { family: 'Inter', size: 12, weight: 'bold' },
-                            bodyFont: { family: 'Inter', size: 12 },
-                            callbacks: {
-                                label: function(context) {
-                                    return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' Mbps';
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: { color: colors.grid },
-                            ticks: { 
-                                color: colors.text,
-                                font: { size: 10, family: 'Inter', weight: '500' },
-                                callback: function(value) { return value + ' Mbps'; }
-                            }
-                        },
-                        x: { 
-                            grid: { display: false },
-                            ticks: {
-                                color: colors.text,
-                                font: { size: 9, family: 'Inter', weight: '500' }
-                            }
-                        }
-                    },
-                    interaction: { intersect: false, mode: 'index' },
-                    elements: {
-                        line: { tension: 0.4 },
-                        point: { radius: 0, hoverRadius: 5, hoverBackgroundColor: '#fff', hoverBorderWidth: 2 }
-                    }
-                }
-            });
-
-            window.addEventListener('themeChanged', () => {
-                const newColors = getThemeColors();
-                trafficChart.options.scales.y.grid.color = newColors.grid;
-                trafficChart.options.scales.y.ticks.color = newColors.text;
-                trafficChart.options.scales.x.ticks.color = newColors.text;
-                trafficChart.options.plugins.tooltip.backgroundColor = newColors.tooltipBg;
-                trafficChart.options.plugins.tooltip.titleColor = newColors.tooltipText;
-                trafficChart.options.plugins.tooltip.bodyColor = newColors.tooltipText;
-                trafficChart.options.plugins.tooltip.borderColor = newColors.tooltipBorder;
-                trafficChart.update();
-            });
-
-            // Pre-load history
-            fetch('/api/monitoring/traffic-history')
-                .then(r => r.json())
-                .then(data => {
-                    if (data.history && data.history.length > 0) {
-                        trafficChart.data.labels = data.history.map(h => h.label);
-                        trafficChart.data.datasets[0].data = data.history.map(h => h.speed_down_mb);
-                        trafficChart.data.datasets[1].data = data.history.map(h => h.speed_up_mb);
-                        trafficChart.update('none');
-                    }
-                });
-        }
-
-        // --- Search & Polling ---
-        function performSearch() {
-            const q = searchInput.value;
-            const status = document.getElementById('statusFilter').value;
-            const traffic = document.getElementById('trafficFilter').value;
-            const sort = document.getElementById('sortFilter').value;
-
-            fetch(`/api/search-clients?q=${encodeURIComponent(q)}&status=${status}&traffic=${traffic}&sort=${sort}`)
-                .then(r => r.json())
-                .then(data => {
-                    renderResults(data.results);
-                    if (data.summary && trafficChart) {
-                        updateChart(data.summary.traffic);
-                    }
-                });
-        }
-
-        let lastTraffic = null;
-        function updateChart(traffic) {
-            if (!lastTraffic) {
-                lastTraffic = traffic;
-                return;
-            }
-
-            const diffDown = Math.max(0, (traffic.received - lastTraffic.received) / 1024 / 1024);
-            const diffUp = Math.max(0, (traffic.sent - lastTraffic.sent) / 1024 / 1024);
-            lastTraffic = traffic;
-
-            // Keep only last 60 points (approx 30 mins)
-            if (trafficChart.data.labels.length >= 60) {
-                trafficChart.data.labels.shift();
-                trafficChart.data.datasets[0].data.shift();
-                trafficChart.data.datasets[1].data.shift();
-            }
-
-            trafficChart.data.labels.push(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-            trafficChart.data.datasets[0].data.push(diffDown);
-            trafficChart.data.datasets[1].data.push(diffUp);
-            
-            trafficChart.update('none');
-        }
-
-        function renderResults(results) {
-            if (!results || results.length === 0) {
-                resultsContainer.innerHTML = `
-                    <div class="flex flex-col items-center justify-center py-20 opacity-30">
-                        <i class="fas fa-search text-5xl mb-4"></i>
-                        <p class="font-bold uppercase tracking-widest text-xs">${labels.noMatches}</p>
-                    </div>
-                `;
-                return;
-            }
-
-            const isMobile = window.innerWidth < 768;
-            let html = '';
-
-            if (isMobile) {
-                html = `<div class="grid grid-cols-1 gap-4 p-4">`;
-                results.forEach(c => {
-                    const isOnline = c.connection_status === 'online';
-                    const isNever = c.connection_status === 'never';
-                    const isRevoked = c.db_status === 'disabled';
-                    html += `
-                        <div class="panel p-4 space-y-4 relative group">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-3">
-                                    <input type="checkbox" name="client_ids[]" value="${c.id}" class="client-checkbox rounded border-default bg-base text-primary cursor-pointer">
-                                    <div class="w-10 h-10 rounded-lg bg-surface-hover flex items-center justify-center text-2xl">${c.flag}</div>
-                                    <div>
-                                        <span class="text-sm font-bold ${isRevoked ? 'text-muted line-through' : ''} block">${c.name}</span>
-                                        <span class="text-[10px] text-muted flex items-center mt-0.5"><i class="fas fa-server mr-1.5 opacity-50"></i>${c.server_name}</span>
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-1.5">
-                                    <div class="flex items-center px-1.5 py-1 rounded ${isRevoked ? 'bg-amber-500/10' : (c.db_status === 'deleting' ? 'bg-red-500/10' : (c.db_status === 'provisioning' ? 'bg-sky-500/10' : (c.db_status === 'error' ? 'bg-red-500/10' : (isOnline ? 'bg-sky-500/10' : (isNever ? 'bg-slate-500/10' : 'bg-red-500/10')))))} border ${isRevoked ? 'border-amber-500/20' : (c.db_status === 'deleting' ? 'border-red-500/20' : (c.db_status === 'provisioning' ? 'border-sky-500/20' : (c.db_status === 'error' ? 'border-red-500/20' : (isOnline ? 'border-sky-500/20' : (isNever ? 'border-slate-500/20' : 'border-red-500/20')))))} h-5">
-                                        <span class="w-1 h-1 rounded-full ${isOnline ? 'bg-sky-500 animate-pulse' : (isRevoked ? 'bg-amber-500' : (c.db_status === 'deleting' ? 'bg-red-500' : (c.db_status === 'provisioning' ? 'bg-sky-500' : (c.db_status === 'error' ? 'bg-red-500' : (isNever ? 'bg-slate-400' : 'bg-red-500')))))} mr-1.5"></span>
-                                        <span class="text-[8px] uppercase tracking-wider ${isRevoked ? 'text-amber-500' : (c.db_status === 'deleting' ? 'text-red-500' : (c.db_status === 'provisioning' ? 'text-sky-500' : (c.db_status === 'error' ? 'text-red-500' : (isOnline ? 'text-sky-500' : (isNever ? 'text-slate-500' : 'text-red-500')))))} font-bold">
-                                            ${isRevoked ? labels.revoked : (c.db_status === 'deleting' ? labels.deleting : (c.db_status === 'provisioning' ? labels.provisioning : (c.db_status === 'error' ? labels.error : (isOnline ? labels.online : (isNever ? labels.never : labels.offline)))))}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="flex items-center justify-between text-[10px] bg-panel/50 rounded p-2">
-                                <div class="flex flex-col">
-                                    <span class="text-muted uppercase font-bold tracking-tighter">${labels.traffic}</span>
-                                    <span class="font-mono font-medium">${c.total_traffic}</span>
-                                    <div class="flex gap-2 mt-1">
-                                        <span class="text-[9px] dark:text-emerald-400 text-emerald-600 font-bold flex items-center bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20"><i class="fas fa-arrow-down mr-1 opacity-70"></i>${c.speed_down}</span>
-                                        <span class="text-[9px] text-primary font-bold flex items-center bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20"><i class="fas fa-arrow-up mr-1 opacity-70"></i>${c.speed_up}</span>
-                                    </div>
-                                </div>
-                                <div class="flex flex-col text-right">
-                                    <span class="text-muted uppercase font-bold tracking-tighter">${labels.lastSeenLabel}</span>
-                                    <span class="font-mono font-medium">${c.last_seen}</span>
-                                </div>
-                            </div>
-                            <div class="flex items-center justify-between pt-2 border-t border-default/50">
-                                <code class="text-[10px] text-secondary font-mono">${c.external_ip || 'No IP'}</code>
-                                <div class="flex items-center gap-1">
-                                    <button onclick="clientAction(${c.id}, 'sync-stats')" class="p-2 text-muted hover:text-primary"><i class="fas fa-sync-alt"></i></button>
-                                    <button onclick="clientAction(${c.id}, '${isRevoked ? 'restore' : 'revoke'}')" class="p-2 text-muted hover:text-amber-500"><i class="fas ${isRevoked ? 'fa-user-check' : 'fa-user-slash'}"></i></button>
-                                    <button onclick="clientAction(${c.id}, 'delete')" class="p-2 text-muted hover:text-red-500"><i class="fas fa-trash-alt"></i></button>
-                                    <a href="/clients/${c.id}" class="ml-2 bg-primary text-white py-1.5 px-3 text-[10px] uppercase font-bold tracking-widest rounded-lg transition-all hover:bg-primary-hover">${labels.edit}</a>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-                html += `</div>`;
-            } else {
-                html = `
-                    <div class="table-wrapper">
-                        <table class="min-w-full">
-                            <thead>
-                                <tr class="bg-panel/50 text-[10px] uppercase tracking-widest text-muted font-bold">
-                                    <th class="px-5 py-3 text-left w-10">
-                                        <input type="checkbox" id="selectAll" class="rounded border-default bg-base text-primary focus:ring-primary/20 cursor-pointer">
-                                    </th>
-                                    <th class="px-5 py-3 text-left">${labels.clientServer}</th>
-                                    <th class="px-5 py-3 text-left">${labels.statusIp}</th>
-                                    <th class="px-5 py-3 text-left">${labels.trafficSeen}</th>
-                                    <th class="px-5 py-3 text-right">${labels.actions}</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-700/50">
-                `;
-
-                results.forEach(c => {
-                    const isOnline = c.connection_status === 'online';
-                    const isNever = c.connection_status === 'never';
-                    const isRevoked = c.db_status === 'disabled';
-                    
-                    html += `
-                        <tr class="hover:bg-surface-hover/50 transition-colors group" id="client-row-${c.id}">
-                            <td class="px-5 py-4">
-                                <input type="checkbox" name="client_ids[]" value="${c.id}" class="client-checkbox rounded border-default bg-base text-primary cursor-pointer">
-                            </td>
-                            <td class="px-5 py-4">
-                                <div class="flex items-center">
-                                    <div class="w-10 h-10 rounded-lg bg-surface-hover flex items-center justify-center mr-3 text-2xl">
-                                        ${c.flag}
-                                    </div>
-                                    <div>
-                                        <span class="text-sm font-medium ${isRevoked ? 'line-through text-muted' : ''} block">${c.name}</span>
-                                        <span class="text-[10px] text-muted block opacity-60">${c.server_name}</span>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="px-5 py-4">
-                                <div class="flex flex-col">
-                                    <div class="flex items-center gap-1.5 mb-1">
-                                        <div class="flex items-center px-1.5 py-1 rounded ${isRevoked ? 'bg-amber-500/10 border border-amber-500/20' : (c.db_status === 'deleting' ? 'bg-red-500/10 border border-red-500/20' : (c.db_status === 'provisioning' ? 'bg-sky-500/10 border border-sky-500/20' : (c.db_status === 'error' ? 'bg-red-500/10 border border-red-500/20' : (isOnline ? 'bg-sky-500/10 border border-sky-500/20' : (isNever ? 'bg-slate-500/10 border border-slate-500/20' : 'bg-red-500/10 border border-red-500/20')))))} h-5">
-                                            <span class="w-1 h-1 rounded-full ${isOnline ? 'bg-sky-500 animate-pulse' : (isRevoked ? 'bg-amber-500' : (c.db_status === 'deleting' ? 'bg-red-500' : (c.db_status === 'provisioning' ? 'bg-sky-500' : (c.db_status === 'error' ? 'bg-red-500' : (isNever ? 'bg-slate-400' : 'bg-red-500')))))} mr-1.5"></span>
-                                            <span class="text-[9px] uppercase tracking-wider ${isRevoked ? 'text-amber-500' : (c.db_status === 'deleting' ? 'text-red-500' : (c.db_status === 'provisioning' ? 'text-sky-500' : (c.db_status === 'error' ? 'text-red-500' : (isOnline ? 'text-sky-500' : (isNever ? 'text-slate-500' : 'text-red-500')))))} font-bold leading-none">
-                                                ${isRevoked ? labels.revoked : (c.db_status === 'deleting' ? labels.deleting : (c.db_status === 'provisioning' ? labels.provisioning : (c.db_status === 'error' ? labels.error : (isOnline ? labels.online : (isNever ? labels.never : labels.offline)))))}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <code class="text-[10px] text-secondary font-mono">${c.external_ip || 'No IP'}</code>
-                                </div>
-                            </td>
-                            <td class="px-5 py-4 font-mono text-xs">
-                                <div class="flex flex-col">
-                                    <span class="font-medium">${c.total_traffic}</span>
-                                    <div class="flex gap-2">
-                                        <span class="text-[9px] dark:text-emerald-400 text-emerald-600 font-bold flex items-center bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20"><i class="fas fa-arrow-down mr-1 opacity-70"></i>${c.speed_down}</span>
-                                        <span class="text-[9px] text-primary font-bold flex items-center bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20"><i class="fas fa-arrow-up mr-1 opacity-70"></i>${c.speed_up}</span>
-                                    </div>
-                                    <span class="text-[10px] text-muted uppercase tracking-tighter mt-1">${c.last_seen}</span>
-                                </div>
-                            </td>
-                            <td class="px-5 py-4 text-right">
-                                <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onclick="clientAction(${c.id}, 'sync-stats')" class="p-1.5 text-muted hover:text-cyan-400 flex items-center gap-1" title="Sync">
-                                        <i class="fa-solid fa-rotate text-[10px]"></i>
-                                        <span class="text-[10px] font-bold uppercase">Refresh</span>
-                                    </button>
-                                    <button onclick="clientAction(${c.id}, '${isRevoked ? 'restore' : 'revoke'}')" class="p-1.5 text-muted hover:text-orange-400" title="${isRevoked ? 'Restore' : 'Revoke'}">
-                                        <i class="fas ${isRevoked ? 'fa-user-check' : 'fa-user-slash'} text-xs"></i>
-                                    </button>
-                                    <button onclick="clientAction(${c.id}, 'delete')" class="p-1.5 text-muted hover:text-red-500" title="Delete">
-                                        <i class="fas fa-trash-alt text-xs"></i>
-                                    </button>
-                                    <a href="/clients/${c.id}" class="ml-2 text-[10px] bg-panel hover:bg-primary text-secondary hover:text-white px-2 py-1 rounded border border-default uppercase font-bold tracking-wider transition-all">
-                                        Edit
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                    `;
-                });
-
-                html += `</tbody></table></div>`;
-            }
-            resultsContainer.innerHTML = html;
-
-            // Checkbox logic
-            const selectAll = document.getElementById('selectAll');
-            const checkboxes = document.querySelectorAll('.client-checkbox');
-            if (selectAll) selectAll.onchange = () => { checkboxes.forEach(cb => cb.checked = selectAll.checked); updateBatchBar(); };
-            checkboxes.forEach(cb => cb.onchange = updateBatchBar);
-        }
-
-        function updateBatchBar() {
-            const selected = document.querySelectorAll('.client-checkbox:checked');
-            const bar = document.getElementById('batchActionBar');
-            if (selected.length > 0) {
-                bar.classList.remove('hidden');
-                bar.classList.add('flex');
-                document.getElementById('selectedCountText').innerText = labels.selected.replace('%s', selected.length);
-            } else {
-                bar.classList.add('hidden');
-                bar.classList.remove('flex');
-            }
-        }
-
-        // --- Fleet Health Polling ---
-        function updateFleetHealth() {
-            const servers = document.querySelectorAll('[data-server-ip]');
-            servers.forEach(card => {
+        // Legacy Beszel polling for metrics (CPU/RAM)
+        // We'll keep this until we have a batch metrics API
+        function updateMetrics() {
+            document.querySelectorAll('[data-server-ip]').forEach(card => {
                 const ip = card.dataset.serverIp;
-                fetch(`/api/monitoring/beszel/${ip}`).then(r => r.json()).then(res => {
+                NK_Monitoring.fetchServerDetails(ip).then(res => {
                     if (res.success && res.data) {
                         const info = res.data.info || {};
                         card.querySelector('.server-cpu-val').innerText = Math.round(info.cpu || 0) + '%';
                         card.querySelector('.server-cpu-bar').style.width = (info.cpu || 0) + '%';
                         card.querySelector('.server-ram-val').innerText = Math.round(info.mp || 0) + '%';
                         card.querySelector('.server-ram-bar').style.width = (info.mp || 0) + '%';
-                        const mbps = ((info.bb || 0) * 8) / 1000000;
-                        card.querySelector('.server-bw-val').innerText = mbps.toFixed(1) + ' Mbps';
+                        card.querySelector('.server-bw-val').innerText = NK_Monitoring.formatBandwidth(info.bb || 0);
                     }
-                }).catch(e => {});
+                });
             });
         }
-
-        // Event listeners
-        searchInput.oninput = () => { clearTimeout(searchTimeout); searchTimeout = setTimeout(performSearch, 300); };
-        ['statusFilter', 'trafficFilter', 'sortFilter'].forEach(id => document.getElementById(id).onchange = () => performSearch());
-
-        // Initial actions
-        initChart();
-        performSearch();
-        updateFleetHealth();
-        setInterval(performSearch, 15000);
-        setInterval(updateFleetHealth, 15000);
+        updateMetrics();
+        setInterval(updateMetrics, 15000);
     });
-
-    window.clientAction = (id, action) => handleAjaxAction(`/clients/${id}/${action}`, {}, action === 'delete' ? labels.confirmDelete : null);
-    window.handleBatchAction = (action) => {
-        const ids = Array.from(document.querySelectorAll('.client-checkbox:checked')).map(cb => cb.value);
-        handleAjaxAction('/clients/batch', { ids, action }, action === 'delete' ? labels.confirmDelete : null);
-    };
 </script>
 {% endblock %}

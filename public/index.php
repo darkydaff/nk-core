@@ -12,6 +12,15 @@ date_default_timezone_set('Europe/Moscow');
 session_name(getenv('SESSION_NAME') ?: 'amnezia_panel_session');
 session_start();
 
+// Populate $_POST from JSON input if necessary
+if (strpos($_SERVER['CONTENT_TYPE'] ?? '', 'application/json') !== false) {
+    $json = file_get_contents('php://input');
+    $data = json_decode($json, true);
+    if (is_array($data)) {
+        $_POST = array_merge($_POST, $data);
+    }
+}
+
 // Load dependencies
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../inc/Config.php';
@@ -208,6 +217,7 @@ Router::post('/servers/{id}/delete', ['ServerController', 'delete']);
 Router::get('/servers/{id}/deploy', ['ServerController', 'showDeploy']);
 Router::post('/servers/{id}/deploy', ['ServerController', 'deploy']);
 Router::get('/servers/{id}/status', ['ServerController', 'getStatus']);
+Router::get('/api/servers/health-batch', ['ServerController', 'getHealthBatch']);
 Router::get('/servers/{id}/logs', ['ServerController', 'getLogs']);
 Router::get('/api/servers/{id}/deployment-logs', ['ApiController', 'getDeploymentLogs']);
 Router::get('/api/jobs/{id}/events', ['ApiController', 'getJobEvents']);

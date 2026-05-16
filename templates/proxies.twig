@@ -16,9 +16,9 @@
 		<div class="flex flex-col gap-6">
 			<div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
 				<div>
-					<h1 class="text-4xl font-bold tracking-tight">{{ t('proxies.title') }}</h1>
-					<p class="text-secondary mt-2 flex items-center gap-2">
-						<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+					<h1 class="text-3xl font-bold tracking-tight">{{ t('proxies.title') }}</h1>
+					<p class="text-secondary mt-1 text-sm flex items-center gap-2">
+						<span class="w-1.5 h-1.5 rounded-full bg-status-active animate-pulse"></span>
 						{{ t('proxies.description')|default('Manage high-performance HTTP/SOCKS5 proxies') }}
 					</p>
 				</div>
@@ -28,19 +28,19 @@
 				</button>
 			</div>
 
-			<div class="panel p-4 flex flex-wrap items-center justify-between gap-4 bg-panel/40 backdrop-blur-md border-white/5">
+			<div class="panel p-4 flex flex-wrap items-center justify-between gap-4">
 				<div class="flex flex-wrap items-center gap-3">
 					<div class="relative w-full md:w-80 group">
 						<i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-muted group-focus-within:text-primary transition-colors text-xs"></i>
 						<input type="text" id="proxySearch" onkeyup="filterProxies()" placeholder="{{ t('common.search')|default('Search by username, server or IP...') }}" 
 							   class="input-field input-with-icon !py-2.5 text-sm bg-panel/60 border-default focus:ring-4 focus:ring-primary/10 transition-all">
 					</div>
-					<select id="typeFilter" onchange="filterProxies()" class="input-field !w-auto !py-2.5 px-4 text-xs font-bold uppercase tracking-wider bg-panel/60 border-default">
+					<select id="typeFilter" onchange="filterProxies()" class="input-field !w-auto !py-2.5 px-4 text-[11px] font-bold uppercase tracking-wider">
 						<option value="all">All Types</option>
 						<option value="http">HTTP</option>
 						<option value="socks5">SOCKS5</option>
 					</select>
-					<select id="statusFilter" onchange="filterProxies()" class="input-field !w-auto !py-2.5 px-4 text-xs font-bold uppercase tracking-wider bg-panel/60 border-default">
+					<select id="statusFilter" onchange="filterProxies()" class="input-field !w-auto !py-2.5 px-4 text-[11px] font-bold uppercase tracking-wider">
 						<option value="all">All Status</option>
 						<option value="active">Active</option>
 						<option value="paused">Paused</option>
@@ -78,10 +78,7 @@
 									</span>
 								</div>
 								<div class="flex items-center gap-2 mt-1.5">
-									<span class="w-1.5 h-1.5 rounded-full flex-shrink-0 {% if proxy.status == 'active' %}bg-primary animate-pulse{% elseif proxy.status == 'paused' %}bg-orange-500{% else %}bg-red-500{% endif %}"></span>
-									<span class="text-[9px] uppercase font-bold tracking-widest {% if proxy.status == 'active' %}text-primary{% elseif proxy.status == 'paused' %}text-orange-500{% else %}text-red-500{% endif %}">
-										{{ t('proxies.' ~ proxy.status) }}
-									</span>
+									{{ ui.status_badge(proxy.status, t('proxies.' ~ proxy.status)) }}
 								</div>
 							</div>
 						</div>
@@ -110,7 +107,7 @@
 							<!-- Row 1: Credentials -->
 							<div class="grid grid-cols-2 gap-3">
 								<div class="relative group/field">
-									<label class="text-[8px] text-muted uppercase font-bold tracking-widest ml-1 mb-1 block opacity-50">{{ t('proxies.username') }}</label>
+									<label class="text-[10px] text-muted uppercase font-bold tracking-widest ml-1 mb-1 block opacity-50">{{ t('proxies.username') }}</label>
 									<div class="flex items-center bg-surface-base/50 rounded-xl border border-default p-0.5 group-hover/field:border-primary/20 transition-colors min-w-0">
 										<span class="px-3 py-1.5 text-xs font-mono truncate flex-grow leading-none min-w-0">{{ proxy.username }}</span>
 										<button onclick="copyToClipboard('{{ proxy.username }}', this)" class="p-1.5 text-muted hover:text-primary transition-colors flex-shrink-0">
@@ -119,7 +116,7 @@
 									</div>
 								</div>
 								<div class="relative group/field">
-									<label class="text-[8px] text-muted uppercase font-bold tracking-widest ml-1 mb-1 block opacity-50">{{ t('proxies.password') }}</label>
+									<label class="text-[10px] text-muted uppercase font-bold tracking-widest ml-1 mb-1 block opacity-50">{{ t('proxies.password') }}</label>
 									<div class="flex items-center bg-surface-base/50 rounded-xl border border-default p-0.5 group-hover/field:border-primary/20 transition-colors min-w-0">
 										<span class="px-3 py-1.5 text-xs font-mono truncate flex-grow leading-none min-w-0">{{ proxy.password }}</span>
 										<button onclick="copyToClipboard('{{ proxy.password }}', this)" class="p-1.5 text-muted hover:text-primary transition-colors flex-shrink-0">
@@ -132,7 +129,7 @@
 							<!-- Row 2: Connection Details -->
 							<div class="grid grid-cols-2 gap-3">
 								<div class="relative group/field">
-									<label class="text-[8px] text-muted uppercase font-bold tracking-widest ml-1 mb-1 block opacity-50">{{ t('proxies.host')|default('Server IP') }}</label>
+									<label class="text-[10px] text-muted uppercase font-bold tracking-widest ml-1 mb-1 block opacity-50">{{ t('proxies.host')|default('Server IP') }}</label>
 									<div class="flex items-center bg-surface-base/50 rounded-xl border border-default p-0.5 group-hover/field:border-primary/20 transition-colors min-w-0">
 										<span class="px-3 py-1.5 text-xs font-mono truncate flex-grow leading-none min-w-0">{{ proxy.server_host }}</span>
 										<button onclick="copyToClipboard('{{ proxy.server_host }}', this)" class="p-1.5 text-muted hover:text-primary transition-colors flex-shrink-0">
@@ -141,7 +138,7 @@
 									</div>
 								</div>
 								<div class="relative group/field">
-									<label class="text-[8px] text-muted uppercase font-bold tracking-widest ml-1 mb-1 block opacity-50">{{ t('proxies.port')|default('Port') }}</label>
+									<label class="text-[10px] text-muted uppercase font-bold tracking-widest ml-1 mb-1 block opacity-50">{{ t('proxies.port')|default('Port') }}</label>
 									<div class="flex items-center bg-surface-base/50 rounded-xl border border-default p-0.5 group-hover/field:border-primary/20 transition-colors min-w-0">
 										<span class="px-3 py-1.5 text-xs font-mono truncate flex-grow leading-none min-w-0">{{ proxy.port }}</span>
 										<button onclick="copyToClipboard('{{ proxy.port }}', this)" class="p-1.5 text-muted hover:text-primary transition-colors flex-shrink-0">
@@ -380,55 +377,6 @@
 			});
 		}
 
-		function copyToClipboard(text, btn) {
-			const doCopy = (txt) => {
-				if (navigator.clipboard && window.isSecureContext) {
-					return navigator.clipboard.writeText(txt);
-				} else {
-					const textArea = document.createElement("textarea");
-					textArea.value = txt;
-					textArea.style.position = "fixed";
-					textArea.style.left = "-9999px";
-					textArea.style.top = "0";
-					document.body.appendChild(textArea);
-					textArea.focus();
-					textArea.select();
-					try {
-						document.execCommand('copy');
-						textArea.remove();
-						return Promise.resolve();
-					} catch (err) {
-						textArea.remove();
-						return Promise.reject(err);
-					}
-				}
-			};
-
-			doCopy(text).then(() => {
-				if (btn) {
-					const icon = btn.querySelector('i');
-					if (icon) {
-						const originalClass = icon.className;
-						icon.className = 'fas fa-check text-white';
-						btn.classList.add('bg-green-500', 'text-white');
-						btn.classList.remove('bg-surface-hover', 'text-muted');
-						setTimeout(() => {
-							icon.className = originalClass;
-							btn.classList.remove('bg-green-500', 'text-white');
-							btn.classList.add('bg-surface-hover', 'text-muted');
-						}, 2000);
-					}
-				}
-				if (typeof showToast === 'function') {
-					showToast('{{ t("common.copied")|default("Copied!") }}', 'success');
-				}
-			}).catch(err => {
-				console.error('Failed to copy: ', err);
-				if (typeof showToast === 'function') {
-					showToast('Copy failed', 'error');
-				}
-			});
-		}
 
 		function generateUsername() {
 			const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';

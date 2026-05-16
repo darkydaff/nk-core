@@ -64,7 +64,7 @@
 									</div>
 								</div>
 							{% endif %}
-							<button onclick="syncStats({{ server.id }})" class="w-6 h-6 rounded-full bg-surface-hover flex items-center justify-center text-muted hover:text-primary transition-all border border-surface-border/50" title="{{ t('common.recheck')|default('Recheck Connectivity') }}">
+							<button onclick="window.serverView.syncStats({{ server.id }})" class="w-6 h-6 rounded-full bg-surface-hover flex items-center justify-center text-muted hover:text-primary transition-all border border-surface-border/50" title="{{ t('common.recheck')|default('Recheck Connectivity') }}">
 								<i class="fas fa-redo-alt text-[10px]"></i>
 							</button>
 						</div>
@@ -78,15 +78,15 @@
 				</div>
 			</div>
 			<div class="flex gap-2 items-center flex-wrap">
-				<button onclick="syncStats({{ server.id }})" id="syncBtn" class="btn-secondary px-4 py-2 text-sm flex items-center">
+				<button onclick="window.serverView.syncStats({{ server.id }})" id="syncBtn" class="btn-secondary px-4 py-2 text-sm flex items-center">
 					<i class="fas fa-sync-alt mr-2" id="syncIcon"></i>
 					{{ t('servers.sync_stats') }}
 				</button>
-				<button onclick="openLogsModal({{ server.id }})" id="viewLogsBtn" class="px-4 py-2 rounded-lg bg-slate-500/10 hover:bg-slate-500/20 text-slate-300 border border-slate-500/30 transition-colors text-sm flex items-center">
+				<button onclick="window.serverView.openLogsModal({{ server.id }})" id="viewLogsBtn" class="px-4 py-2 rounded-lg bg-slate-500/10 hover:bg-slate-500/20 text-slate-300 border border-slate-500/30 transition-colors text-sm flex items-center">
 					<i class="fas fa-terminal mr-2"></i>
 					{{ t('servers.view_logs')|default('View Logs') }}
 				</button>
-				<button onclick="handleDeleteServer({{ server.id }}, '{{ server.name|e('js') }}')" class="px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-colors text-sm">
+				<button onclick="window.serverView.handleDeleteServer({{ server.id }}, '{{ server.name|e('js') }}')" class="px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-colors text-sm">
 					<i class="fas fa-trash-alt mr-2"></i>
 					{{ t('servers.delete') }}
 				</button>
@@ -229,8 +229,99 @@
 			</div>
 		</div>
 
+		<!-- Deployment Progress UI (Visible only when deploying) -->
+		{% if server.status == 'deploying' %}
+			<div class="panel p-6 mb-6 border-l-4 border-sky-500 animate-pulse">
+				<div class="flex items-center justify-between mb-4">
+					<div class="flex items-center">
+						<div class="w-10 h-10 rounded-lg bg-sky-500/10 text-sky-500 flex items-center justify-center mr-4">
+							<i class="fas fa-rocket text-lg"></i>
+						</div>
+						<div>
+							<h3 class="text-sm font-bold uppercase tracking-widest text-sky-400">{{ t('servers.deployment_in_progress')|default('Deployment In Progress') }}</h3>
+							<p class="text-[10px] text-muted font-medium uppercase">{{ t('servers.deploying_to')|default('Provisioning node:') }} {{ server.host }}</p>
+						</div>
+					</div>
+					<div class="text-right">
+						<span class="text-xs font-mono text-sky-500 bg-sky-500/5 px-2 py-1 rounded border border-sky-500/20" id="deploy-percentage">65%</span>
+					</div>
+				</div>
+				
+				<div class="relative pt-1">
+					<div class="flex mb-2 items-center justify-between">
+						<div class="flex gap-4">
+							<div class="flex items-center gap-1.5 opacity-100">
+								<div class="w-2 h-2 rounded-full bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.5)]"></div>
+								<span class="text-[10px] font-bold uppercase text-sky-400">Initialize</span>
+							</div>
+							<div class="flex items-center gap-1.5 opacity-100">
+								<div class="w-2 h-2 rounded-full bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.5)]"></div>
+								<span class="text-[10px] font-bold uppercase text-sky-400">Environment</span>
+							</div>
+							<div class="flex items-center gap-1.5 opacity-50">
+								<div class="w-2 h-2 rounded-full bg-slate-500"></div>
+								<span class="text-[10px] font-bold uppercase text-muted">Orchestration</span>
+							</div>
+							<div class="flex items-center gap-1.5 opacity-30">
+								<div class="w-2 h-2 rounded-full bg-slate-700"></div>
+								<span class="text-[10px] font-bold uppercase text-muted">Finalize</span>
+							</div>
+						</div>
+					</div>
+					<div class="overflow-hidden h-1.5 mb-4 text-xs flex rounded bg-surface-hover border border-white/5">
+						<div style="width:65%" class="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-sky-500"></div>
+					</div>
+				</div>
+				<p class="text-[10px] text-muted font-mono leading-relaxed mt-2">
+					<i class="fas fa-chevron-right mr-2 text-sky-500/50"></i>{{ t('servers.deploy_step_hint')|default('Tailoring kernel parameters for high-performance VPN throughput...') }}
+				</p>
+			</div>
+		{% endif %}
+
 		<div
-			class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+			class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8"
+            id="server-view-container"
+            data-config="{{ {
+                serverId: server.id,
+                serverName: server.name,
+                serverHost: server.host,
+                serverStatus: server.status,
+                beszelUrl: beszel_config.url,
+                csrfToken: csrf_token,
+                currentJobId: server.current_job_id,
+                centrifugoUrl: centrifugo_url,
+                connectionToken: connection_token,
+                subscriptionToken: subscription_token,
+                labels: {
+                    clientServer: t('clients.list', [], 'Client'),
+                    statusIp: t('common.status', [], 'Status') ~ '/ IP',
+                    trafficSeen: t('common.traffic', [], 'Traffic') ~ '/ ' ~ t('clients.last_seen', [], 'Last seen'),
+                    actions: t('servers.actions', [], 'Actions'),
+                    online: t('status.online'),
+                    offline: t('status.offline'),
+                    never: t('status.never')|default('Never Connected'),
+                    searching: t('common.searching'),
+                    noMatches: t('common.no_matches'),
+                    sync: t('common.sync'),
+                    revoke: t('common.revoke'),
+                    restore: t('common.restore'),
+                    delete: t('common.delete'),
+                    confirmDelete: t('common.confirm_delete'),
+                    revoked: t('status.revoked', [], 'Revoked'),
+                    provisioning: t('status.provisioning', [], 'Provisioning'),
+                    deleting: t('status.deleting', [], 'Deleting'),
+                    error: t('status.error', [], 'Error'),
+                    verifying: t('status.verifying', [], 'Verifying'),
+                    edit: t('common.edit'),
+                    selected: t('common.selected_count', [], '%s items selected'),
+                    traffic: t('common.traffic'),
+                    lastSeenLabel: t('common.last_seen'),
+                    noLogs: t('servers.no_logs'),
+                    logEntries: t('servers.log_entries'),
+                    logsFailed: t('servers.logs_failed')
+                }
+            }|json_encode|e('html_attr') }}">
+
 			<!-- Quick Info & Add Client -->
 			<div class="lg:col-span-1 space-y-6">
 				<div class="panel p-5">
@@ -281,19 +372,19 @@
                                 <div class="flex flex-col md:flex-row items-center w-full gap-3 md:gap-2">
                                     <div class="flex items-center w-full md:w-auto border-b md:border-b-0 border-default/50 pb-2 md:pb-0">
                                         <span class="text-[11px] md:text-[10px] font-bold text-primary uppercase tracking-widest mr-auto md:mr-2" id="selectedCountText">0 SELECTED</span>
-                                        <button onclick="document.querySelectorAll('.client-checkbox').forEach(cb => cb.checked = false); updateBatchBar();" class="md:hidden text-[10px] text-muted hover:text-primary uppercase font-bold px-2 py-1">
+                                        <button onclick="document.querySelectorAll('.client-checkbox').forEach(cb => cb.checked = false); window.serverView.updateBatchBar();" class="md:hidden text-[10px] text-muted hover:text-primary uppercase font-bold px-2 py-1">
                                             <i class="fas fa-times mr-1"></i>{{ t('common.clear')|default('Clear') }}
                                         </button>
                                     </div>
                                     
                                     <div class="flex items-center justify-around w-full md:w-auto gap-2">
-                                        <button onclick="handleBatchAction('revoke')" class="flex-1 md:flex-none text-[11px] md:text-[10px] font-bold text-orange-400 hover:text-orange-300 uppercase tracking-tight px-3 py-2.5 md:px-2 md:py-1 transition-colors bg-orange-500/10 md:bg-transparent rounded-lg border border-orange-500/20 md:border-0 text-center">
+                                        <button onclick="window.serverView.handleBatchAction('revoke')" class="flex-1 md:flex-none text-[11px] md:text-[10px] font-bold text-orange-400 hover:text-orange-300 uppercase tracking-tight px-3 py-2.5 md:px-2 md:py-1 transition-colors bg-orange-500/10 md:bg-transparent rounded-lg border border-orange-500/20 md:border-0 text-center">
                                             <i class="fas fa-user-slash mr-1.5 md:hidden"></i>{{ t('common.revoke')|default('Revoke') }}
                                         </button>
-                                        <button onclick="handleBatchAction('restore')" class="flex-1 md:flex-none text-[11px] md:text-[10px] font-bold dark:text-green-400 text-green-600 hover:dark:text-green-300 hover:text-green-700 uppercase tracking-tight px-3 py-2.5 md:px-2 md:py-1 transition-colors bg-green-500/10 md:bg-transparent rounded-lg border border-green-500/20 md:border-0 text-center">
+                                        <button onclick="window.serverView.handleBatchAction('restore')" class="flex-1 md:flex-none text-[11px] md:text-[10px] font-bold dark:text-green-400 text-green-600 hover:dark:text-green-300 hover:text-green-700 uppercase tracking-tight px-3 py-2.5 md:px-2 md:py-1 transition-colors bg-green-500/10 md:bg-transparent rounded-lg border border-green-500/20 md:border-0 text-center">
                                             <i class="fas fa-user-check mr-1.5 md:hidden"></i>{{ t('common.restore')|default('Restore') }}
                                         </button>
-                                        <button onclick="handleBatchAction('delete')" class="flex-1 md:flex-none text-[11px] md:text-[10px] font-bold dark:text-red-400 text-red-600 hover:dark:text-red-300 hover:text-red-700 uppercase tracking-tight px-3 py-2.5 md:px-2 md:py-1 transition-colors bg-red-500/10 md:bg-transparent rounded-lg border border-red-500/20 md:border-0 text-center">
+                                        <button onclick="window.serverView.handleBatchAction('delete')" class="flex-1 md:flex-none text-[11px] md:text-[10px] font-bold dark:text-red-400 text-red-600 hover:dark:text-red-300 hover:text-red-700 uppercase tracking-tight px-3 py-2.5 md:px-2 md:py-1 transition-colors bg-red-500/10 md:bg-transparent rounded-lg border border-red-500/20 md:border-0 text-center">
                                             <i class="fas fa-trash-alt mr-1.5 md:hidden"></i>{{ t('common.delete')|default('Delete') }}
                                         </button>
                                     </div>
@@ -336,13 +427,13 @@
 	<!-- ===== Terminal Log Modal ===== -->
 	<div id="logsModal" class="fixed inset-0 z-[200] flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true" aria-labelledby="logsModalTitle">
 		<!-- Backdrop -->
-		<div class="absolute inset-0 bg-black/80" onclick="closeLogsModal()"></div>
+		<div class="absolute inset-0 bg-black/80" onclick="window.serverView.closeLogsModal()"></div>
 		<!-- Panel -->
 		<div class="relative w-full max-w-4xl flex flex-col rounded-xl overflow-hidden shadow-2xl border border-slate-700/60" style="max-height:85vh;">
 			<!-- Terminal chrome -->
 			<div class="flex items-center gap-2 px-4 py-3 bg-[#1e1e2e] border-b border-slate-700/50 flex-shrink-0">
 				<div class="flex gap-1.5">
-					<button onclick="closeLogsModal()" class="w-3 h-3 rounded-full bg-red-500 hover:bg-red-400 transition-colors" title="{{ t('common.close') }}"></button>
+					<button onclick="window.serverView.closeLogsModal()" class="w-3 h-3 rounded-full bg-red-500 hover:bg-red-400 transition-colors" title="{{ t('common.close') }}"></button>
 					<span class="w-3 h-3 rounded-full bg-yellow-500"></span>
 					<span class="w-3 h-3 rounded-full bg-green-500"></span>
 				</div>
@@ -352,7 +443,7 @@
 						<input type="checkbox" id="logsAutoScroll" checked class="rounded border-slate-600 bg-slate-800 text-cyan-500 focus:ring-cyan-500/20">
 						{{ t('common.auto_scroll') }}
 					</label>
-					<button onclick="refreshLogs()" class="text-[10px] text-slate-400 hover:text-cyan-400 transition-colors px-2 py-1 rounded border border-slate-700 hover:border-cyan-500/40" title="{{ t('common.refresh') }}">
+					<button onclick="window.serverView.refreshLogs()" class="text-[10px] text-slate-400 hover:text-cyan-400 transition-colors px-2 py-1 rounded border border-slate-700 hover:border-cyan-500/40" title="{{ t('common.refresh') }}">
 						<i class="fas fa-redo-alt mr-1"></i>{{ t('common.refresh') }}
 					</button>
 				</div>
@@ -364,614 +455,20 @@
 			<!-- Footer -->
 			<div class="flex items-center justify-between px-4 py-2 bg-[#1e1e2e] border-t border-slate-700/50 flex-shrink-0">
 				<span class="text-xs font-mono text-slate-500" id="logsCount">0 {{ t('servers.log_entries') }}</span>
-				<button onclick="closeLogsModal()" class="text-[10px] px-3 py-1.5 rounded border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition-all">{{ t('common.close') }}</button>
+				<button onclick="window.serverView.closeLogsModal()" class="text-[10px] px-3 py-1.5 rounded border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition-all">{{ t('common.close') }}</button>
 			</div>
 		</div>
 	</div>
+	<script src="https://cdn.jsdelivr.net/npm/centrifuge@3.1.0/dist/centrifuge.min.js"></script>
+	<script src="/js/servers/view.js?v=2"></script>
 
 	<script>
-		function handleDeleteServer(serverId, serverName) {
-            const input = prompt (`To delete this server, please type its name exactly: "${serverName}"`);
-            if (input === null) return; // Cancelled
-            
-            if (input === serverName) {
-                handleAjaxAction(`/servers/${serverId}/delete`, { confirm_name: input });
-            } else {
-                alert("Name doesn't match. Deletion aborted.");
-            }
-        }
-
-		function syncStats(serverId) {
-			handleAjaxAction(`/servers/${serverId}/sync-stats`);
-		}
-
-// Multi-language labels from PHP/Twig
-const labels = {
-    clientServer: "{{ t('clients.list', [], 'Client') }}",
-    statusIp: "{{ t('common.status', [], 'Status') }}/ IP",
-    trafficSeen: "{{ t('common.traffic', [], 'Traffic') }}/   {{ t('clients.last_seen', [], 'Last seen') }}",
-    actions: "{{ t('servers.actions', [], 'Actions') }}",
-    online: "{{ t('status.online') }}",
-    offline: "{{ t('status.offline') }}",
-    never: "{{ t('status.never')|default('Never Connected') }}",
-    searching: "{{ t('common.searching') }}",
-    noMatches: "{{ t('common.no_matches') }}",
-    sync: "{{ t('common.sync') }}",
-    revoke: "{{ t('common.revoke') }}",
-    restore: "{{ t('common.restore') }}",
-    delete: "{{ t('common.delete') }}",
-    confirmDelete: "{{ t('common.confirm_delete') }}",
-    revoked: "{{ t('status.revoked', [], 'Revoked') }}",
-    provisioning: "{{ t('status.provisioning', [], 'Provisioning') }}",
-    deleting: "{{ t('status.deleting', [], 'Deleting') }}",
-    error: "{{ t('status.error', [], 'Error') }}",
-    verifying: "{{ t('status.verifying', [], 'Verifying') }}",
-    edit: "{{ t('common.edit') }}",
-    selected: "{{ t('common.selected_count', [], '%s items selected') }}",
-    traffic: "{{ t('common.traffic') }}",
-    lastSeenLabel: "{{ t('common.last_seen') }}",
-    provisioning: "{{ t('status.provisioning')|default('Provisioning...') }}",
-    error: "{{ t('status.error') }}",
-    deleting: "{{ t('status.deleting')|default('Deleting...') }}",
-    noLogs: "{{ t('servers.no_logs') }}",
-    logEntries: "{{ t('servers.log_entries') }}",
-    logsFailed: "{{ t('servers.logs_failed') }}"
-};
-
-document.addEventListener('DOMContentLoaded', function () {
-const searchInput = document.getElementById('clientSearch');
-const resultsContainer = document.getElementById('searchResults');
-const statusFilter = document.getElementById('statusFilter');
-const trafficFilter = document.getElementById('trafficFilter');
-const sortFilter = document.getElementById('sortFilter');
-const batchActionBar = document.getElementById('batchActionBar');
-const selectedCountText = document.getElementById('selectedCountText');
-
-let searchTimeout = null;
-
-let transitionPoll = null;
-
-function performSearch(isAutoRefresh = false) {
-    const query = searchInput.value.trim();
-    const serverId = {{ server.id }};
-    const status = statusFilter.value;
-    const traffic = trafficFilter.value;
-    const sort = sortFilter.value;
-    
-    // Save selected checkboxes
-    const selectedIds = Array.from(document.querySelectorAll('.client-checkbox:checked')).map(cb => cb.value);
-    
-    clearTimeout(transitionPoll);
-    
-    const url = `/api/search-clients?q=${encodeURIComponent(query)}&server_id=${serverId}&status=${status}&traffic=${traffic}&sort=${sort}`;
-    
-    // Only show spinner if container is empty and it's NOT an auto-refresh
-    if (resultsContainer.innerHTML.trim() === '' && !isAutoRefresh) {
-        resultsContainer.innerHTML = `
-            <div class="flex items-center justify-center h-64">
-                <div class="text-center">
-                    <div class="animate-spin text-primary text-2xl mb-3">
-                        <i class="fas fa-circle-notch"></i>
-                    </div>
-                    <p class="text-sm text-muted">${labels.searching}</p>
-                </div>
-            </div>
-        `;
-    }
-
-    fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-        .then(response => response.json())
-        .then(data => {
-            if (data.error) throw new Error(data.error);
-            renderResults(data.results);
-            
-            // Restore selected checkboxes
-            document.querySelectorAll('.client-checkbox').forEach(cb => {
-                if (selectedIds.includes(cb.value)) cb.checked = true;
-            });
-            updateBatchBar();
-
-            // Update Summary Stats
-            if (data.summary) {
-                const s = data.summary;
-                document.getElementById('summary-total').innerText = s.total;
-                document.getElementById('summary-online').innerText = s.online;
-                document.getElementById('summary-inbound').innerText = (s.traffic.received / 1073741824).toFixed(2);
-                document.getElementById('summary-outbound').innerText = (s.traffic.sent / 1073741824).toFixed(2);
-            }
-
-            // Schedule next refresh (every 10s if tab is active)
-            const refreshDelay = 10000;
-            transitionPoll = setTimeout(() => {
-                // Only auto-refresh if user isn't searching or if it's the server view
-                if (document.visibilityState === 'visible') {
-                    performSearch(true);
-                } else {
-                    // If tab hidden, wait longer
-                    transitionPoll = setTimeout(() => performSearch(true), refreshDelay);
-                }
-            }, refreshDelay);
-        })
-        .catch(err => {
-            if (!isAutoRefresh) {
-                resultsContainer.innerHTML = `<div class="p-10 text-center text-red-500">Error: ${err.message}</div>`;
+		document.addEventListener('DOMContentLoaded', () => {
+            const container = document.getElementById('server-view-container');
+            if (container) {
+                const config = JSON.parse(container.getAttribute('data-config'));
+                window.serverView = new ServerView(config);
             }
         });
-}
-
-function renderResults(results) {
-    if (!results || results.length === 0) {
-        resultsContainer.innerHTML = `
-            <div class="flex flex-col items-center justify-center h-64 text-center p-10">
-                <i class="fas fa-search text-muted text-4xl mb-4"></i>
-                <p class="text-secondary">${labels.noMatches}</p>
-            </div>
-        `;
-        return;
-    }
-
-    const isMobile = window.innerWidth < 768;
-    let html = '';
-
-    if (isMobile) {
-        html = `<div class="grid grid-cols-1 gap-4 p-4">`;
-        results.forEach(client => {
-            const isDisabled = (client.db_status === 'disabled');
-            html += `
-                <div class="panel p-4 space-y-4 relative group" id="client-card-${client.id}">
-                    <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-3">
-                            <input type="checkbox" name="client_ids[]" value="${client.id}" class="client-checkbox rounded border-default bg-base text-primary focus:ring-primary/20 cursor-pointer">
-                            <div class="w-10 h-10 rounded-lg bg-surface-hover flex items-center justify-center text-2xl">${client.flag}</div>
-                            <div>
-                                <span class="text-sm font-bold ${isDisabled ? 'text-muted line-through' : ''} block">${client.name}</span>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-1.5">
-                            <div class="flex items-center px-1.5 py-1 rounded ${isDisabled ? 'bg-orange-500/10' : (client.db_status === 'deleting' ? 'bg-red-500/10' : (client.db_status === 'provisioning' ? 'bg-amber-500/10' : (client.db_status === 'error' ? 'bg-red-500/10' : (client.connection_status === 'online' ? 'bg-sky-500/10' : (client.connection_status === 'never' ? 'bg-slate-500/10' : 'bg-red-500/10')))))} border ${isDisabled ? 'border-orange-500/20' : (client.db_status === 'deleting' ? 'border-red-500/20' : (client.db_status === 'provisioning' ? 'border-amber-500/20' : (client.db_status === 'error' ? 'border-red-500/20' : (client.connection_status === 'online' ? 'border-sky-500/20' : (client.connection_status === 'never' ? 'border-slate-500/20' : 'border-red-500/20')))))}">
-                                <span class="w-1 h-1 rounded-full ${isDisabled ? 'bg-orange-500' : (client.db_status === 'deleting' ? 'bg-red-600 animate-pulse' : (client.db_status === 'provisioning' ? 'bg-amber-500 animate-pulse' : (client.db_status === 'error' ? 'bg-red-600' : (client.connection_status === 'online' ? 'bg-sky-500 animate-pulse' : (client.connection_status === 'never' ? 'bg-slate-400' : 'bg-red-500')))))} mr-1.5"></span>
-                                <span class="text-[8px] uppercase tracking-wider ${isDisabled ? 'text-orange-500' : (client.db_status === 'deleting' ? 'text-red-500' : (client.db_status === 'provisioning' ? 'text-amber-500' : (client.db_status === 'error' ? 'text-red-500' : (client.connection_status === 'online' ? 'text-sky-500' : (client.connection_status === 'never' ? 'text-slate-500' : 'text-red-500')))))} font-bold">
-                                    ${isDisabled ? labels.revoked : (client.db_status === 'deleting' ? labels.deleting : (client.db_status === 'provisioning' ? labels.provisioning : (client.db_status === 'error' ? labels.error : (client.connection_status === 'online' ? labels.online : (client.connection_status === 'never' ? labels.never : labels.offline)))))}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="flex items-center justify-between text-[10px] bg-panel/50 rounded p-2">
-                        <div class="flex flex-col">
-                            <span class="text-muted uppercase font-bold tracking-tighter">${labels.traffic}</span>
-                            <span class="font-mono font-medium">${client.total_traffic}</span>
-                            <div class="flex gap-2 mt-1">
-                                <span class="text-[9px] dark:text-emerald-400 text-emerald-600 font-bold flex items-center bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20"><i class="fas fa-arrow-down mr-1 opacity-70"></i>${client.speed_down}</span>
-                                <span class="text-[9px] text-primary font-bold flex items-center bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20"><i class="fas fa-arrow-up mr-1 opacity-70"></i>${client.speed_up}</span>
-                            </div>
-                        </div>
-                        <div class="flex flex-col text-right">
-                            <span class="text-muted uppercase font-bold tracking-tighter">${labels.lastSeenLabel}</span>
-                            <span class="font-mono font-medium">${client.last_seen}</span>
-                        </div>
-                    </div>
-                    <div class="flex items-center justify-between pt-2 border-t border-default/50">
-                        <code class="text-[10px] text-secondary font-mono">${client.external_ip || 'No IP'}</code>
-                        <div class="flex items-center gap-1">
-                            <button onclick="clientAction(${client.id}, 'sync-stats', this)" class="p-2 text-muted hover:text-cyan-400"><i class="fas fa-sync-alt"></i></button>
-                            <button onclick="clientAction(${client.id}, '${isDisabled ? 'restore' : 'revoke'}', this)" class="p-2 ${isDisabled ? 'text-green-500' : 'text-muted hover:text-orange-400'}"><i class="fas ${isDisabled ? 'fa-user-check' : 'fa-user-slash'}"></i></button>
-                            <button onclick="clientAction(${client.id}, 'delete', this)" class="p-2 text-muted hover:text-red-500"><i class="fas fa-trash-alt"></i></button>
-                            <a href="/clients/${client.id}" class="ml-2 text-[10px] bg-primary text-white px-3 py-1.5 rounded-lg uppercase font-bold tracking-wider hover:bg-primary-hover transition-all">${labels.edit}</a>
-                        </div>
-                    </div>
-                </div>
-            `;
-        });
-        html += `</div>`;
-    } else {
-        html = `
-            <div class="table-wrapper">
-                <table class="min-w-full">
-                    <thead>
-                        <tr class="bg-panel/50">
-                            <th class="px-5 py-3 text-left w-10">
-                                <input type="checkbox" id="selectAll" class="rounded border-default bg-base text-primary focus:ring-primary/20 cursor-pointer">
-                            </th>
-                            <th class="px-5 py-3 text-left text-[10px] uppercase tracking-widest text-muted font-bold">${labels.clientServer}</th>
-                            <th class="px-5 py-3 text-left text-[10px] uppercase tracking-widest text-muted font-bold">${labels.statusIp}</th>
-                            <th class="px-5 py-3 text-left text-[10px] uppercase tracking-widest text-muted font-bold">${labels.trafficSeen}</th>
-                            <th class="px-5 py-3 text-right text-[10px] uppercase tracking-widest text-muted font-bold">${labels.actions}</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-700/50">
-        `;
-
-        results.forEach(client => {
-            const isDisabled = (client.db_status === 'disabled');
-            html += `
-                <tr class="hover:bg-surface-hover/50 transition-colors group" id="client-row-${client.id}">
-                    <td class="px-5 py-4">
-                        <input type="checkbox" name="client_ids[]" value="${client.id}" class="client-checkbox rounded border-default bg-base text-primary focus:ring-primary/20 cursor-pointer">
-                    </td>
-                    <td class="px-5 py-4">
-                        <div class="flex items-center">
-                            <div class="w-10 h-10 rounded-lg bg-surface-hover flex items-center justify-center mr-3 text-2xl">
-                                ${client.flag}
-                            </div>
-                            <div>
-                                <span class="text-sm font-medium ${isDisabled ? 'text-muted line-through' : ''} block">${client.name}</span>
-                            </div>
-                        </div>
-                    </td>
-                    <td class="px-5 py-4">
-                        <div class="flex flex-col">
-                            <div class="flex items-center gap-1.5 mb-1">
-                                    <div class="flex items-center px-1.5 py-1 rounded ${isDisabled ? 'bg-amber-500/10 border border-amber-500/20' : (client.db_status === 'deleting' ? 'bg-red-500/10 border border-red-500/20' : (client.db_status === 'provisioning' ? 'bg-sky-500/10 border border-sky-500/20' : (client.db_status === 'verifying' ? 'bg-sky-500/10 border border-sky-500/20' : (client.db_status === 'error' ? 'bg-red-500/10 border border-red-500/20' : (client.connection_status === 'online' ? 'bg-sky-500/10 border border-sky-500/20' : (client.connection_status === 'never' ? 'bg-slate-500/10 border border-slate-500/20' : 'bg-red-500/10 border border-red-500/20'))))))} h-5">
-                                        <span class="w-1 h-1 rounded-full ${client.connection_status === 'online' ? 'bg-sky-500 animate-pulse' : (isDisabled ? 'bg-amber-500' : (client.db_status === 'deleting' ? 'bg-red-500' : (client.db_status === 'provisioning' ? 'bg-sky-500' : (client.db_status === 'verifying' ? 'bg-sky-500' : (client.db_status === 'error' ? 'bg-red-500' : (client.connection_status === 'never' ? 'bg-slate-400' : 'bg-red-500'))))))} mr-1.5"></span>
-                                        <span class="text-[9px] uppercase tracking-wider ${isDisabled ? 'text-amber-500' : (client.db_status === 'deleting' ? 'text-red-500' : (client.db_status === 'provisioning' ? 'text-sky-500' : (client.db_status === 'verifying' ? 'text-sky-500' : (client.db_status === 'error' ? 'text-red-500' : (client.connection_status === 'online' ? 'text-sky-500' : (client.connection_status === 'never' ? 'text-slate-500' : 'text-red-500'))))))} font-bold leading-none">
-                                            ${isDisabled ? labels.revoked : (client.db_status === 'deleting' ? labels.deleting : (client.db_status === 'provisioning' ? labels.provisioning : (client.db_status === 'verifying' ? labels.verifying : (client.db_status === 'error' ? labels.error : (client.connection_status === 'online' ? labels.online : (client.connection_status === 'never' ? labels.never : labels.offline))))))}
-                                        </span>
-                                    </div>    </div>
-                            </div>
-                            <code class="text-[10px] text-secondary font-mono">${client.external_ip || 'No IP'}</code>
-                        </div>
-                    </td>
-                    <td class="px-5 py-4 font-mono text-xs">
-                        <div class="flex flex-col">
-                            <span class="font-medium">${client.total_traffic}</span>
-                            <div class="flex gap-2">
-                                <span class="text-[9px] dark:text-emerald-400 text-emerald-600 font-bold flex items-center bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20"><i class="fas fa-arrow-down mr-1 opacity-70"></i>${client.speed_down}</span>
-                                <span class="text-[9px] text-primary font-bold flex items-center bg-primary/10 px-1.5 py-0.5 rounded border border-primary/20"><i class="fas fa-arrow-up mr-1 opacity-70"></i>${client.speed_up}</span>
-                            </div>
-                            <span class="text-[10px] text-muted uppercase tracking-tighter">${client.last_seen}</span>
-                        </div>
-                    </td>
-                    <td class="px-5 py-4 text-right">
-                        <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onclick="clientAction(${client.id}, 'sync-stats', this)" class="p-1.5 text-muted hover:text-cyan-400" title="${labels.sync}">
-                                <i class="fa-solid fa-rotate text-[10px]"></i>
-                                {{ t('common.refresh') }}
-                            </button>
-                            <button onclick="clientAction(${client.id}, '${isDisabled ? 'restore' : 'revoke'}', this)" class="p-1.5 ${isDisabled ? 'text-green-500 hover:text-green-400' : 'text-muted hover:text-orange-400'}" title="${isDisabled ? labels.restore : labels.revoke}">
-                                <i class="fas ${isDisabled ? 'fa-user-check' : 'fa-user-slash'} text-xs"></i>
-                            </button>
-                            <button onclick="clientAction(${client.id}, 'delete', this)" class="p-1.5 text-muted hover:text-red-500" title="${labels.delete}">
-                                <i class="fas fa-trash-alt text-xs"></i>
-                            </button>
-                            <a href="/clients/${client.id}" class="ml-2 text-[10px] bg-panel hover:bg-primary text-secondary hover:text-white px-2 py-1 rounded border border-default uppercase font-bold tracking-wider transition-all">
-                                ${labels.edit}
-                            </a>
-                        </div>
-                    </td>
-                </tr>
-            `;
-        });
-        html += `</tbody></table></div>`;
-    }
-    
-    resultsContainer.innerHTML = html;
-
-    // Re-attach event listeners for checkboxes
-    const selectAll = document.getElementById('selectAll');
-    const checkboxes = document.querySelectorAll('.client-checkbox');
-
-    if (selectAll) {
-        selectAll.addEventListener('change', function() {
-            checkboxes.forEach(cb => cb.checked = selectAll.checked);
-            updateBatchBar();
-        });
-    }
-
-    checkboxes.forEach(cb => {
-        cb.addEventListener('change', updateBatchBar);
-    });
-}
-
-function updateBatchBar() {
-    const selected = document.querySelectorAll('.client-checkbox:checked');
-    if (selected.length > 0) {
-        batchActionBar.classList.remove('hidden');
-        selectedCountText.innerText = labels.selected.replace('%s', selected.length);
-    } else {
-        batchActionBar.classList.add('hidden');
-    }
-}
-
-window.handleBatchAction = async function(action) {
-    const selected = Array.from(document.querySelectorAll('.client-checkbox:checked')).map(cb => cb.value);
-    if (selected.length === 0) return;
-
-    const confirmMsg = action === 'delete' ? labels.confirmDelete : null;
-    if (confirmMsg && !confirm(confirmMsg)) return;
-
-    handleAjaxAction('/clients/batch', { ids: selected, action: action }, null);
-};
-
-window.clientAction = async function (id, action, btn) {
-    const confirmMsg = action === 'delete' ? labels.confirmDelete : null;
-    handleAjaxAction(`/clients/${id}/${action}`, {}, confirmMsg);
-};
-
-// Event Listeners
-searchInput.addEventListener('input', function (e) {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => performSearch(), 300);
-});
-
-[statusFilter, trafficFilter, sortFilter].forEach(el => {
-    if (el) el.addEventListener('change', () => performSearch());
-});
-
-// Initial load
-performSearch();
-});
-
-function initBeszel(ip) {
-if (! ip) 
-return;
-
-
-fetch('/api/monitoring/beszel/' + ip).then(response => response.json()).then(res => {
-if (res.success && res.data) {
-const data = res.data;
-const info = data.info || {};
-
-document.getElementById('beszel-health-section').classList.remove('hidden');
-
-// Update Hub Link to specific system
-const hubLink = document.querySelector('a[title="Open Beszel Hub"]');
-if (hubLink && data.id) {
-const baseUrl = '{{ beszel_config.url }}'.replace(/\/$/, '');
-hubLink.href = `${baseUrl}/system/${
-data.id
-}`;
-}
-
-// CPU
-const cpu = info.cpu || 0;
-document.getElementById('beszel-cpu-val').innerText = cpu.toFixed(1) + '%';
-document.getElementById('beszel-cpu-bar').style.width = cpu + '%';
-document.getElementById('beszel-cpu-info').innerText = (info.t || '?') + ' {{ t('monitoring.threads') }}';
-
-// RAM
-const ram = info.mp || 0;
-document.getElementById('beszel-ram-val').innerText = ram.toFixed(1) + '%';
-document.getElementById('beszel-ram-bar').style.width = ram + '%';
-// Try to find memory capacity (in stats.m or data.m)
-const stats = data.stats || {};
-const totalMem = stats.m || data.m || info.m;
-if (totalMem) {
-document.getElementById('beszel-ram-info').innerText = totalMem.toFixed(1) + ' GB {{ t('monitoring.capacity') }}';
-}
-
-// Disk
-const disk = info.dp || 0;
-document.getElementById('beszel-disk-val').innerText = disk.toFixed(1) + '%';
-document.getElementById('beszel-disk-bar').style.width = disk + '%';
-// Try to find disk capacity (in stats.d or data.d)
-const totalDisk = stats.d || data.d || info.d;
-if (totalDisk) {
-document.getElementById('beszel-disk-info').innerText = totalDisk.toFixed(0) + ' GB {{ t('monitoring.total_space') }}';
-}
-
-// Bandwidth calculation (Mbps)
-// Use 'bb' (Bytes per second) from info if available
-let rx_mbps = 0,
-tx_mbps = 0,
-total_mbps = 0;
-
-if (info.bb) {
-total_mbps = (info.bb * 8) / 1000000;
-// For split RX/TX, we still need ns/nr or b
-if (stats.nr || stats.ns) {
-rx_mbps = (stats.nr || 0) * 8;
-tx_mbps = (stats.ns || 0) * 8;
-} else if (stats.b && Array.isArray(stats.b)) {
-tx_mbps = (stats.b[0] * 8) / (15 * 1000000);
-rx_mbps = (stats.b[1] * 8) / (15 * 1000000);
-}
-} else {
-if (stats.nr || stats.ns) {
-rx_mbps = (stats.nr || 0) * 8;
-tx_mbps = (stats.ns || 0) * 8;
-} else if (stats.b && Array.isArray(stats.b)) {
-tx_mbps = (stats.b[0] * 8) / (15 * 1000000);
-rx_mbps = (stats.b[1] * 8) / (15 * 1000000);
-}
-total_mbps = rx_mbps + tx_mbps;
-}
-
-const fmtBw = (val) => val >= 1000 ? (val / 1000).toFixed(2) + ' {{ t('common.gbps') }}' : val.toFixed(1) + ' {{ t('common.mbps') }}';
-
-document.getElementById('beszel-bw-rx').innerText = fmtBw(rx_mbps);
-document.getElementById('beszel-bw-tx').innerText = fmtBw(tx_mbps);
-document.getElementById('beszel-bw-total').innerText = fmtBw(total_mbps);
-
-// Load & Uptime
-if (info.la) {
-document.getElementById('beszel-load').innerText = info.la.map(l => l.toFixed(2)).join(' ');
-}
-
-if (info.u) {
-const days = Math.floor(info.u / 86400);
-const hours = Math.floor((info.u % 86400) / 3600);
-document.getElementById('beszel-uptime').innerText = `{{ t('monitoring.uptime') }}: ${days}d ${hours}h`;
-}
-}
-}).catch(err => console.error('Beszel error:', err));
-}
-
-document.addEventListener('DOMContentLoaded', function () {
-initBeszel('{{ server.host }}');
-// Refresh every 15 seconds to match Beszel agent
-setInterval(() => initBeszel('{{ server.host }}'), 15000);
-});
-
-// ===== Smart Polling (deploying state) =====
-(function () {
-	const currentStatus = '{{ server.status }}';
-	if (currentStatus !== 'deploying') return;
-
-	const serverId = {{ server.id }};
-	let pollTimer = null;
-
-	function pollStatus() {
-		fetch(`/servers/${serverId}/status`, {
-			headers: { 'X-Requested-With': 'XMLHttpRequest' }
-		})
-		.then(r => r.json())
-		.then(data => {
-			if (data.status && data.status !== 'deploying') {
-				// Server finished — clear saved scroll so reload starts at top
-				localStorage.removeItem('globalScrollPos');
-				clearInterval(pollTimer);
-				window.location.reload();
-			}
-		})
-		.catch(() => { /* ignore transient errors, keep polling */ });
-	}
-
-	// Start polling every 2.5 seconds
-	pollTimer = setInterval(pollStatus, 2500);
-})();
-
-// ===== Log Modal =====
-let _logsServerId = null;
-let _logsRefreshTimer = null;
-
-window.openLogsModal = function (serverId) {
-	_logsServerId = serverId;
-	// Clear any stale timer from a previous open (prevents double-interval accumulation)
-	if (_logsRefreshTimer !== null) {
-		clearTimeout(_logsRefreshTimer);
-		_logsRefreshTimer = null;
-	}
-	document.getElementById('logsModal').classList.remove('hidden');
-	document.body.style.overflow = 'hidden';
-	fetchLogs();
-};
-
-window.closeLogsModal = function () {
-	document.getElementById('logsModal').classList.add('hidden');
-	document.body.style.overflow = '';
-	if (_logsRefreshTimer !== null) {
-		clearTimeout(_logsRefreshTimer);
-		_logsRefreshTimer = null;
-	}
-};
-
-window.refreshLogs = function () {
-	// Cancel any pending auto-refresh before manual refresh
-	if (_logsRefreshTimer !== null) {
-		clearTimeout(_logsRefreshTimer);
-		_logsRefreshTimer = null;
-	}
-	fetchLogs();
-};
-
-function fetchLogs() {
-	if (!_logsServerId) return;
-	fetch(`/servers/${_logsServerId}/logs`, {
-		headers: { 'X-Requested-With': 'XMLHttpRequest' }
-	})
-	.then(r => r.json())
-	.then(data => {
-		renderLogs(data.logs || []);
-		// Schedule next refresh AFTER this one completes (eliminates overlapping fetches)
-		if (document.getElementById('logsModal') &&
-			!document.getElementById('logsModal').classList.contains('hidden')) {
-			_logsRefreshTimer = setTimeout(fetchLogs, 5000);
-		}
-	})
-	.catch(err => {
-		document.getElementById('logsBody').innerHTML =
-			`<p class="text-red-400">${labels.logsFailed}: ${err.message}</p>`;
-		// Retry after 8s on error
-		if (document.getElementById('logsModal') &&
-			!document.getElementById('logsModal').classList.contains('hidden')) {
-			_logsRefreshTimer = setTimeout(fetchLogs, 8000);
-		}
-	});
-}
-
-function renderLogs(logs) {
-	const body    = document.getElementById('logsBody');
-	const countEl = document.getElementById('logsCount');
-
-	if (!logs || logs.length === 0) {
-		body.innerHTML = `<p class="text-slate-500 italic">${labels.noLogs}</p>`;
-		countEl.textContent = `0 ${labels.logEntries}`;
-		return;
-	}
-
-	countEl.textContent = logs.length + ' ' + labels.logEntries;
-
-	const lines = logs.map(entry => {
-		const level   = (entry.level_name || 'INFO').toUpperCase();
-		const channel = entry.channel_source || entry.channel || '';
-		const msg     = entry.message || '';
-		const ctx     = entry.context || {};
-
-		// Timestamp — keep only HH:MM:SS portion
-		const rawDt  = entry.datetime || '';
-		const dtPart = rawDt.includes('T')
-			? rawDt.split('T')[1]?.split('+')[0]?.split('-')[0]?.substring(0,8)
-			: rawDt.substring(11,19);
-
-		// Color-code by level
-		let levelClass = 'text-slate-400';
-		if (['ERROR','CRITICAL','ALERT','EMERGENCY'].includes(level)) {
-			levelClass = 'text-red-400 font-bold';
-		} else if (level === 'WARNING') {
-			levelClass = 'text-yellow-400';
-		} else if (level === 'INFO') {
-			levelClass = (channel === 'ssh' || ctx.command) ? 'text-blue-400' : 'text-cyan-400';
-		} else if (level === 'DEBUG') {
-			levelClass = 'text-slate-500';
-		}
-
-		// Build context snippet (skip server_id — always the same)
-		const ctxFiltered = Object.fromEntries(
-			Object.entries(ctx).filter(([k]) => k !== 'server_id')
-		);
-		const ctxStr = Object.keys(ctxFiltered).length
-			? ' <span class="text-slate-600">' + escapeHtml(JSON.stringify(ctxFiltered)) + '</span>'
-			: '';
-
-		// Override color for SSH command results
-		let finalClass = levelClass;
-		if (ctx.exit_code === 0 || (ctx.output && ctx.exit_code === undefined)) {
-			finalClass = 'text-green-400';
-		} else if (ctx.exit_code !== undefined && ctx.exit_code !== 0) {
-			finalClass = 'text-red-400 font-bold';
-		}
-
-		const channelBadge = `<span class="text-[9px] px-1 py-0.5 rounded bg-slate-800 text-slate-500 mr-1.5 uppercase tracking-wider">${escapeHtml(channel)}</span>`;
-
-		return `<div class="py-0.5 flex flex-wrap gap-1 items-baseline border-b border-slate-800/40">`
-			+ `<span class="text-slate-600 flex-shrink-0 mr-1">${escapeHtml(dtPart || '??:??:??')}</span>`
-			+ channelBadge
-			+ `<span class="${finalClass} flex-shrink-0">[${level}]</span> `
-			+ `<span class="text-slate-200 break-all">${escapeHtml(msg)}</span>`
-			+ ctxStr
-			+ `</div>`;
-	});
-
-	body.innerHTML = lines.join('');
-
-	// Auto-scroll to bottom if checkbox is checked
-	if (document.getElementById('logsAutoScroll')?.checked) {
-		body.scrollTop = body.scrollHeight;
-	}
-}
-
-function escapeHtml(str) {
-	if (typeof str !== 'string') str = JSON.stringify(str);
-	return str
-		.replace(/&/g, '&amp;')
-		.replace(/</g, '&lt;')
-		.replace(/>/g, '&gt;')
-		.replace(/"/g, '&quot;');
-}
-
-// Close modal on Escape key
-document.addEventListener('keydown', e => {
-	if (e.key === 'Escape') closeLogsModal();
-});
 	</script>
 {% endblock %}

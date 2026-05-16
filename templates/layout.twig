@@ -25,345 +25,18 @@
     <link rel="icon" type="image/svg+xml" href="/img/logo.svg">
     <meta name="csrf-token" content="{{ csrf_token }}">
     
+    <link rel="stylesheet" href="/css/tokens.css">
     <link rel="stylesheet" href="/css/output.css">
+    <link rel="stylesheet" href="/css/app.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous" referrerpolicy="no-referrer">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="/js/core.js"></script>
     
     <link rel="stylesheet" href="/css/twf-font.css">
 
+    {% import "macros/ui.twig" as ui %}
     {% block styles %}{% endblock %}
     
-    <style>
-        :root {
-            /* ── Refined Warm Parchment (Light) ── */
-            --color-surface-base:   #f7f5f2;
-            --color-surface-panel:  #ffffff;
-            --color-surface-hover:  #f0ede8;
-            --color-surface-border: #e6e1d6;
-            --color-sidebar:        #fcfbf9;
-            --color-sidebar-text:   #1c1917;
-            --color-sidebar-border: #e6e1d6;
-            --color-sidebar-hover:  rgba(0, 0, 0, 0.04);
-            --color-sidebar-active-bg: rgba(43, 89, 255, 0.05);
-            --color-sidebar-active-text: var(--color-primary);
-
-            --color-content-primary:   #1c1917;
-            --color-content-secondary: #57534e;
-            --color-content-muted:     #a8a29e;
-
-            --color-primary:       #2b59ff;
-            --color-primary-hover: #1a42cc;
-            --color-primary-light: rgba(43, 89, 255, 0.1);
-
-            --color-status-active:  #10b981;
-            --color-status-warning: #f59e0b;
-            --color-status-error:   #ef4444;
-            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
-            --sidebar-width: 260px;
-        }
-
-        .dark {
-            /* ── Refined Deep Indigo Night (Dark) ── */
-            --color-surface-base:   #0a0c14;
-            --color-surface-panel:  #111421;
-            --color-surface-hover:  #1a1e2e;
-            --color-surface-border: #23293d;
-            --color-sidebar:        #0d0f1a;
-            --color-sidebar-text:   #e2e4f0;
-            --color-sidebar-border: #23293d;
-            --color-sidebar-hover:  rgba(255, 255, 255, 0.05);
-            --color-sidebar-active-bg: rgba(79, 135, 255, 0.08);
-            --color-sidebar-active-text: var(--color-primary);
-
-            --color-content-primary:   #f8fafc;
-            --color-content-secondary: #94a3b8;
-            --color-content-muted:     #475569;
-
-            --color-primary:       #4f87ff;
-            --color-primary-hover: #709fff;
-            --color-primary-light: rgba(79, 135, 255, 0.15);
-
-            --color-status-active:  #10b981;
-            --color-status-warning: #f59e0b;
-            --color-status-error:   #f87171;
-            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.5);
-            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--color-surface-base);
-            color: var(--color-content-primary);
-            min-height: 100vh;
-            display: flex;
-            overflow-x: hidden;
-        }
-
-        h1, h2, h3, h4, .font-brand {
-            font-family: 'Space Grotesk', sans-serif;
-        }
-
-        /* ── Sidebar ── */
-        .sidebar {
-            width: var(--sidebar-width);
-            background: var(--color-sidebar);
-            color: var(--color-sidebar-text);
-            height: 100vh;
-            position: fixed;
-            left: 0;
-            top: 0;
-            z-index: 100;
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            display: flex;
-            flex-direction: column;
-            border-right: 1px solid var(--color-surface-border);
-        }
-
-        .sidebar-item {
-            display: flex;
-            align-items: center;
-            padding: 0.75rem 1.25rem;
-            margin: 0.25rem 0.75rem;
-            border-radius: 0.75rem;
-            color: var(--color-sidebar-text);
-            opacity: 0.7;
-            transition: all 0.2s ease;
-            font-size: 0.875rem;
-            font-weight: 500;
-        }
-
-        .sidebar-item:hover {
-            opacity: 1;
-            background: var(--color-sidebar-hover);
-        }
-
-        .sidebar-item.active {
-            opacity: 1;
-            background: var(--color-sidebar-active-bg);
-            color: var(--color-sidebar-active-text);
-            border-left: 2px solid var(--color-primary);
-            border-radius: 0 0.75rem 0.75rem 0;
-            margin-left: 0;
-            padding-left: calc(1.25rem - 2px);
-        }
-
-        .sidebar-logo {
-            padding: 1.5rem 1.25rem;
-            display: flex;
-            align-items: center;
-            font-weight: 700;
-            letter-spacing: -0.025em;
-        }
-
-        /* ── Main Content ── */
-        .main-wrapper {
-            flex: 1;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            transition: all 0.3s ease;
-            width: 100%;
-        }
-
-        @media (min-width: 1025px) {
-            body.has-sidebar .main-wrapper {
-                margin-left: var(--sidebar-width);
-                width: calc(100% - var(--sidebar-width));
-            }
-        }
-
-        .top-bar {
-            height: 64px;
-            background: var(--color-surface-panel);
-            border-bottom: 1px solid var(--color-surface-border);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 1.5rem;
-            position: sticky;
-            top: 0;
-            z-index: 90;
-        }
-
-        /* ── UI Components (No Glass) ── */
-        .panel {
-            background: var(--color-surface-panel);
-            border: 1px solid var(--color-surface-border);
-            border-radius: 1rem;
-            box-shadow: var(--shadow-sm);
-        }
-
-        .btn-primary {
-            background: var(--color-primary);
-            color: white;
-            padding: 0.625rem 1.25rem;
-            border-radius: 0.75rem;
-            font-weight: 600;
-            transition: all 0.2s ease;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .btn-primary:hover {
-            background: var(--color-primary-hover);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px -2px rgba(99, 102, 241, 0.3);
-        }
-
-        .bg-primary { background-color: var(--color-primary); }
-        .bg-base, .bg-surface { background-color: var(--color-surface-base); }
-        .bg-panel, .bg-surface-panel { background-color: var(--color-surface-panel); }
-        .bg-status-active { background-color: var(--color-status-active); }
-        .text-primary { color: var(--color-primary); }
-        .text-status-active { color: var(--color-status-active); }
-
-        .btn-secondary {
-            background: var(--color-surface-base);
-            border: 1px solid var(--color-surface-border);
-            color: var(--color-content-primary);
-            padding: 0.625rem 1.25rem;
-            border-radius: 0.75rem;
-            font-weight: 500;
-            transition: all 0.2s ease;
-        }
-
-        .btn-secondary:hover {
-            background: var(--color-surface-hover);
-        }
-
-        .input-field {
-            background: var(--color-surface-base);
-            border: 1px solid var(--color-surface-border);
-            color: var(--color-content-primary);
-            border-radius: 0.75rem;
-            padding: 0.75rem 1rem;
-            transition: all 0.2s ease;
-            appearance: none;
-            line-height: 1.5;
-            width: 100%;
-            font-size: 0.875rem;
-        }
-
-        .input-with-icon {
-            padding-left: 3.25rem !important;
-        }
-
-        /* Ensure options are readable in dark mode */
-        .input-field option {
-            background: var(--color-surface-panel);
-            color: var(--color-content-primary);
-        }
-
-        .input-field:focus {
-            border-color: var(--color-primary);
-            background: var(--color-surface-panel);
-            outline: none;
-            box-shadow: 0 0 0 4px var(--color-primary-light);
-        }
-
-        /* ── Animations ── */
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .animate-in {
-            animation: slideIn 0.4s ease forwards;
-        }
-
-        /* ── Responsive ── */
-        @media (max-width: 1024px) {
-            .sidebar {
-                transform: translateX(-100%);
-            }
-            .sidebar.open {
-                transform: translateX(0);
-                box-shadow: 20px 0 50px rgba(0,0,0,0.2);
-            }
-            .main-wrapper {
-                margin-left: 0 !important;
-                width: 100% !important;
-                overflow-x: hidden;
-            }
-            .sidebar-overlay {
-                display: none;
-                position: fixed;
-                inset: 0;
-                background: rgba(0,0,0,0.6);
-                z-index: 95;
-            }
-            .sidebar-overlay.open {
-                display: block;
-            }
-            .top-bar {
-                padding: 0 1rem;
-                height: 56px;
-            }
-            .panel {
-                padding: 1rem !important;
-                border-radius: 0.75rem;
-            }
-            .grid {
-                gap: 1rem !important;
-            }
-        }
-
-        /* Toast Styling */
-        .toast-container {
-            position: fixed;
-            bottom: 1.5rem;
-            right: 1.5rem;
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-
-        .toast {
-            background: var(--color-surface-panel);
-            border-left: 4px solid var(--color-primary);
-            box-shadow: var(--shadow);
-            padding: 1rem 1.25rem;
-            border-radius: 0.75rem;
-            display: flex;
-            align-items: center;
-            min-width: 300px;
-            animation: toastIn 0.3s ease;
-        }
-
-        @keyframes toastIn {
-            from { opacity: 0; transform: translateX(20px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-        /* ── Custom Scrollbar ── */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background-color: var(--color-surface-border);
-            border: 2px solid transparent;
-            background-clip: padding-box;
-            border-radius: 10px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background-color: var(--color-content-muted);
-        }
-
-        /* Firefox Support */
-        * {
-            scrollbar-width: thin;
-            scrollbar-color: var(--color-surface-border) transparent;
-        }
-    </style>
 </head>
 <body class="antialiased text-[14px] {% if user %}has-sidebar{% endif %}">
     {% if user %}
@@ -475,115 +148,30 @@
         </footer>
     </div>
 
-    <div id="toastContainer" class="toast-container"></div>
+    <div id="toast-container" class="toast-container"></div>
 
     <script>
         function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('sidebarOverlay');
-            sidebar.classList.toggle('open');
-            overlay.classList.toggle('open');
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('sidebarOverlay').classList.toggle('open');
         }
 
         function toggleLanguageDropdown() {
-            const dropdown = document.getElementById('languageDropdown');
-            dropdown.classList.toggle('hidden');
+            document.getElementById('languageDropdown').classList.toggle('hidden');
         }
 
         function toggleTheme() {
             const isDark = document.documentElement.classList.toggle('dark');
             localStorage.setItem('theme', isDark ? 'dark' : 'light');
             const icon = document.getElementById('themeIcon');
-            if (icon) {
-                icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
-            }
+            if (icon) icon.className = isDark ? 'fas fa-sun' : 'fas fa-moon';
             window.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme: isDark ? 'dark' : 'light' } }));
         }
 
-        // Initialize Theme Icon
         document.addEventListener('DOMContentLoaded', () => {
             const icon = document.getElementById('themeIcon');
-            if (icon) {
-                icon.className = document.documentElement.classList.contains('dark') ? 'fas fa-sun' : 'fas fa-moon';
-            }
+            if (icon) icon.className = document.documentElement.classList.contains('dark') ? 'fas fa-sun' : 'fas fa-moon';
         });
-
-        function showToast(message, type = 'success') {
-            const container = document.getElementById('toastContainer');
-            const toast = document.createElement('div');
-            toast.className = `toast toast-${type}`;
-            
-            const colorClass = type === 'success' ? 'text-green-500' : (type === 'error' ? 'text-red-500' : 'text-amber-500');
-            const icon = type === 'success' ? 'fa-check-circle' : (type === 'error' ? 'fa-exclamation-circle' : 'fa-exclamation-triangle');
-            
-            toast.innerHTML = `
-                <i class="fas ${icon} mr-3 ${colorClass}"></i>
-                <span class="text-sm font-medium text-primary">${message}</span>
-            `;
-            
-            container.appendChild(toast);
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transform = 'translateX(20px)';
-                setTimeout(() => toast.remove(), 300);
-            }, 4000);
-        }
-
-        async function handleAjaxAction(url, data = {}, confirmMsg = null) {
-            if (confirmMsg && !confirm(confirmMsg)) return;
-            try {
-                const params = new URLSearchParams();
-                for (const key in data) params.append(key, data[key]);
-                params.append('csrf_token', '{{ csrf_token }}');
-
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
-                    body: params
-                });
-                const result = await response.json();
-                if (result.success) {
-                    showToast(result.message || 'Success', 'success');
-                    setTimeout(() => location.reload(), 1000);
-                } else {
-                    showToast(result.error || 'Failed', 'error');
-                }
-            } catch (e) {
-                showToast('Network error', 'error');
-            }
-        }
-
-        async function handleAjaxForm(event, url) {
-            event.preventDefault();
-            const form = event.target;
-            const btn = form.querySelector('button[type="submit"]');
-            const originalBtnHtml = btn.innerHTML;
-            
-            btn.disabled = true;
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>{{ t("common.processing", [], "Processing...") }}';
-            
-            try {
-                const formData = new FormData(form);
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                    body: new URLSearchParams(formData)
-                });
-                const result = await response.json();
-                if (result.success) {
-                    showToast(result.message || 'Success', 'success');
-                    setTimeout(() => location.reload(), 1000);
-                } else {
-                    showToast(result.error || 'Failed', 'error');
-                    btn.disabled = false;
-                    btn.innerHTML = originalBtnHtml;
-                }
-            } catch (e) {
-                showToast('Network error', 'error');
-                btn.disabled = false;
-                btn.innerHTML = originalBtnHtml;
-            }
-        }
 
         async function globalSyncAll(btn) {
             const icon = btn.querySelector('i');
@@ -597,13 +185,13 @@
                 });
                 const data = await response.json();
                 if (data.success) {
-                    showToast('Fleet synchronized', 'success');
+                    NK.toast('Fleet synchronized', 'success');
                     setTimeout(() => location.reload(), 1000);
                 } else {
-                    showToast(data.error || 'Sync failed', 'error');
+                    NK.toast(data.error || 'Sync failed', 'error');
                 }
             } catch (e) {
-                showToast('Sync failed', 'error');
+                NK.toast('Sync failed', 'error');
             } finally {
                 btn.disabled = false;
                 icon.classList.remove('fa-spin');

@@ -13,10 +13,11 @@ enum ServerStatus: string implements JsonSerializable {
     }
 
     public function canTransitionTo(ServerStatus $newStatus): bool {
+        if ($this === $newStatus) return true;
         return match($this) {
             self::DEPLOYING => in_array($newStatus, [self::ACTIVE, self::ERROR, self::DELETED]),
             self::DELETING => in_array($newStatus, [self::STOPPED, self::DELETED, self::ERROR]),
-            self::ACTIVE => in_array($newStatus, [self::STOPPED, self::ERROR, self::DELETED, self::DELETING]),
+            self::ACTIVE => in_array($newStatus, [self::DEPLOYING, self::STOPPED, self::ERROR, self::DELETED, self::DELETING]),
             self::STOPPED => in_array($newStatus, [self::ACTIVE, self::DELETED, self::DELETING]),
             self::ERROR => in_array($newStatus, [self::DEPLOYING, self::DELETED, self::DELETING]),
             self::DELETED => false,
@@ -34,6 +35,7 @@ enum ClientStatus: string {
     case DELETED = 'deleted';
 
     public function canTransitionTo(ClientStatus $newStatus): bool {
+        if ($this === $newStatus) return true;
         return match($this) {
             self::PROVISIONING => in_array($newStatus, [self::VERIFYING, self::ACTIVE, self::ERROR, self::DELETED, self::DELETING]),
             self::VERIFYING => in_array($newStatus, [self::ACTIVE, self::ERROR, self::DELETED, self::DELETING]),

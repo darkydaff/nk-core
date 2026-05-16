@@ -8,27 +8,34 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Space Grotesk', 'sans-serif'],
+        sans: ['Inter', 'sans-serif'],
+        header: ['Space Grotesk', 'sans-serif'],
         mono: ['Geist Mono', 'monospace'],
         brand: ['Geist Mono', 'monospace'],
       },
       colors: {
         surface: {
-          base: 'var(--color-surface-base)',
-          panel: 'var(--color-surface-panel)',
-          hover: 'var(--color-surface-hover)',
-          border: 'var(--color-surface-border)',
+          base: '#0c0e17',
+          panel: '#11131c',
+          hover: '#1a1c26',
+          border: '#232530',
         },
         content: {
-          primary: 'var(--color-content-primary)',
-          secondary: 'var(--color-content-secondary)',
-          muted: 'var(--color-content-muted)',
+          primary: '#f8fafc',
+          secondary: '#94a3b8',
+          muted: '#475569',
         },
         primary: {
-          DEFAULT: 'var(--color-primary)',
-          hover: 'var(--color-primary-hover)',
-          light: 'var(--color-primary-light)',
-        }
+          DEFAULT: '#0ea5e9',
+          hover: '#0284c7',
+          light: 'rgba(14, 165, 233, 0.15)',
+        },
+        success: '#10b981',
+        warning: '#f59e0b',
+        error: '#f43f5e',
+      },
+      boxShadow: {
+        'tactical': '0 1px 2px 0 rgba(0, 0, 0, 0.5)',
       }
     }
   },

@@ -21,37 +21,28 @@
     </div>
 
     {% if success %}
-    <div class="mb-6 bg-primary/10 border border-primary/30 dark:text-primary text-primary-hover px-4 py-3 rounded-lg flex items-center">
-        <i class="fas fa-check-circle mr-3"></i>
-        <p class="text-sm font-medium">{{ success }}</p>
-    </div>
+        {{ ui.alert('success', success) }}
     {% endif %}
 
     {% if error %}
-    <div class="mb-6 bg-red-500/10 border border-red-500/30 dark:text-red-400 text-red-600 px-4 py-3 rounded-lg flex items-center">
-        <i class="fas fa-exclamation-circle mr-3"></i>
-        <p class="text-sm font-medium">{{ error }}</p>
-    </div>
+        {{ ui.alert('error', error) }}
     {% endif %}
 
     {% if warning %}
-    <div class="mb-6 bg-amber-500/10 border border-amber-500/30 dark:text-amber-400 text-amber-600 px-4 py-3 rounded-lg flex items-center">
-        <i class="fas fa-exclamation-triangle mr-3"></i>
-        <p class="text-sm font-medium">{{ warning }}</p>
-    </div>
+        {{ ui.alert('warning', warning) }}
     {% endif %}
 
-    <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
-        <button onclick="showTab('profile')" id="tab-profile" class="tab-btn tab-btn-active px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap">
+    <div class="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-none">
+        <button onclick="NK_Settings.showTab('profile')" id="tab-profile" class="tab-btn tab-btn-active px-4 py-2 text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all whitespace-nowrap">
             <i class="fas fa-user mr-2"></i>{{ t('settings.profile') }}
         </button>
-        <button onclick="showTab('backups')" id="tab-backups" class="tab-btn px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap">
+        <button onclick="NK_Settings.showTab('backups')" id="tab-backups" class="tab-btn px-4 py-2 text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all whitespace-nowrap">
             <i class="fas fa-shield-alt mr-2"></i>{{ t('settings.backups') }}
         </button>
-        <button onclick="showTab('telegram')" id="tab-telegram" class="tab-btn px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap">
+        <button onclick="NK_Settings.showTab('telegram')" id="tab-telegram" class="tab-btn px-4 py-2 text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all whitespace-nowrap">
             <i class="fab fa-telegram-plane mr-2"></i>{{ t('settings.telegram') }}
         </button>
-        <button onclick="showTab('beszel')" id="tab-beszel" class="tab-btn px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap">
+        <button onclick="NK_Settings.showTab('beszel')" id="tab-beszel" class="tab-btn px-4 py-2 text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all whitespace-nowrap">
             <i class="fas fa-microchip mr-2"></i>{{ t('settings.beszel') }}
         </button>
     </div>
@@ -241,7 +232,7 @@
                     <form onsubmit="handleAjaxForm(event, '/settings/upload-restore', true)" enctype="multipart/form-data" class="flex flex-col md:flex-row gap-3">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <div class="relative group">
-                            <input type="file" name="backup_file" id="backup_file_input" accept=".tar.gz,.sql.gz" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="updateFileName(this)">
+                            <input type="file" name="backup_file" id="backup_file_input" accept=".tar.gz,.sql.gz" required class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="NK_Settings.updateFileName(this)">
                             <div class="px-4 py-2.5 rounded-lg bg-panel border border-default text-secondary group-hover:border-primary transition-all flex items-center min-w-[200px]">
                                 <i class="fas fa-file-upload mr-2 text-xs"></i>
                                 <span class="text-xs" id="file-name-label">{{ t('common.select_file') }}</span>
@@ -278,10 +269,10 @@
                                             </div>
                                         </td>
                                         <td class="py-3 text-right flex items-center justify-end gap-2">
-                                            <button onclick="confirmRestore('{{ backup.key }}', 'local')" class="text-[10px] dark:text-primary text-primary-hover bg-primary/10 px-2 py-1 rounded transition-all font-bold">
+                                            <button onclick="NK_Settings.confirmRestore('{{ backup.key }}', 'local')" class="text-[10px] dark:text-primary text-primary-hover bg-primary/10 px-2 py-1 rounded transition-all font-bold">
                                                 <i class="fas fa-undo-alt mr-1"></i>{{ t('common.restore') }}
                                             </button>
-                                            <button onclick="deleteBackup('{{ backup.key }}', 'local')" class="text-[10px] dark:text-red-400 text-red-600 bg-red-500/10 px-2 py-1 rounded transition-all">
+                                            <button onclick="NK_Settings.deleteBackup('{{ backup.key }}', 'local', '{{ t('settings.confirm_delete_backup') }}')" class="text-[10px] dark:text-red-400 text-red-600 bg-red-500/10 px-2 py-1 rounded transition-all">
                                                 <i class="fas fa-trash-alt"></i>
                                             </button>
                                         </td>
@@ -317,10 +308,10 @@
                                             </div>
                                         </td>
                                         <td class="py-3 text-right flex items-center justify-end gap-2">
-                                            <button onclick="confirmRestore('{{ backup.key }}', 'cloud')" class="text-[10px] dark:text-amber-400 text-amber-600 bg-amber-500/10 px-2 py-1 rounded transition-all font-bold">
+                                            <button onclick="NK_Settings.confirmRestore('{{ backup.key }}', 'cloud')" class="text-[10px] dark:text-amber-400 text-amber-600 bg-amber-500/10 px-2 py-1 rounded transition-all font-bold">
                                                 <i class="fas fa-undo-alt mr-1"></i>{{ t('common.restore') }}
                                             </button>
-                                            <button onclick="deleteBackup('{{ backup.key }}', 'cloud')" class="text-[10px] dark:text-red-400 text-red-600 bg-red-500/10 px-2 py-1 rounded transition-all">
+                                            <button onclick="NK_Settings.deleteBackup('{{ backup.key }}', 'cloud', '{{ t('settings.confirm_delete_backup') }}')" class="text-[10px] dark:text-red-400 text-red-600 bg-red-500/10 px-2 py-1 rounded transition-all">
                                                 <i class="fas fa-trash-alt"></i>
                                             </button>
                                         </td>
@@ -484,8 +475,8 @@
                 <input type="password" name="confirm_password" required placeholder="{{ t('settings.enter_admin_password') }}" 
                     class="input-field w-full px-4 py-3 text-primary placeholder-slate-600 focus:border-amber-500 transition-all">
             </div>
-<div class="flex gap-3">
-                <button type="button" onclick="closeRestoreModal()" class="flex-1 px-4 py-3 rounded-lg bg-panel text-primary hover:bg-surface-hover transition-colors text-sm font-medium">
+             <div class="flex gap-3">
+                <button type="button" onclick="NK_Settings.closeRestoreModal()" class="flex-1 px-4 py-3 rounded-lg bg-panel text-primary hover:bg-surface-hover transition-colors text-sm font-medium">
                     {{ t('common.cancel') }}
                 </button>
                 <button type="submit" class="flex-1 px-4 py-3 rounded-lg bg-amber-600 text-primary hover:bg-amber-500 transition-all text-sm font-bold shadow-lg shadow-amber-900/20">
@@ -495,56 +486,13 @@
         </form>
     </div>
 </div>
+{% endblock %}
 
-<style>
-    .tab-btn { background: var(--color-surface-hover); color: var(--color-content-secondary); }
-    .tab-btn:hover { background: var(--color-surface-border); color: var(--color-content-primary); }
-    .tab-btn-active { background: var(--color-primary); color: white; }
-    .tab-btn-active:hover { background: var(--color-primary-hover); }
-</style>
+{% block scripts %}
+<script src="/js/modules/settings.js"></script>
 <script>
-    function confirmRestore(key, type) {
-        document.getElementById('restoreKeyInput').value = key;
-        document.getElementById('restoreTypeInput').value = type;
-        document.getElementById('restoreModal').classList.remove('hidden');
-    }
-
-    function closeRestoreModal() {
-        document.getElementById('restoreModal').classList.add('hidden');
-    }
-
-    function showTab(tab) {
-        document.querySelectorAll('[id^="content-"]').forEach(el => el.classList.add('hidden'));
-        document.getElementById('content-' + tab).classList.remove('hidden');
-        
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('tab-btn-active'));
-        document.getElementById('tab-' + tab).classList.add('tab-btn-active');
-        
-        window.location.hash = tab;
-    }
-
-    function updateFileName(input) {
-        const label = document.getElementById('file-name-label');
-        if (input.files && input.files[0]) {
-            label.textContent = input.files[0].name;
-            label.classList.add('text-primary');
-            label.classList.remove('text-secondary');
-        } else {
-            label.textContent = "{{ t('common.select_file') }}";
-            label.classList.remove('text-primary');
-            label.classList.add('text-secondary');
-        }
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        const hash = window.location.hash.substring(1);
-        if (hash && document.getElementById('tab-' + hash)) {
-            showTab(hash);
-        }
+    document.addEventListener('DOMContentLoaded', () => {
+        NK_Settings.init();
     });
-
-    async function deleteBackup(key, type) {
-        handleAjaxAction('/settings/delete-backup', { key: key, type: type }, "{{ t('settings.confirm_delete_backup') }}");
-    }
 </script>
 {% endblock %}

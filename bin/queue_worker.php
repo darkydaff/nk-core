@@ -77,7 +77,11 @@ while (true) {
                     
                     $result = $vpnServer->deploy(false);
                     
-                    if ($orchestration) $orchestration->success($result);
+                    if (!$result->success) {
+                        throw new Exception("Deployment failed: " . $result->errorMessage);
+                    }
+
+                    if ($orchestration) $orchestration->success($result->toArray());
                     Logger::channel('deployments')->info('Server deployment successful', ['server_id' => $serverId]);
                 } catch (\Throwable $e) {
                     if ($orchestration) $orchestration->fail($e->getMessage());
@@ -230,6 +234,7 @@ while (true) {
                     Logger::info('Syncing server', ['server_id' => $serverId]);
                     $vs = new VpnServer($serverId);
                     $vs->updatePingAndStatus();
+                    $vs->updateGeoIp();
                     VpnClient::syncAllStatsForServer($serverId);
 
                     // Only sync proxies if this server actually has any — avoids redundant SSH connections
