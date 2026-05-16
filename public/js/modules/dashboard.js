@@ -92,8 +92,8 @@ const Dashboard = {
             .then(data => {
                 if (data.history) {
                     this.chart.data.labels = data.history.map(h => h.label);
-                    this.chart.data.datasets[0].data = data.history.map(h => h.speed_down_mb);
-                    this.chart.data.datasets[1].data = data.history.map(h => h.speed_up_mb);
+                    this.chart.data.datasets[0].data = data.history.map(h => h.speed_down_mb < 0.01 ? 0 : h.speed_down_mb);
+                    this.chart.data.datasets[1].data = data.history.map(h => h.speed_up_mb < 0.01 ? 0 : h.speed_up_mb);
                     this.chart.update('none');
                 }
             });
@@ -180,8 +180,11 @@ const Dashboard = {
         const diffUp = Math.max(0, (traffic.sent - this.lastTraffic.sent));
         this.lastTraffic = traffic;
 
-        const mbpsDown = (diffDown * 8) / 15 / 1024 / 1024;
-        const mbpsUp = (diffUp * 8) / 15 / 1024 / 1024;
+        let mbpsDown = (diffDown * 8) / 15 / 1024 / 1024;
+        let mbpsUp = (diffUp * 8) / 15 / 1024 / 1024;
+
+        if (mbpsDown < 0.01) mbpsDown = 0;
+        if (mbpsUp < 0.01) mbpsUp = 0;
 
         if (this.chart.data.labels.length >= 60) {
             this.chart.data.labels.shift();
