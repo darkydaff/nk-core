@@ -545,21 +545,12 @@ class ServerView {
 
                     // Bandwidth
                     let rx_mbps = 0, tx_mbps = 0, total_mbps = 0;
-                    if (info.bb) {
-                        total_mbps = (info.bb * 8) / 1000000;
-                        if (stats.nr || stats.ns) {
-                            rx_mbps = (stats.nr || 0) * 8; tx_mbps = (stats.ns || 0) * 8;
-                        } else if (stats.b && Array.isArray(stats.b)) {
-                            tx_mbps = (stats.b[0] * 8) / (15 * 1000000); rx_mbps = (stats.b[1] * 8) / (15 * 1000000);
-                        }
-                    } else {
-                        if (stats.nr || stats.ns) {
-                            rx_mbps = (stats.nr || 0) * 8; tx_mbps = (stats.ns || 0) * 8;
-                        } else if (stats.b && Array.isArray(stats.b)) {
-                            tx_mbps = (stats.b[0] * 8) / (15 * 1000000); rx_mbps = (stats.b[1] * 8) / (15 * 1000000);
-                        }
-                        total_mbps = rx_mbps + tx_mbps;
+                    if (stats.nr || stats.ns) {
+                        rx_mbps = (stats.nr || 0) * 8; tx_mbps = (stats.ns || 0) * 8;
+                    } else if (stats.b && Array.isArray(stats.b)) {
+                        tx_mbps = (stats.b[0] * 8) / (15 * 1000000); rx_mbps = (stats.b[1] * 8) / (15 * 1000000);
                     }
+                    total_mbps = rx_mbps + tx_mbps;
 
                     const fmtBw = (val) => val >= 1000 ? (val / 1000).toFixed(2) + ' Gbps' : val.toFixed(1) + ' Mbps';
                     const bwRx = document.getElementById('beszel-bw-rx');
