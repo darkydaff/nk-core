@@ -292,9 +292,37 @@ class VpnProvisioner
 
         // Auto-detect the panel host address using a secure waterfall mechanism
         $panelHost = '';
-        if (isset($_SERVER['HTTP_HOST'])) {
+        
+        // 1. Highest Priority: Explicit override in .env
+        $panelUrl = getenv('PANEL_URL');
+        if (empty($panelUrl) && class_exists('Config') && method_exists('Config', 'class')) {
+            // Check if config helper loaded
+        }
+        // Try fallback getenv/$_ENV
+        if (empty($panelUrl) && isset($_ENV['PANEL_URL'])) {
+            $panelUrl = $_ENV['PANEL_URL'];
+        }
+        if (!empty($panelUrl)) {
+            $panelHost = $panelUrl;
+        }
+
+        // 2. Fallback: Parse port from Centrifugo WS URL in .env if hostname matches
+        if (empty($panelHost) && isset($_SERVER['HTTP_HOST'])) {
             $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https://' : 'http://';
-            $panelHost = $scheme . $_SERVER['HTTP_HOST'];
+            $httpHost = $_SERVER['HTTP_HOST'];
+            
+            // Check if HTTP_HOST already has a port
+            if (strpos($httpHost, ':') === false) {
+                $wsUrl = getenv('CENTRIFUGO_WS_URL') ?: ($_ENV['CENTRIFUGO_WS_URL'] ?? '');
+                if (!empty($wsUrl)) {
+                    $parsed = parse_url($wsUrl);
+                    $wsPort = $parsed['port'] ?? '';
+                    if (!empty($wsPort)) {
+                        $httpHost .= ':' . $wsPort;
+                    }
+                }
+            }
+            $panelHost = $scheme . $httpHost;
         }
         
         if (empty($panelHost)) {
