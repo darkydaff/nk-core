@@ -360,7 +360,9 @@ while True:
             method="POST"
         )
         
-        with urllib.request.urlopen(req, timeout=10) as f:
+        import ssl
+        context = ssl._create_unverified_context()
+        with urllib.request.urlopen(req, timeout=10, context=context) as f:
             resp = f.read().decode().strip()
             if resp.isdigit():
                 interval = int(resp)
