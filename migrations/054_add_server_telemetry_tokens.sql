@@ -14,7 +14,7 @@ WHERE telemetry_token IS NULL;
 -- 3. Create client_hourly_metrics for 30-day retention tiering
 CREATE TABLE client_hourly_metrics (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    client_id INT NOT NULL,
+    client_id INT UNSIGNED NOT NULL,
     bytes_sent_delta BIGINT NOT NULL COMMENT 'Accumulated sent in this hour',
     bytes_received_delta BIGINT NOT NULL COMMENT 'Accumulated received in this hour',
     peak_speed_up_kbps FLOAT NOT NULL DEFAULT 0.0,
@@ -28,7 +28,7 @@ CREATE TABLE client_hourly_metrics (
 -- 4. Create client_daily_metrics for long-term/indefinite history
 CREATE TABLE client_daily_metrics (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    client_id INT NOT NULL,
+    client_id INT UNSIGNED NOT NULL,
     bytes_sent_delta BIGINT NOT NULL COMMENT 'Accumulated sent in this day',
     bytes_received_delta BIGINT NOT NULL COMMENT 'Accumulated received in this day',
     peak_speed_up_kbps FLOAT NOT NULL DEFAULT 0.0,
