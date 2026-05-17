@@ -1,0 +1,3 @@
+## 2024-05-17 - [DB Connection Verification Throttle]
+**Learning:** The database connection class (`DB::conn()`) previously checked if the connection was alive by running `SELECT 1` on *every single request* for the PDO instance. This was essentially acting as a huge N+1 query issue, considering `DB::conn()` is widely used across the codebase and often called multiple times in single controller methods (e.g. 8+ times in ServerController).
+**Action:** Always throttle ping queries (like `SELECT 1`) on persistent database wrappers. A 5-second TTL on the ping ensures the connection is mostly verified before use, while eliminating massive redundant queries per application request cycle.

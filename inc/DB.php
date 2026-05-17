@@ -1,14 +1,20 @@
 <?php
 class DB {
   private static ?PDO $pdo = null;
+  private static int $lastVerified = 0;
 
   public static function conn(): PDO {
     if (self::$pdo) {
-      // Verify connection is still alive (handles long-running processes)
-      try {
-        self::$pdo->query('SELECT 1');
-      } catch (\Throwable $e) {
-        self::$pdo = null; // Force reconnect
+      // Verify connection is still alive, but throttle to max once per 5 seconds
+      // to avoid hitting the DB with 'SELECT 1' on every query
+      $now = time();
+      if ($now - self::$lastVerified > 5) {
+        try {
+          self::$pdo->query('SELECT 1');
+          self::$lastVerified = $now;
+        } catch (\Throwable $e) {
+          self::$pdo = null; // Force reconnect
+        }
       }
     }
     if (self::$pdo) return self::$pdo;
