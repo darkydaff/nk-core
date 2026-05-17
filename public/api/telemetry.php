@@ -256,6 +256,18 @@ try {
         VALUES (?, ?, ?, ?, ?)
     ");
 
+    $updateGeoStmt = $db->prepare("
+        UPDATE vpn_clients 
+        SET ip_country = ?, 
+            ip_country_code = ?, 
+            ip_city = ?, 
+            ip_isp = ?, 
+            ip_org = ?,
+            ip_lat = ?, 
+            ip_lon = ?
+        WHERE id = ?
+    ");
+
     $realtimeEvents = [];
 
     foreach ($peers as $peer) {
@@ -310,6 +322,32 @@ try {
             'ts' => $timestamp,
             'id' => $clientId
         ]);
+
+        // Automatically fetch and update GeoIP metadata when external IP changes or is missing
+        $newExternalIp = $peer['endpoint_ip'] ?? null;
+        if (!empty($newExternalIp) && $newExternalIp !== '(none)') {
+            if ($newExternalIp !== ($client['external_ip'] ?? null) || empty($client['ip_country'])) {
+                try {
+                    $geoData = VpnClient::lookupIpGeo($newExternalIp);
+                    if ($geoData) {
+                        $updateGeoStmt->execute([
+                            $geoData['country'] ?? null,
+                            $geoData['countryCode'] ?? null,
+                            $geoData['city'] ?? null,
+                            $geoData['isp'] ?? null,
+                            $geoData['org'] ?? null,
+                            $geoData['lat'] ?? null,
+                            $geoData['lon'] ?? null,
+                            $clientId
+                        ]);
+                    }
+                } catch (\Throwable $geoE) {
+                    if (class_exists('Logger')) {
+                        \Logger::warning("Fast-path GeoIP failed for client {$clientId}: " . $geoE->getMessage());
+                    }
+                }
+            }
+        }
 
         // Guard: Skip metrics history writes when under DB backpressure to save disk I/O
         if (!$backpressureActive) {

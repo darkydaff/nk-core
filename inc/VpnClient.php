@@ -1295,7 +1295,7 @@ public static function getClientsOverLimit(): array {
     /**
      * Lookup IP Geolocation data using ip-api.com
      */
-    private static function lookupIpGeo(string $ip): ?array {
+    public static function lookupIpGeo(string $ip): ?array {
         // Defensive: strip port if present
         if (strpos($ip, ':') !== false) {
             $ip = (strpos($ip, ']:') !== false) ? substr($ip, 1, strpos($ip, ']:') - 1) : explode(':', $ip)[0];
