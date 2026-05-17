@@ -419,6 +419,64 @@ class ServerController
         }
     }
 
+    public function toggleTelemetry($params)
+    {
+        requireAuth();
+        $serverId = (int) $params['id'];
+
+        header('Content-Type: application/json');
+
+        unlockSession();
+
+        try {
+            $server = new VpnServer($serverId);
+            $serverData = $server->getData();
+
+            $user = Auth::user();
+            if ($serverData['user_id'] != $user['id'] && !Auth::isAdmin()) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Forbidden']);
+                return;
+            }
+
+            $currentMode = $serverData['telemetry_mode'] ?? 'ssh';
+            $targetMode = ($currentMode === 'push') ? 'ssh' : 'push';
+
+            $db = DB::conn();
+            
+            if ($targetMode === 'push') {
+                // Perform setup magic!
+                require_once __DIR__ . '/../inc/VpnProvisioner.php';
+                $provisioner = new VpnProvisioner($serverId);
+                $provisioner->installTelemetryAgent();
+                
+                $message = 'Push telemetry successfully deployed and activated!';
+            } else {
+                // Switch back to legacy SSH
+                $db->prepare("UPDATE vpn_servers SET telemetry_mode = 'ssh' WHERE id = ?")
+                   ->execute([$serverId]);
+                   
+                // Safe remote agent uninstallation/cleanup
+                try {
+                    $server->executeCommand("systemctl disable --now nk-telemetry.service && rm -f /etc/systemd/system/nk-telemetry.service /usr/local/bin/nk-telemetry-agent.py && systemctl daemon-reload", true, true);
+                } catch (\Throwable $th) {
+                    // Ignore transient SSH errors during removal, legacy database mode is successfully locked in
+                }
+                
+                $message = 'Successfully reverted to legacy SSH telemetry mode.';
+            }
+
+            echo json_encode([
+                'success' => true, 
+                'mode' => $targetMode,
+                'message' => $message
+            ]);
+        } catch (Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+    }
+
     public function syncAll()
     {
         requireAuth();

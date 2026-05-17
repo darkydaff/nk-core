@@ -265,7 +265,7 @@ class VpnProvisioner
     /**
      * Install the lightweight adaptive push telemetry agent on the remote VPN node.
      */
-    private function installTelemetryAgent(): void
+    public function installTelemetryAgent(): void
     {
         $serverData = $this->getData();
         $pdo = DB::conn();

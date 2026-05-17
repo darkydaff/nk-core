@@ -523,6 +523,51 @@ class ServerView {
         }
     }
 
+    async toggleTelemetry(serverId) {
+        const btn = document.getElementById('telemetryToggleBtn');
+        const icon = document.getElementById('telemetryToggleIcon');
+        const text = document.getElementById('telemetryToggleText');
+        const badge = document.getElementById('telemetryModeBadge');
+        
+        if (btn) btn.disabled = true;
+        if (icon) {
+            icon.className = 'fas fa-spinner fa-spin';
+        }
+        if (text) {
+            const isPush = badge && badge.innerText.includes('PUSH');
+            text.innerText = isPush ? 'Reinstalling...' : 'Enabling...';
+        }
+
+        try {
+            const result = await NK.handleAjaxAction(`/servers/${serverId}/toggle-telemetry`);
+            if (result && result.success) {
+                if (badge) {
+                    badge.innerText = result.mode === 'push' ? 'Push (Active)' : 'SSH (Legacy)';
+                    badge.className = `text-xs font-mono font-bold uppercase ${result.mode === 'push' ? 'text-primary' : 'text-slate-400'}`;
+                }
+                if (text) {
+                    text.innerText = result.mode === 'push' ? 'Reinstall Agent' : 'Enable Push';
+                }
+                
+                if (window.showToast) {
+                    window.showToast(result.message || 'Success!', 'success');
+                } else {
+                    alert(result.message || 'Success!');
+                }
+                
+                // Immediately pull stats to update last seen status
+                this.syncStats(serverId);
+            }
+        } catch (err) {
+            console.error('Failed to toggle telemetry:', err);
+        } finally {
+            if (btn) btn.disabled = false;
+            if (icon) {
+                icon.className = 'fas fa-magic';
+            }
+        }
+    }
+
     initBeszel() {
         if (!this.serverHost) return;
         fetch(`/api/monitoring/beszel/${this.serverHost}`)

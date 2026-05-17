@@ -225,6 +225,7 @@ Router::post('/api/jobs/{id}/cancel', ['ApiController', 'cancelJob']);
 Router::get('/servers/diagnostics', ['ServerController', 'diagnostics']);
 Router::get('/servers/{id}', ['ServerController', 'view']);
 Router::post('/servers/{id}/sync-stats', ['ServerController', 'syncStats']);
+Router::post('/servers/{id}/toggle-telemetry', ['ServerController', 'toggleTelemetry']);
 Router::post('/servers/sync-all', ['ServerController', 'syncAll']);
 Router::get('/api/search-clients', ['ServerController', 'searchClients']);
 Router::get('/api/monitoring/traffic-history', ['ServerController', 'getTrafficHistory']);
