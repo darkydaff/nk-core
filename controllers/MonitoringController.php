@@ -15,9 +15,17 @@ class MonitoringController {
         header('Content-Type: application/json');
         
         try {
+            // Fetch server name by host IP to allow domain/name matching in Beszel
+            require_once __DIR__ . '/../inc/DB.php';
+            $db = DB::conn();
+            $stmt = $db->prepare("SELECT name FROM vpn_servers WHERE host = ? LIMIT 1");
+            $stmt->execute([$ip]);
+            $serverRow = $stmt->fetch(PDO::FETCH_ASSOC);
+            $name = $serverRow ? $serverRow['name'] : '';
+
             require_once __DIR__ . '/../inc/BeszelClient.php';
             $beszel = new BeszelClient();
-            $data = $beszel->getSystemByIp($ip);
+            $data = $beszel->getSystemByIp($ip, $name);
             
             if ($data) {
                 // Handle info field if it's a string

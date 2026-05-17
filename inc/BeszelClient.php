@@ -105,29 +105,40 @@ class BeszelClient {
     /**
      * Get monitoring data for a specific IP
      */
-    public function getSystemByIp(string $ip): ?array {
-        $token = $this->getToken();
-        if (!$token) return null;
-
-        // Search by host field in PocketBase (should match IP)
-        $url = "{$this->baseUrl}/api/collections/systems/records?filter=(host='{$ip}')";
+    public function getSystemByIp(string $ip, string $name = ''): ?array {
+        $systems = $this->getSystems();
         
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ["Authorization: Bearer {$token}"]);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-        $response = curl_exec($ch);
-        $result = json_decode($response, true);
-        $items = $result['items'] ?? [];
-
-        if (!empty($items)) {
-            $system = $items[0];
-            $stats = $this->getLatestStats($system['id']);
-            if ($stats) $system['stats'] = $stats;
-            return $system;
+        foreach ($systems as $system) {
+            // A. Match by exact IP
+            if (isset($system['host']) && $system['host'] === $ip) {
+                return $this->hydrateSystemStats($system);
+            }
+            
+            // B. Match by case-insensitive name
+            if (!empty($name) && isset($system['name']) && strtolower($system['name']) === strtolower($name)) {
+                return $this->hydrateSystemStats($system);
+            }
+            
+            // C. Match by DNS-resolved host IP
+            $host = $system['host'] ?? '';
+            if (!empty($host) && filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) {
+                $resolvedIp = gethostbyname($host);
+                if ($resolvedIp === $ip) {
+                    return $this->hydrateSystemStats($system);
+                }
+            }
         }
 
         return null;
+    }
+
+    /**
+     * Hydrate system stats for a resolved system
+     */
+    private function hydrateSystemStats(array $system): array {
+        $stats = $this->getLatestStats($system['id']);
+        if ($stats) $system['stats'] = $stats;
+        return $system;
     }
 
     /**
