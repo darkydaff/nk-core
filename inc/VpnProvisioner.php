@@ -209,6 +209,8 @@ class VpnProvisioner
         try {
             if ($this->detectAndImportExistingConfig()) {
                 $this->server->load();
+                // Automatically install telemetry agent if push mode is active
+                $this->installTelemetryAgent();
                 return true;
             }
         } catch (Exception $e) {
@@ -249,6 +251,146 @@ class VpnProvisioner
 
         // Automatically fetch GeoIP data after successful deployment
         $this->server->updateGeoIp();
+
+        // Automatically install adaptive push telemetry agent
+        try {
+            $this->installTelemetryAgent();
+        } catch (Exception $e) {
+            Logger::channel('deployments')->error("Failed to install telemetry agent: " . $e->getMessage(), [
+                'server_id' => $this->getId()
+            ]);
+        }
+    }
+
+    /**
+     * Install the lightweight adaptive push telemetry agent on the remote VPN node.
+     */
+    private function installTelemetryAgent(): void
+    {
+        $serverData = $this->getData();
+        if (($serverData['telemetry_mode'] ?? 'ssh') !== 'push') {
+            return;
+        }
+
+        $token = $serverData['telemetry_token'] ?? '';
+        if (empty($token)) {
+            $token = bin2hex(random_bytes(32));
+            $pdo = DB::conn();
+            $pdo->prepare('UPDATE vpn_servers SET telemetry_token = ? WHERE id = ?')
+                ->execute([$token, $this->getId()]);
+            $serverData['telemetry_token'] = $token;
+        }
+
+        // Auto-detect the panel host address using a secure waterfall mechanism
+        $panelHost = '';
+        if (isset($_SERVER['HTTP_HOST'])) {
+            $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') ? 'https://' : 'http://';
+            $panelHost = $scheme . $_SERVER['HTTP_HOST'];
+        }
+        
+        if (empty($panelHost)) {
+            $externalIp = trim(@file_get_contents('http://ipinfo.io/ip'));
+            if (!empty($externalIp) && filter_var($externalIp, FILTER_VALIDATE_IP)) {
+                $panelHost = 'http://' . $externalIp . ':8443';
+            } else {
+                $panelHost = 'http://localhost:8443';
+            }
+        }
+
+        $url = rtrim($panelHost, '/') . '/api/telemetry.php';
+
+        Logger::channel('deployments')->info('Installing automated telemetry agent on node...', [
+            'server_id' => $this->getId(),
+            'url' => $url
+        ]);
+
+        $pythonCode = <<<'PYTHON'
+import subprocess, json, urllib.request, time, sys
+
+TOKEN = "{TOKEN}"
+URL = "{URL}"
+
+interval = 15
+
+while True:
+    try:
+        container = "nk-awg-v2"
+        res = subprocess.run(["docker", "exec", container, "/usr/local/bin/awg", "show", "all", "dump"], capture_output=True, text=True)
+        if res.returncode != 0:
+            container = "amnezia-wg"
+            res = subprocess.run(["docker", "exec", container, "/usr/local/bin/awg", "show", "all", "dump"], capture_output=True, text=True)
+            
+        dump = res.stdout.strip()
+        peers = []
+        
+        if dump:
+            for line in dump.split("\n"):
+                parts = line.split("\t")
+                if len(parts) >= 8:
+                    peers.append({
+                        "public_key": parts[1],
+                        "bytes_received": int(parts[6]),
+                        "bytes_sent": int(parts[7]),
+                        "last_handshake": int(parts[5])
+                    })
+        
+        payload = {
+            "timestamp": int(time.time()),
+            "peers": peers
+        }
+        
+        req = urllib.request.Request(
+            URL,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {TOKEN}"
+            },
+            method="POST"
+        )
+        
+        with urllib.request.urlopen(req, timeout=10) as f:
+            resp = f.read().decode().strip()
+            if resp.isdigit():
+                interval = int(resp)
+            else:
+                interval = 15
+                
+    except Exception as e:
+        interval = 15
+        
+    time.sleep(interval)
+PYTHON;
+
+        $pythonCode = str_replace(['{TOKEN}', '{URL}'], [$token, $url], $pythonCode);
+        $base64 = base64_encode($pythonCode);
+
+        // Provision agent and register it as an active systemd unit service
+        $setupCmd = implode(' && ', [
+            "echo '{$base64}' | base64 -d > /usr/local/bin/nk-telemetry-agent.py",
+            "chmod +x /usr/local/bin/nk-telemetry-agent.py",
+            "echo '[Unit]
+Description=NK-Core Adaptive Telemetry Agent
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/bin/nk-telemetry-agent.py
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target' > /etc/systemd/system/nk-telemetry.service",
+            "systemctl daemon-reload",
+            "systemctl enable nk-telemetry.service",
+            "systemctl restart nk-telemetry.service"
+        ]);
+
+        $this->server->executeCommand($setupCmd, true, true);
+        Logger::channel('deployments')->info('Telemetry agent systemd service deployed successfully on host', ['server_id' => $this->getId()]);
     }
 
 
