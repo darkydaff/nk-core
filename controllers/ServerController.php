@@ -446,8 +446,15 @@ class ServerController
             
             if ($targetMode === 'push') {
                 // Perform setup magic!
+                require_once __DIR__ . '/../inc/LinuxProvisioner.php';
+                require_once __DIR__ . '/../inc/AwgConfigGenerator.php';
                 require_once __DIR__ . '/../inc/VpnProvisioner.php';
-                $provisioner = new VpnProvisioner($serverId);
+                
+                $provisioner = new VpnProvisioner(
+                    new LinuxProvisioner($server->getSshClient(), $serverId),
+                    new AwgConfigGenerator()
+                );
+                $provisioner->setServer($server);
                 $provisioner->installTelemetryAgent();
                 
                 $message = 'Push telemetry successfully deployed and activated!';

@@ -18,6 +18,12 @@ class VpnProvisioner
         $this->configGen = $configGen;
     }
 
+    public function setServer(VpnServer $server): self
+    {
+        $this->server = $server;
+        return $this;
+    }
+
     private function getData(): array
     {
         return $this->server->getData() ?? [];
