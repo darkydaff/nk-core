@@ -37,8 +37,14 @@ require_once __DIR__ . '/../../inc/JWT.php';
 // Load environment configuration
 Config::load(__DIR__ . '/../../.env');
 
-// 2. Validate token header
+// 2. Validate token header (allow X-Telemetry-Token or Authorization Bearer fallback)
 $token = $_SERVER['HTTP_X_TELEMETRY_TOKEN'] ?? '';
+if (empty($token) && isset($_SERVER['HTTP_AUTHORIZATION'])) {
+    if (preg_match('/Bearer\s+(.+)/i', $_SERVER['HTTP_AUTHORIZATION'], $matches)) {
+        $token = trim($matches[1]);
+    }
+}
+
 if (empty($token) || strlen($token) !== 64) {
     http_response_code(400);
     echo "15";
@@ -48,7 +54,7 @@ if (empty($token) || strlen($token) !== 64) {
 $json = file_get_contents('php://input');
 $payload = json_decode($json, true);
 
-if (!is_array($payload) || empty($payload['peers'])) {
+if (!is_array($payload) || !isset($payload['peers']) || !is_array($payload['peers'])) {
     http_response_code(400);
     echo "15";
     exit;

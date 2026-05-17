@@ -344,7 +344,8 @@ while True:
             data=json.dumps(payload).encode("utf-8"),
             headers={
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {TOKEN}"
+                "Authorization": f"Bearer {TOKEN}",
+                "X-Telemetry-Token": TOKEN
             },
             method="POST"
         )
