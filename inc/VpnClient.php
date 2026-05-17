@@ -791,6 +791,18 @@ class VpnClient {
             throw new Exception('Server is not active (status: ' . $serverData['status'] . ')');
         }
 
+        // 0. Hard Telemetry Authority Lockout for Push Servers
+        $mode = $serverData['telemetry_mode'] ?? 'ssh';
+        if ($mode !== 'ssh') {
+            return false;
+        }
+        if (!empty($serverData['last_telemetry_at'])) {
+            $lastTelemetry = strtotime($serverData['last_telemetry_at']);
+            if (time() - $lastTelemetry < 300) {
+                return false;
+            }
+        }
+
         // 1. Sync traffic via ServerMonitoring to prevent counter resets and double counting
         try {
             require_once __DIR__ . '/ServerMonitoring.php';
