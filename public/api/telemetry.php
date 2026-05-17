@@ -187,7 +187,8 @@ try {
     // 5. Batch SELECT active clients on this server in one query (incorporating cached previous metrics columns)
     $clientsStmt = $db->prepare("
         SELECT id, public_key, bytes_sent, bytes_received, 
-               last_bytes_sent, last_bytes_received, UNIX_TIMESTAMP(last_metric_at) as last_ts
+               last_bytes_sent, last_bytes_received, UNIX_TIMESTAMP(last_metric_at) as last_ts,
+               external_ip, ip_country
         FROM vpn_clients 
         WHERE server_id = ? AND deleted_at IS NULL
     ");
