@@ -1,0 +1,564 @@
+{% extends "layout.twig" %}
+
+{% block title %}Fleet Telemetry Control Room & SLO Diagnostics{% endblock %}
+
+{% block breadcrumbs %}
+    <li><a href="/servers" class="hover:text-primary transition-colors">Servers</a></li>
+    <li><i class="fas fa-chevron-right text-[10px] mx-2 opacity-50"></i></li>
+    <li class="text-primary font-semibold">Telemetry & SLO Diagnostics</li>
+{% endblock %}
+
+{% block styles %}
+<style>
+    .glass-panel {
+        background: rgba(30, 41, 59, 0.45);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 24px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .glass-panel:hover {
+        border-color: rgba(99, 102, 241, 0.25);
+        box-shadow: 0 10px 30px -10px rgba(99, 102, 241, 0.15);
+    }
+    .ring-progress {
+        transform: rotate(-90deg);
+        transform-origin: 50% 50%;
+        transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .terminal-window {
+        background: #090d16;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 16px;
+        font-family: 'Geist Mono', monospace;
+    }
+    .badge-state {
+        padding: 4px 12px;
+        border-radius: 9999px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .badge-state.active {
+        background: rgba(16, 185, 129, 0.1);
+        color: #10b981;
+        border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+    .badge-state.idle {
+        background: rgba(99, 102, 241, 0.1);
+        color: #6366f1;
+        border: 1px solid rgba(99, 102, 241, 0.2);
+    }
+    .badge-state.backpressure {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        border: 1px solid rgba(239, 68, 68, 0.2);
+        animation: pulse 2s infinite;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-8 animate-fade-in">
+    <!-- Header with Pulse Status -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+            <h1 class="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+                <span class="relative flex h-3 w-3">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                </span>
+                Fleet Telemetry Operations Center
+            </h1>
+            <p class="text-muted mt-1">Real-time closed-loop control system, SLO compliance audits, and failure modeling.</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <button onclick="runStabilitySweep()" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold flex items-center gap-2 shadow-lg hover:shadow-indigo-500/20 transition-all">
+                <i class="fas fa-satellite-dish"></i> Run Stability Sweep
+            </button>
+        </div>
+    </div>
+
+    <!-- Core SLO Compliance Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <!-- SLO Ingestion Ring -->
+        <div class="glass-panel p-6 flex flex-col items-center text-center">
+            <div class="relative w-32 h-32">
+                <svg class="w-full h-full">
+                    <circle cx="64" cy="64" r="50" fill="transparent" stroke="rgba(255,255,255,0.05)" stroke-width="8"/>
+                    <circle id="ring-ingest" class="ring-progress" cx="64" cy="64" r="50" fill="transparent" stroke="#10b981" stroke-width="8" stroke-dasharray="314" stroke-dashoffset="314"/>
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                    <span id="txt-ingest" class="text-2xl font-bold text-white">0%</span>
+                    <span class="text-[9px] text-muted uppercase tracking-widest mt-0.5">SLO Target</span>
+                </div>
+            </div>
+            <h3 class="text-sm font-semibold text-white mt-4">Ingestion Latency</h3>
+            <p class="text-xs text-muted mt-1">$p95 < 20\text{ms}$ contract threshold</p>
+        </div>
+
+        <!-- SLO DB Ring -->
+        <div class="glass-panel p-6 flex flex-col items-center text-center">
+            <div class="relative w-32 h-32">
+                <svg class="w-full h-full">
+                    <circle cx="64" cy="64" r="50" fill="transparent" stroke="rgba(255,255,255,0.05)" stroke-width="8"/>
+                    <circle id="ring-db" class="ring-progress" cx="64" cy="64" r="50" fill="transparent" stroke="#6366f1" stroke-width="8" stroke-dasharray="314" stroke-dashoffset="314"/>
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                    <span id="txt-db" class="text-2xl font-bold text-white">0%</span>
+                    <span class="text-[9px] text-muted uppercase tracking-widest mt-0.5">SLO Target</span>
+                </div>
+            </div>
+            <h3 class="text-sm font-semibold text-white mt-4">DB Transactions</h3>
+            <p class="text-xs text-muted mt-1">$p95 < 15\text{ms}$ transaction locks</p>
+        </div>
+
+        <!-- SLO WebSocket Ring -->
+        <div class="glass-panel p-6 flex flex-col items-center text-center">
+            <div class="relative w-32 h-32">
+                <svg class="w-full h-full">
+                    <circle cx="64" cy="64" r="50" fill="transparent" stroke="rgba(255,255,255,0.05)" stroke-width="8"/>
+                    <circle id="ring-ws" class="ring-progress" cx="64" cy="64" r="50" fill="transparent" stroke="#f59e0b" stroke-width="8" stroke-dasharray="314" stroke-dashoffset="314"/>
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                    <span id="txt-ws" class="text-2xl font-bold text-white">0%</span>
+                    <span class="text-[9px] text-muted uppercase tracking-widest mt-0.5">SLO Target</span>
+                </div>
+            </div>
+            <h3 class="text-sm font-semibold text-white mt-4">WebSocket Fanout</h3>
+            <p class="text-xs text-muted mt-1">Publish delay < 10ms boundaries</p>
+        </div>
+
+        <!-- SLO Freshness Ring -->
+        <div class="glass-panel p-6 flex flex-col items-center text-center">
+            <div class="relative w-32 h-32">
+                <svg class="w-full h-full">
+                    <circle cx="64" cy="64" r="50" fill="transparent" stroke="rgba(255,255,255,0.05)" stroke-width="8"/>
+                    <circle id="ring-fresh" class="ring-progress" cx="64" cy="64" r="50" fill="transparent" stroke="#ec4899" stroke-width="8" stroke-dasharray="314" stroke-dashoffset="314"/>
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                    <span id="txt-fresh" class="text-2xl font-bold text-white">0%</span>
+                    <span class="text-[9px] text-muted uppercase tracking-widest mt-0.5">SLO Target</span>
+                </div>
+            </div>
+            <h3 class="text-sm font-semibold text-white mt-4">Node Freshness</h3>
+            <p class="text-xs text-muted mt-1">Telemetry update window < 30s</p>
+        </div>
+    </div>
+
+    <!-- Main Node Matrix & Simulator Split -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <!-- Node Fleet Status Table -->
+        <div class="lg:col-span-2 glass-panel p-6">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2 mb-4">
+                <i class="fas fa-server text-indigo-400"></i> Active Telemetry Nodes
+            </h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-white/5 text-muted text-xs font-semibold uppercase tracking-wider">
+                            <th class="pb-3">Node Name</th>
+                            <th class="pb-3">Current State</th>
+                            <th class="pb-3 text-center">Health Grade</th>
+                            <th class="pb-3 text-right">Metrics & Drift</th>
+                            <th class="pb-3 text-right">Diagnostics</th>
+                        </tr>
+                    </thead>
+                    <tbody id="nodes-table-body" class="divide-y divide-white/5 text-sm text-secondary">
+                        <tr>
+                            <td colspan="5" class="py-8 text-center text-muted">
+                                <i class="fas fa-circle-notch fa-spin mr-2"></i> Querying fleet diagnostics...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- SRE Simulator Box -->
+        <div class="glass-panel p-6 flex flex-col gap-6">
+            <div>
+                <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                    <i class="fas fa-flask text-amber-400"></i> Resiliency Chaos Lab
+                </h2>
+                <p class="text-xs text-muted mt-1">Inject failure patterns into the local ingestion framework to evaluate recovery behavior.</p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <button onclick="triggerScenario('db_slow')" class="p-3 text-left rounded-xl bg-white/5 border border-white/5 hover:border-amber-500/30 hover:bg-amber-500/5 transition-all group">
+                    <div class="text-xs font-bold text-white group-hover:text-amber-400 transition-colors">Slow Database</div>
+                    <div class="text-[10px] text-muted mt-0.5">25ms simulated DB transaction lag</div>
+                </button>
+                <button onclick="triggerScenario('ws_outage')" class="p-3 text-left rounded-xl bg-white/5 border border-white/5 hover:border-pink-500/30 hover:bg-pink-500/5 transition-all group">
+                    <div class="text-xs font-bold text-white group-hover:text-pink-400 transition-colors">WS Outage</div>
+                    <div class="text-[10px] text-muted mt-0.5">Centrifugo circuit break trip</div>
+                </button>
+                <button onclick="triggerScenario('replay_storm')" class="p-3 text-left rounded-xl bg-white/5 border border-white/5 hover:border-indigo-500/30 hover:bg-indigo-500/5 transition-all group">
+                    <div class="text-xs font-bold text-white group-hover:text-indigo-400 transition-colors">Replay Storm</div>
+                    <div class="text-[10px] text-muted mt-0.5">50% out-of-order stale packets</div>
+                </button>
+                <button onclick="triggerScenario('mixed_failures')" class="p-3 text-left rounded-xl bg-white/5 border border-white/5 hover:border-red-500/30 hover:bg-red-500/5 transition-all group">
+                    <div class="text-xs font-bold text-white group-hover:text-red-400 transition-colors">Mixed Cascade</div>
+                    <div class="text-[10px] text-muted mt-0.5">Combined delays & packet replays</div>
+                </button>
+                <button onclick="triggerScenario('adversarial')" class="p-3 text-left rounded-xl bg-white/5 border border-white/5 hover:border-red-500/50 hover:bg-red-500/10 transition-all group col-span-2">
+                    <div class="text-xs font-bold text-white group-hover:text-red-400 transition-colors flex items-center gap-1.5">
+                        <span class="relative flex h-2 w-2">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                        </span>
+                        Adversarial Sequencing Cascade
+                    </div>
+                    <div class="text-[10px] text-muted mt-0.5">Worst-case compounding cascading failure storm over 4 ticking stages</div>
+                </button>
+            </div>
+
+            <div class="terminal-window p-4 flex-grow flex flex-col min-h-[220px]">
+                <div class="flex items-center justify-between border-b border-white/10 pb-2 mb-3">
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-3 h-3 rounded-full bg-red-500"></span>
+                        <span class="w-3 h-3 rounded-full bg-yellow-500"></span>
+                        <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
+                    </div>
+                    <span class="text-[10px] text-muted tracking-wider uppercase">SRE Chaos Terminal</span>
+                </div>
+                <div id="terminal-content" class="text-xs text-emerald-400 overflow-y-auto max-h-[240px] flex-grow space-y-1.5 scrollbar-thin">
+                    <div class="text-muted">> Waiting for scenario launch...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Transition Graph Analysis Modal -->
+<div id="transition-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="glass-panel max-w-2xl w-full p-6 space-y-6">
+        <div class="flex items-center justify-between border-b border-white/5 pb-4">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                <i class="fas fa-project-diagram text-indigo-400"></i> Nonlinear Control Loop Damping Graph
+                <span id="modal-loop-state" class="text-[10px] font-bold badge-state idle ml-2">STABLE</span>
+            </h2>
+            <button onclick="closeTransitionModal()" class="text-muted hover:text-white transition-colors">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+                <div id="modal-instability-index" class="text-xl font-bold text-white">0.00</div>
+                <div class="text-[10px] text-muted uppercase mt-1">Instability Index</div>
+            </div>
+            <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+                <div id="modal-reciprocal-cycles" class="text-xl font-bold text-indigo-400">0</div>
+                <div class="text-[10px] text-muted uppercase mt-1">Reciprocal Cycles</div>
+            </div>
+            <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+                <div id="modal-entropy" class="text-xl font-bold text-emerald-400">0.00</div>
+                <div class="text-[10px] text-muted uppercase mt-1">Shannon Entropy</div>
+            </div>
+            <div class="bg-white/5 p-4 rounded-xl border border-white/5">
+                <div id="modal-damping" class="text-xl font-bold text-pink-400">1.00</div>
+                <div class="text-[10px] text-muted uppercase mt-1">Damping Ratio</div>
+            </div>
+        </div>
+
+        <div class="space-y-3">
+            <h3 class="text-sm font-semibold text-white">Transition History Logs</h3>
+            <div id="modal-transitions-list" class="max-h-[240px] overflow-y-auto space-y-2 pr-2 scrollbar-thin text-xs text-secondary">
+                <!-- Transition items inject dynamically -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Explainability Trace Modal -->
+<div id="explain-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="glass-panel max-w-xl w-full p-6 space-y-6">
+        <div class="flex items-center justify-between border-b border-white/5 pb-4">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                <i class="fas fa-search text-emerald-400"></i> Decision Path Explainability Trace
+            </h2>
+            <button onclick="closeExplainModal()" class="text-muted hover:text-white transition-colors">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="bg-[#090d16] p-4 rounded-xl border border-white/5 font-mono text-xs text-emerald-400 max-h-[300px] overflow-y-auto space-y-2 scrollbar-thin">
+            <div id="explain-modal-trace"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        pollDiagnostics();
+        setInterval(pollDiagnostics, 5000);
+    });
+
+    async function pollDiagnostics() {
+        try {
+            const response = await fetch('/api/system/nodes');
+            const data = await response.json();
+            if (data.success && data.nodes) {
+                renderNodesTable(data.nodes);
+                calculateAggregateSLOs(data.nodes);
+            }
+        } catch (e) {
+            console.error("Failed to sync fleet diagnostics: ", e);
+        }
+    }
+
+    function renderNodesTable(nodes) {
+        const tbody = document.getElementById('nodes-table-body');
+        if (!tbody) return;
+
+        if (nodes.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-muted">No nodes active in the current fleet.</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = nodes.map(node => {
+            let stateClass = 'idle';
+            if (node.telemetry_state === 'ACTIVE_5S') stateClass = 'active';
+            if (node.telemetry_state === 'BACKPRESSURE_30S') stateClass = 'backpressure';
+
+            const healthColor = node.server_health_score > 90 ? 'text-emerald-400' : (node.server_health_score > 60 ? 'text-amber-400' : 'text-red-400');
+            const decisionJson = JSON.stringify(node.decision_path || []);
+
+            return `
+                <tr class="hover:bg-white/5 transition-colors">
+                    <td class="py-4 font-semibold text-white">
+                        ${node.name}
+                        <div class="text-[10px] text-muted font-normal mt-0.5">${node.host}</div>
+                    </td>
+                    <td class="py-4">
+                        <span class="badge-state ${stateClass}">
+                            <span class="relative flex h-2 w-2">
+                                <span class="relative inline-flex rounded-full h-2 w-2 ${node.telemetry_state === 'ACTIVE_5S' ? 'bg-emerald-400' : (node.telemetry_state === 'BACKPRESSURE_30S' ? 'bg-red-400' : 'bg-indigo-400')}"></span>
+                            </span>
+                            ${node.telemetry_state || 'IDLE_15S'}
+                        </span>
+                    </td>
+                    <td class="py-4 text-center font-bold ${healthColor}">${node.server_health_score}/100</td>
+                    <td class="py-4 text-right font-mono text-xs text-white">
+                        <div class="text-white">${node.last_db_time_ms ? parseFloat(node.last_db_time_ms).toFixed(1) + 'ms' : '0.0ms'}</div>
+                        <div class="text-[10px] text-muted">Drift: ${node.baseline_drift_index ? parseFloat(node.baseline_drift_index).toFixed(1) + '%' : '0%'}</div>
+                    </td>
+                    <td class="py-4 text-right space-x-2">
+                        <button onclick='openExplainModal(${decisionJson})' class="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors text-xs font-semibold">
+                            Explain
+                        </button>
+                        <button onclick="openTransitionModal(${node.id})" class="px-3 py-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 hover:bg-indigo-500/20 transition-colors text-xs font-semibold">
+                            Transitions
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function calculateAggregateSLOs(nodes) {
+        if (nodes.length === 0) return;
+
+        let ingestViolations = 0;
+        let dbViolations = 0;
+        let wsViolations = 0;
+        let freshnessViolations = 0;
+
+        const now = Math.floor(Date.now() / 1000);
+
+        nodes.forEach(node => {
+            if (parseFloat(node.last_ingest_latency_ms) > 20.0) ingestViolations++;
+            if (parseFloat(node.last_db_time_ms) > 15.0) dbViolations++;
+            if (parseFloat(node.last_centrifugo_time_ms) > 10.0) wsViolations++;
+
+            const lastTelemetry = node.last_telemetry_at ? Math.floor(Date.parse(node.last_telemetry_at) / 1000) : 0;
+            if (now - lastTelemetry > 30) freshnessViolations++;
+        });
+
+        const ingestComp = ((1 - ingestViolations / nodes.length) * 100).toFixed(0);
+        const dbComp = ((1 - dbViolations / nodes.length) * 100).toFixed(0);
+        const wsComp = ((1 - wsViolations / nodes.length) * 100).toFixed(0);
+        const freshComp = ((1 - freshnessViolations / nodes.length) * 100).toFixed(0);
+
+        updateSLORing('ingest', ingestComp);
+        updateSLORing('db', dbComp);
+        updateSLORing('ws', wsComp);
+        updateSLORing('fresh', freshComp);
+    }
+
+    function updateSLORing(id, percent) {
+        const ring = document.getElementById(`ring-${id}`);
+        const txt = document.getElementById(`txt-${id}`);
+        if (!ring || !txt) return;
+
+        txt.textContent = `${percent}%`;
+        const offset = 314 - (314 * percent) / 100;
+        ring.setAttribute('stroke-dashoffset', offset);
+
+        if (percent >= 95) ring.setAttribute('stroke', '#10b981');
+        else if (percent >= 80) ring.setAttribute('stroke', '#f59e0b');
+        else ring.setAttribute('stroke', '#ef4444');
+    }
+
+    async function openTransitionModal(serverId) {
+        const modal = document.getElementById('transition-modal');
+        if (!modal) return;
+
+        try {
+            const response = await fetch(`/api/system/transitions?server_id=${serverId}`);
+            const data = await response.json();
+            if (data.success) {
+                document.getElementById('modal-instability-index').textContent = data.metrics.cumulative_instability_index.toFixed(2);
+                document.getElementById('modal-reciprocal-cycles').textContent = data.metrics.reciprocal_cycle_count;
+                document.getElementById('modal-entropy').textContent = data.metrics.loop_entropy.toFixed(2);
+                document.getElementById('modal-damping').textContent = data.metrics.control_loop_damping.toFixed(2);
+                
+                const stateEl = document.getElementById('modal-loop-state');
+                stateEl.textContent = data.status.toUpperCase();
+                stateEl.className = `text-[10px] font-bold badge-state justify-center ml-2 ${data.status === 'stable' ? 'idle' : 'backpressure'}`;
+
+                const list = document.getElementById('modal-transitions-list');
+                if (data.transitions.length === 0) {
+                    list.innerHTML = `<div class="text-muted p-4 text-center">No state transitions recorded yet for this server loop.</div>`;
+                } else {
+                    list.innerHTML = data.transitions.map(t => {
+                        return `
+                            <div class="flex items-center justify-between p-3 bg-white/5 border border-white/5 rounded-xl">
+                                <div>
+                                    <div class="font-semibold text-white flex items-center gap-1.5">
+                                        <span class="text-muted">${t.from_state}</span>
+                                        <i class="fas fa-arrow-right text-[10px] opacity-40"></i>
+                                        <span class="text-indigo-400">${t.to_state}</span>
+                                    </div>
+                                    <div class="text-[10px] text-muted mt-0.5">Trigger: ${t.trigger_event}</div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="font-mono font-semibold text-white">+${parseFloat(t.instability_weight).toFixed(2)}</div>
+                                    <div class="text-[9px] text-muted">${t.created_at}</div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                modal.classList.remove('hidden');
+            }
+        } catch (e) {
+            console.error("Failed to load transition logs: ", e);
+        }
+    }
+
+    function closeTransitionModal() {
+        document.getElementById('transition-modal').classList.add('hidden');
+    }
+
+    function openExplainModal(decisionPath) {
+        const modal = document.getElementById('explain-modal');
+        const traceEl = document.getElementById('explain-modal-trace');
+        if (!modal || !traceEl) return;
+
+        if (decisionPath.length === 0) {
+            traceEl.innerHTML = `<div class="text-muted">No decision trace recorded. Wait for next telemetry tick.</div>`;
+        } else {
+            traceEl.innerHTML = decisionPath.map(trace => {
+                return `<div class="flex items-start gap-2">
+                    <span class="text-muted select-none">↳</span>
+                    <span>${trace}</span>
+                </div>`;
+            }).join('');
+        }
+        modal.classList.remove('hidden');
+    }
+
+    function closeExplainModal() {
+        document.getElementById('explain-modal').classList.add('hidden');
+    }
+
+    async function triggerScenario(scenario) {
+        const term = document.getElementById('terminal-content');
+        if (!term) return;
+
+        term.innerHTML = `<div class="text-muted">> Launching scenario: ${scenario} simulation...</div>`;
+        
+        try {
+            const response = await fetch(`/api/system/replay?scenario=${scenario}`);
+            const data = await response.json();
+
+            if (data.success && data.logs) {
+                // Pipe SRE console output into the terminal live!
+                term.innerHTML = '';
+                let i = 0;
+                const interval = setInterval(() => {
+                    if (i < data.logs.length) {
+                        const line = document.createElement('div');
+                        // Colorize specific terminal flags
+                        let text = data.logs[i];
+                        if (text.includes('🚨') || text.includes('💥')) {
+                            line.className = 'text-white font-bold';
+                        } else if (text.includes('⚠️')) {
+                            line.className = 'text-amber-400';
+                        } else if (text.includes('📡')) {
+                            line.className = 'text-secondary';
+                        } else if (text.includes('📊')) {
+                            line.className = 'text-indigo-300';
+                        }
+                        line.textContent = text;
+                        term.appendChild(line);
+                        term.scrollTop = term.scrollHeight;
+                        i++;
+                    } else {
+                        clearInterval(interval);
+                        pollDiagnostics();
+                    }
+                }, 150);
+            }
+        } catch (e) {
+            term.innerHTML += `<div class="text-red-400">> Error executing chaos harness. Check logs.</div>`;
+        }
+    }
+
+    async function runStabilitySweep() {
+        const term = document.getElementById('terminal-content');
+        if (!term) return;
+
+        term.innerHTML = `<div class="text-muted">> Starting stability envelope sweep matrix...</div>`;
+        term.innerHTML += `<div>> Sweeping Region A to Region D boundaries...</div>`;
+
+        try {
+            const response = await fetch(`/api/system/replay?scenario=sweep`);
+            const data = await response.json();
+            if (data.success && data.logs) {
+                term.innerHTML = '';
+                let i = 0;
+                const interval = setInterval(() => {
+                    if (i < data.logs.length) {
+                        const line = document.createElement('div');
+                        let text = data.logs[i];
+                        if (text.includes('MAP') || text.includes('===')) {
+                            line.className = 'text-white font-bold';
+                        } else if (text.includes('Region')) {
+                            line.className = 'text-indigo-400';
+                        }
+                        line.textContent = text;
+                        term.appendChild(line);
+                        term.scrollTop = term.scrollHeight;
+                        i++;
+                    } else {
+                        clearInterval(interval);
+                        pollDiagnostics();
+                    }
+                }, 100);
+            }
+        } catch (e) {
+            term.innerHTML += `<div class="text-red-400">> Error executing sweep matrix.</div>`;
+        }
+    }
+</script>
+{% endblock %}

@@ -55,6 +55,52 @@ class EventBus
     }
 
     /**
+     * Check if a channel has active WebSocket subscribers via Centrifugo Presence API
+     */
+    public static function hasActiveSubscribers(string $channel): bool
+    {
+        $apiKey = Config::get('CENTRIFUGO_API_KEY');
+        $apiUrl = Config::get('CENTRIFUGO_API_URL', 'http://centrifugo:8000/api');
+
+        if (!$apiKey) {
+            return false;
+        }
+
+        try {
+            $payload = json_encode([
+                'method' => 'presence',
+                'params' => [
+                    'channel' => $channel
+                ]
+            ]);
+
+            $ch = curl_init($apiUrl);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: application/json',
+                'Authorization: apikey ' . $apiKey
+            ]);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 1); // 1-second timeout for ultra-fast checks
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+            if ($httpCode !== 200 || !$response) {
+                return false;
+            }
+
+            $res = json_decode($response, true);
+            // Centrifugo returns the presence mapping in result.presence
+            $presence = $res['result']['presence'] ?? [];
+            return !empty($presence);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
      * Generate a connection token for the frontend (JWT)
      */
     public static function generateConnectionToken(string $userId): string

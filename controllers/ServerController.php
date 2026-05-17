@@ -331,6 +331,18 @@ class ServerController
         }
     }
 
+    public function diagnostics()
+    {
+        requireAuth();
+        if (!Auth::isAdmin()) {
+            http_response_code(403);
+            echo "Forbidden";
+            return;
+        }
+
+        View::render('servers/diagnostics.twig');
+    }
+
     public function view($params)
     {
         requireAuth();

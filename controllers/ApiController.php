@@ -676,6 +676,417 @@ class ApiController {
         }
     }
 
+    public function systemHealth() {
+        header('Content-Type: application/json');
+        $user = $this->requireAnyAuth();
+        if (!$user || $user['role'] !== 'admin') {
+            $this->respond(['error' => 'Forbidden'], 403);
+        }
+
+        try {
+            $db = DB::conn();
+            
+            // 1. Basic counts
+            $serversCount = (int)$db->query("SELECT COUNT(*) FROM vpn_servers WHERE deleted_at IS NULL")->fetchColumn();
+            $clientsCount = (int)$db->query("SELECT COUNT(*) FROM vpn_clients WHERE deleted_at IS NULL")->fetchColumn();
+            
+            // 2. Telemetry metadata aggregation
+            $stats = $db->query("
+                SELECT 
+                    SUM(total_ingest_count) as total_ingestion,
+                    SUM(backpressure_count) as total_backpressure,
+                    SUM(circuit_breaker_count) as total_cb,
+                    SUM(replayed_packets_count) as total_replays,
+                    AVG(server_health_score) as avg_health,
+                    AVG(last_ingest_latency_ms) as avg_ingest_ms,
+                    AVG(last_db_time_ms) as avg_db_ms,
+                    AVG(last_centrifugo_time_ms) as avg_cent_ms
+                FROM vpn_servers
+                WHERE deleted_at IS NULL
+            ")->fetch(PDO::FETCH_ASSOC);
+
+            // 3. HARD SLO COMPLIANCE METRICS
+            $sloStats = $db->query("
+                SELECT 
+                    COUNT(*) as total_active,
+                    SUM(CASE WHEN last_ingest_latency_ms > 20.0 THEN 1 ELSE 0 END) as ingest_violations,
+                    SUM(CASE WHEN last_db_time_ms > 15.0 THEN 1 ELSE 0 END) as db_violations,
+                    SUM(CASE WHEN last_centrifugo_time_ms > 10.0 THEN 1 ELSE 0 END) as centrifugo_violations,
+                    SUM(CASE WHEN last_telemetry_at IS NULL OR TIMESTAMPDIFF(SECOND, last_telemetry_at, NOW()) > 30 THEN 1 ELSE 0 END) as freshness_violations
+                FROM vpn_servers
+                WHERE deleted_at IS NULL AND telemetry_token IS NOT NULL
+            ")->fetch(PDO::FETCH_ASSOC);
+
+            $totalActive = (int)($sloStats['total_active'] ?? 0);
+            $sloCompliance = [
+                'ingest_latency_p95_compliance' => $totalActive > 0 ? round((1 - ($sloStats['ingest_violations'] ?? 0) / $totalActive) * 100, 2) : 100.0,
+                'db_transaction_p95_compliance' => $totalActive > 0 ? round((1 - ($sloStats['db_violations'] ?? 0) / $totalActive) * 100, 2) : 100.0,
+                'centrifugo_latency_compliance' => $totalActive > 0 ? round((1 - ($sloStats['centrifugo_violations'] ?? 0) / $totalActive) * 100, 2) : 100.0,
+                'node_freshness_compliance' => $totalActive > 0 ? round((1 - ($sloStats['freshness_violations'] ?? 0) / $totalActive) * 100, 2) : 100.0
+            ];
+
+            // 4. Platform Health Status derived from SLO contracts
+            $avgHealth = $stats['avg_health'] !== null ? round((float)$stats['avg_health'], 2) : 100.0;
+            $status = 'healthy';
+            if ($avgHealth < 75) $status = 'unstable';
+            elseif ($avgHealth < 90) $status = 'degraded';
+
+            // 5. Centrifugo socket status
+            $centrifugoStatus = 'healthy';
+            try {
+                EventBus::hasActiveSubscribers("system:ping");
+            } catch (\Throwable $e) {
+                $centrifugoStatus = 'offline';
+            }
+
+            $this->respond([
+                'success' => true,
+                'status' => $status,
+                'score' => $avgHealth,
+                'counts' => [
+                    'servers' => $serversCount,
+                    'clients' => $clientsCount
+                ],
+                'slo_compliance' => $sloCompliance,
+                'telemetry' => [
+                    'total_ingests' => (int)($stats['total_ingestion'] ?? 0),
+                    'total_backpressures' => (int)($stats['total_backpressure'] ?? 0),
+                    'total_circuit_breakers' => (int)($stats['total_cb'] ?? 0),
+                    'total_replays' => (int)($stats['total_replays'] ?? 0),
+                    'latencies' => [
+                        'avg_ingest_ms' => round((float)($stats['avg_ingest_ms'] ?? 0), 2),
+                        'avg_db_ms' => round((float)($stats['avg_db_ms'] ?? 0), 2),
+                        'avg_centrifugo_ms' => round((float)($stats['avg_cent_ms'] ?? 0), 2)
+                    ]
+                ],
+                'dependencies' => [
+                    'database' => 'healthy',
+                    'centrifugo' => $centrifugoStatus
+                ]
+            ]);
+        } catch (Exception $e) {
+            $this->respond(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function systemNodes() {
+        header('Content-Type: application/json');
+        $user = $this->requireAnyAuth();
+        if (!$user || $user['role'] !== 'admin') {
+            $this->respond(['error' => 'Forbidden'], 403);
+        }
+
+        try {
+            $db = DB::conn();
+            $stmt = $db->query("
+                SELECT id, name, host, last_telemetry_at, 
+                       last_ingest_latency_ms, last_db_time_ms, last_centrifugo_time_ms,
+                       total_ingest_count, backpressure_count, circuit_breaker_count,
+                       replayed_packets_count, server_health_score, last_failure_reasons,
+                       telemetry_state, last_decision_path, loop_entropy, baseline_drift_index, control_loop_damping
+                FROM vpn_servers
+                WHERE deleted_at IS NULL
+                ORDER BY server_health_score ASC, name ASC
+            ");
+            $nodes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Format health status labels
+            foreach ($nodes as &$node) {
+                $node['reasons'] = !empty($node['last_failure_reasons']) ? json_decode($node['last_failure_reasons'], true) : [];
+                unset($node['last_failure_reasons']); // Strip raw JSON string to keep clean
+
+                $node['decision_path'] = !empty($node['last_decision_path']) ? json_decode($node['last_decision_path'], true) : [];
+                unset($node['last_decision_path']);
+
+                $score = (int)$node['server_health_score'];
+                $status = '🟢 Healthy';
+                
+                if (!empty($node['reasons'])) {
+                    if (in_array('backpressure_active', $node['reasons']) || in_array('centrifugo_outage', $node['reasons'])) {
+                        $status = '🔴 Unstable';
+                    } else {
+                        $status = '🟡 Degraded';
+                    }
+                }
+                
+                // Check if offline (no telemetry for > 60s)
+                if (empty($node['last_telemetry_at']) || (time() - strtotime($node['last_telemetry_at'])) > 60) {
+                    $status = '⚫ Offline';
+                    $node['server_health_score'] = 0;
+                    $node['reasons'] = array_values(array_unique(array_merge($node['reasons'], ['heartbeat_timeout'])));
+                }
+                
+                $node['status'] = $status;
+            }
+
+            $this->respond([
+                'success' => true,
+                'nodes' => $nodes
+            ]);
+        } catch (Exception $e) {
+            $this->respond(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function systemTransitions() {
+        header('Content-Type: application/json');
+        $user = $this->requireAnyAuth();
+        if (!$user || $user['role'] !== 'admin') {
+            $this->respond(['error' => 'Forbidden'], 403);
+        }
+
+        $db = DB::conn();
+        $serverId = (int)($_GET['server_id'] ?? 0);
+        if ($serverId <= 0) {
+            $this->respond(['error' => 'Server ID is required'], 400);
+            return;
+        }
+
+        try {
+            // Load current dynamics from server
+            $serverStmt = $db->prepare("SELECT loop_entropy, baseline_drift_index, control_loop_damping FROM vpn_servers WHERE id = ?");
+            $serverStmt->execute([$serverId]);
+            $srv = $serverStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+            $transitionsStmt = $db->prepare("
+                SELECT id, from_state, to_state, trigger_event, instability_weight, created_at
+                FROM telemetry_state_transitions
+                WHERE server_id = ?
+                ORDER BY created_at DESC
+                LIMIT 50
+            ");
+            $transitionsStmt->execute([$serverId]);
+            $transitions = $transitionsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Compute Oscillation & Thrash Metrics
+            $totalTransitions = count($transitions);
+            $instabilityTotal = 0.0;
+            foreach ($transitions as $t) {
+                $instabilityTotal += (float)$t['instability_weight'];
+            }
+
+            // Detect cycles in recent history (order chronologically)
+            $chrono = array_reverse($transitions);
+            $oscillationCount = 0;
+            for ($i = 1; $i < count($chrono); $i++) {
+                $prev = $chrono[$i - 1];
+                $curr = $chrono[$i];
+                // Check if they are reciprocal: A -> B followed by B -> A
+                if ($prev['from_state'] === $curr['to_state'] && $prev['to_state'] === $curr['from_state']) {
+                    $oscillationCount++;
+                }
+            }
+
+            // Determine health classification of control loop
+            $loopStatus = 'stable';
+            $warnings = [];
+            if ($instabilityTotal > 2.0) {
+                $loopStatus = 'thrashing';
+                $warnings[] = 'High frequency control loop oscillation detected (thrash chain active).';
+            } elseif ($oscillationCount >= 3) {
+                $loopStatus = 'oscillating';
+                $warnings[] = 'Unstable state oscillation between active/idle/backpressure nodes detected.';
+            }
+
+            $this->respond([
+                'success' => true,
+                'server_id' => $serverId,
+                'status' => $loopStatus,
+                'warnings' => $warnings,
+                'metrics' => [
+                    'total_transitions' => $totalTransitions,
+                    'cumulative_instability_index' => round($instabilityTotal, 2),
+                    'reciprocal_cycle_count' => $oscillationCount,
+                    'loop_entropy' => round((float)($srv['loop_entropy'] ?? 0.0), 2),
+                    'baseline_drift_index' => round((float)($srv['baseline_drift_index'] ?? 0.0), 1),
+                    'control_loop_damping' => round((float)($srv['control_loop_damping'] ?? 1.0), 2)
+                ],
+                'transitions' => $transitions
+            ]);
+        } catch (Exception $e) {
+            $this->respond(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    public function systemReplay() {
+        header('Content-Type: application/json');
+        $user = $this->requireAnyAuth();
+        if (!$user || $user['role'] !== 'admin') {
+            $this->respond(['error' => 'Forbidden'], 403);
+        }
+
+        $db = DB::conn();
+        $serverId = (int)($_GET['server_id'] ?? 0);
+        $fromTime = $_GET['from'] ?? null;
+        $toTime = $_GET['to'] ?? null;
+        
+        $scenario = $_GET['scenario'] ?? '';
+        if (!empty($scenario)) {
+            $safeScenario = escapeshellarg($scenario);
+            exec("php " . dirname(__DIR__) . "/bin/load-test.php --nodes=1 --clients=2 --scenario={$safeScenario}", $output, $status);
+            $this->respond([
+                'success' => $status === 0,
+                'message' => "Scenario {$scenario} simulation run complete",
+                'logs' => $output
+            ]);
+            return;
+        }
+
+        try {
+            // Programmatically execute a packet replay if payload_id is specified
+            $payloadId = (int)($_GET['payload_id'] ?? 0);
+            if ($payloadId > 0) {
+                $log = $db->query("SELECT * FROM telemetry_replay_logs WHERE id = {$payloadId}")->fetch(PDO::FETCH_ASSOC);
+                if (!$log) {
+                    $this->respond(['error' => 'Replay log entry not found'], 404);
+                    return;
+                }
+                
+                $result = $this->runLocalReplay($log);
+                $this->respond([
+                    'success' => true,
+                    'message' => 'Single packet replay simulation complete',
+                    'replay' => $result
+                ]);
+                return;
+            }
+
+            // Expose captured telemetry logs query window
+            $query = "SELECT id, server_id, status, latency_ms, created_at, SUBSTRING(payload, 1, 80) as payload_preview 
+                      FROM telemetry_replay_logs 
+                      WHERE 1=1";
+            $binds = [];
+            if ($serverId > 0) {
+                $query .= " AND server_id = ?";
+                $binds[] = $serverId;
+            }
+            if ($fromTime) {
+                $query .= " AND created_at >= ?";
+                $binds[] = $fromTime;
+            }
+            if ($toTime) {
+                $query .= " AND created_at <= ?";
+                $binds[] = $toTime;
+            }
+            $query .= " ORDER BY created_at DESC LIMIT 50";
+            
+            $stmt = $db->prepare($query);
+            $stmt->execute($binds);
+            $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $this->respond([
+                'success' => true,
+                'logs' => $logs
+            ]);
+        } catch (Exception $e) {
+            $this->respond(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    private function runLocalReplay($log) {
+        $db = DB::conn();
+        $serverId = (int)$log['server_id'];
+        $payload = json_decode($log['payload'], true);
+        
+        $startTime = microtime(true);
+        $dbStart = microtime(true);
+        $dbDuration = 0.0;
+        
+        // Wrap query execution inside a Transaction that automatically rolls back!
+        // This validates raw performance timings without modifying live bytes metrics.
+        $db->beginTransaction();
+        try {
+            $peers = $payload['peers'] ?? [];
+            $clientsStmt = $db->prepare("SELECT public_key, id FROM vpn_clients WHERE server_id = ? AND deleted_at IS NULL");
+            $clientsStmt->execute([$serverId]);
+            $clients = $clientsStmt->fetchAll(PDO::FETCH_KEY_PAIR);
+            
+            $updateStmt = $db->prepare("UPDATE vpn_clients SET bytes_sent = ?, bytes_received = ?, last_metric_at = NOW() WHERE id = ?");
+            
+            foreach ($peers as $peer) {
+                $pubKey = $peer['public_key'] ?? '';
+                if (isset($clients[$pubKey])) {
+                    $clientId = $clients[$pubKey];
+                    $updateStmt->execute([
+                        (int)($peer['tx'] ?? 0),
+                        (int)($peer['rx'] ?? 0),
+                        $clientId
+                    ]);
+                }
+            }
+            $dbDuration = (microtime(true) - $dbStart) * 1000.0;
+            $db->rollBack(); // Always roll back simulated packets
+        } catch (\Throwable $ex) {
+            $db->rollBack();
+            return [
+                'success' => false,
+                'error' => 'DB Replay simulation error: ' . $ex->getMessage()
+            ];
+        }
+        
+        $totalDuration = (microtime(true) - $startTime) * 1000.0;
+        
+        // Mark replay logs state
+        $db->prepare("UPDATE telemetry_replay_logs SET status = 'replayed', latency_ms = ? WHERE id = ?")
+           ->execute([$totalDuration, $log['id']]);
+
+        return [
+            'success' => true,
+            'simulated_db_latency_ms' => round($dbDuration, 2),
+            'total_replay_latency_ms' => round($totalDuration, 2),
+            'status' => 'success'
+        ];
+    }
+
+    public function systemMetrics() {
+        header('Content-Type: application/json');
+        $user = $this->requireAnyAuth();
+        if (!$user || $user['role'] !== 'admin') {
+            $this->respond(['error' => 'Forbidden'], 403);
+        }
+
+        try {
+            $db = DB::conn();
+            // Fetch hourly aggregated metrics in the past 24 hours
+            $stmt = $db->query("
+                SELECT 
+                    recorded_hour as time_label,
+                    SUM(bytes_sent_delta) as bytes_sent,
+                    SUM(bytes_received_delta) as bytes_received,
+                    MAX(peak_speed_up_kbps) as peak_speed_up,
+                    MAX(peak_speed_down_kbps) as peak_speed_down
+                FROM client_hourly_metrics
+                WHERE recorded_hour >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                GROUP BY recorded_hour
+                ORDER BY recorded_hour ASC
+            ");
+            $hourly = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            // Fetch daily aggregated metrics in the past 30 days
+            $stmt = $db->query("
+                SELECT 
+                    recorded_day as time_label,
+                    SUM(bytes_sent_delta) as bytes_sent,
+                    SUM(bytes_received_delta) as bytes_received,
+                    MAX(peak_speed_up_kbps) as peak_speed_up,
+                    MAX(peak_speed_down_kbps) as peak_speed_down
+                FROM client_daily_metrics
+                WHERE recorded_day >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+                GROUP BY recorded_day
+                ORDER BY recorded_day ASC
+            ");
+            $daily = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            $this->respond([
+                'success' => true,
+                'hourly_24h' => $hourly,
+                'daily_30d' => $daily
+            ]);
+        } catch (Exception $e) {
+            $this->respond(['error' => $e->getMessage()], 500);
+        }
+    }
+
     private function requireAnyAuth() {
         $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
         if ($authHeader && preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {

@@ -222,6 +222,7 @@ Router::get('/servers/{id}/logs', ['ServerController', 'getLogs']);
 Router::get('/api/servers/{id}/deployment-logs', ['ApiController', 'getDeploymentLogs']);
 Router::get('/api/jobs/{id}/events', ['ApiController', 'getJobEvents']);
 Router::post('/api/jobs/{id}/cancel', ['ApiController', 'cancelJob']);
+Router::get('/servers/diagnostics', ['ServerController', 'diagnostics']);
 Router::get('/servers/{id}', ['ServerController', 'view']);
 Router::post('/servers/{id}/sync-stats', ['ServerController', 'syncStats']);
 Router::post('/servers/sync-all', ['ServerController', 'syncAll']);
@@ -310,6 +311,13 @@ Router::post('/api/proxies', ['ApiController', 'createProxy']);
 Router::post('/api/proxies/{id}/pause', ['ApiController', 'pauseProxy']);
 Router::post('/api/proxies/{id}/resume', ['ApiController', 'resumeProxy']);
 Router::delete('/api/proxies/{id}', ['ApiController', 'deleteProxy']);
+
+// System Telemetry & Self-Diagnostics API Routes
+Router::get('/api/system/health', ['ApiController', 'systemHealth']);
+Router::get('/api/system/nodes', ['ApiController', 'systemNodes']);
+Router::get('/api/system/metrics', ['ApiController', 'systemMetrics']);
+Router::get('/api/system/replay', ['ApiController', 'systemReplay']);
+Router::get('/api/system/transitions', ['ApiController', 'systemTransitions']);
 
 // Beszel Monitoring API
 Router::get('/api/monitoring/beszel/{ip}', ['MonitoringController', 'getSystemData']);

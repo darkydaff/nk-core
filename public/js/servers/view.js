@@ -34,6 +34,26 @@ class ServerView {
         this.bindEvents();
         this.startPolling();
         
+        // Inject Premium Telemetry Animation Sheet dynamically
+        if (!document.getElementById('telemetry-animations')) {
+            const style = document.createElement('style');
+            style.id = 'telemetry-animations';
+            style.innerHTML = `
+                .pulse-glow {
+                    animation: telemetryPulse 0.4s ease-out;
+                }
+                @keyframes telemetryPulse {
+                    0% { filter: brightness(1); transform: scale(1); }
+                    50% { filter: brightness(1.4); transform: scale(1.04); }
+                    100% { filter: brightness(1); transform: scale(1); }
+                }
+                .bg-emerald-500\\/10, .bg-primary\\/10 {
+                    transition: all 0.3s ease-in-out;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+
         // Initial load
         requestAnimationFrame(() => {
             this.performSearch();
@@ -45,9 +65,8 @@ class ServerView {
             }, 15000);
         });
 
-        if (this.serverStatus === 'deploying' && this.currentJobId) {
-            this.initCentrifugo();
-        }
+        // Initialize Centrifugo for deployments and telemetry
+        this.initCentrifuge();
 
         this.initVisibilityListener();
     }
@@ -152,6 +171,13 @@ class ServerView {
     }
 
     renderResults(results, isAutoRefresh = false) {
+        if (!this.clientDbStatuses) this.clientDbStatuses = new Map();
+        if (results && results.length > 0) {
+            results.forEach(client => {
+                this.clientDbStatuses.set(Number(client.id), client.db_status);
+            });
+        }
+
         if (!results || results.length === 0) {
             this.resultsContainer.innerHTML = `
                 <div class="flex flex-col items-center justify-center h-64 text-center p-10">
@@ -437,6 +463,11 @@ class ServerView {
                 this.updateBatchBar();
             });
         }
+
+        // Re-cache telemetry row selectors for dynamic updates
+        if (this.telemetrySubscription) {
+            this.cacheTelemetryRows();
+        }
     }
 
     updateBatchBar() {
@@ -582,23 +613,40 @@ class ServerView {
             }).catch(err => console.error('Beszel error:', err));
     }
 
-    initCentrifugo() {
-        if (!this.centrifugoUrl || !this.connectionToken || !this.currentJobId) return;
+    initCentrifuge() {
+        if (!this.centrifugoUrl || !this.connectionToken) return;
+        if (this.centrifuge) return; // Already initialized
 
-        console.log(`[Centrifugo] Connecting to ${this.centrifugoUrl} for job:${this.currentJobId}`);
+        console.log(`[Centrifugo] Connecting to WebSocket: ${this.centrifugoUrl}`);
         
         this.centrifuge = new Centrifuge(this.centrifugoUrl, {
             token: this.connectionToken
         });
 
         this.centrifuge.on('connected', () => {
-            console.log('[Centrifugo] Connected');
+            console.log('[Centrifugo] Connection established');
+            // Dynamically subscribe to real-time telemetry if the page is currently visible
+            if (document.visibilityState === 'visible') {
+                this.subscribeTelemetry();
+            }
+            // Subscribe to deployments if actively deploying
+            if (this.serverStatus === 'deploying' && this.currentJobId) {
+                this.subscribeJobEvents();
+            }
         });
 
         this.centrifuge.on('disconnected', (ctx) => {
-            console.warn('[Centrifugo] Disconnected', ctx);
+            console.warn('[Centrifugo] Connection disconnected', ctx);
         });
 
+        this.centrifuge.connect();
+    }
+
+    subscribeJobEvents() {
+        if (!this.centrifuge || !this.currentJobId || !this.subscriptionToken) return;
+        if (this.subscription) return; // Already subscribed
+
+        console.log(`[Centrifugo] Subscribing to job channel: job:${this.currentJobId}`);
         this.subscription = this.centrifuge.newSubscription(`job:${this.currentJobId}`, {
             token: this.subscriptionToken
         });
@@ -608,9 +656,8 @@ class ServerView {
         });
 
         this.subscription.subscribe();
-        this.centrifuge.connect();
 
-        // Also fetch history for hydration
+        // Fetch deployment event history for hydration
         fetch(`/api/jobs/${this.currentJobId}/events`)
             .then(r => r.json())
             .then(d => {
@@ -618,7 +665,134 @@ class ServerView {
                     d.events.forEach(event => this.processJobEvent(event));
                 }
             })
-            .catch(e => console.error("[Centrifugo] Hydration failed", e));
+            .catch(e => console.error("[Centrifugo] Deployment history hydration failed", e));
+    }
+
+    subscribeTelemetry() {
+        if (!this.centrifuge) return;
+        if (this.telemetrySubscription) return; // Already subscribed
+
+        console.log(`[Telemetry] Subscribing to public telemetry channel: server:telemetry:${this.serverId}`);
+        this.telemetrySubscription = this.centrifuge.newSubscription(`server:telemetry:${this.serverId}`);
+
+        let pendingTelemetry = null;
+        let telemetryFrameQueued = false;
+
+        this.telemetrySubscription.on('publication', (ctx) => {
+            pendingTelemetry = ctx.data;
+
+            if (!telemetryFrameQueued) {
+                telemetryFrameQueued = true;
+                requestAnimationFrame(() => {
+                    this.hydrateTelemetry(pendingTelemetry);
+                    telemetryFrameQueued = false;
+                });
+            }
+        });
+
+        this.telemetrySubscription.subscribe();
+        
+        // Cache initial DOM row selectors for fast O(1) loop lookups
+        this.cacheTelemetryRows();
+    }
+
+    unsubscribeTelemetry() {
+        if (this.telemetrySubscription) {
+            console.log(`[Telemetry] Unsubscribing from telemetry channel: server:telemetry:${this.serverId}`);
+            this.telemetrySubscription.unsubscribe();
+            this.telemetrySubscription = null;
+            this.telemetryRows = null; // Clear cached row selectors to defend against leaks
+        }
+    }
+
+    cacheTelemetryRows() {
+        this.telemetryRows = new Map();
+        
+        // Match both mobile card views ("client-card-") and desktop row views ("client-row-")
+        const items = document.querySelectorAll('[id^="client-row-"], [id^="client-card-"]');
+        items.forEach(el => {
+            const id = Number(el.id.replace('client-row-', '').replace('client-card-', ''));
+            if (id) {
+                // Highly performant sub-selectors for client rows
+                const speedDownSpan = el.querySelector('.bg-emerald-500\\/10');
+                const speedUpSpan = el.querySelector('.bg-primary\\/10');
+                const trafficSpan = el.querySelector('.cell-traffic span.font-medium') || el.querySelector('.font-mono.font-medium');
+                const statusContainer = el.querySelector('.cell-status div') || el.querySelector('.flex.items-center.gap-1\\.5');
+                const seenSpan = el.querySelector('.cell-traffic span.text-muted') || el.querySelector('.font-mono.font-medium + .text-muted') || el.querySelector('.font-mono.font-medium + div + .text-muted');
+
+                this.telemetryRows.set(id, {
+                    el,
+                    speedDown: speedDownSpan,
+                    speedUp: speedUpSpan,
+                    traffic: trafficSpan,
+                    status: statusContainer,
+                    seen: seenSpan
+                });
+            }
+        });
+    }
+
+    hydrateTelemetry(data) {
+        if (!data || !Array.isArray(data.clients)) return;
+
+        // Ensure status map is initialized
+        if (!this.clientDbStatuses) {
+            this.clientDbStatuses = new Map();
+        }
+
+        // Cache rows on first publish if not already indexed
+        if (!this.telemetryRows || this.telemetryRows.size === 0) {
+            this.cacheTelemetryRows();
+        }
+
+        data.clients.forEach(client => {
+            const row = this.telemetryRows.get(Number(client.id));
+            if (!row) return;
+
+            // 1. Hydrate Download Speed with a beautiful micro-pulse anim
+            if (row.speedDown) {
+                const innerText = `<i class="fas fa-arrow-down mr-1 opacity-70"></i>${client.down}`;
+                if (row.speedDown.innerHTML !== innerText) {
+                    row.speedDown.innerHTML = innerText;
+                    row.speedDown.classList.add('pulse-glow');
+                    setTimeout(() => row.speedDown.classList.remove('pulse-glow'), 400);
+                }
+            }
+
+            // 2. Hydrate Upload Speed with a beautiful micro-pulse anim
+            if (row.speedUp) {
+                const innerText = `<i class="fas fa-arrow-up mr-1 opacity-70"></i>${client.up}`;
+                if (row.speedUp.innerHTML !== innerText) {
+                    row.speedUp.innerHTML = innerText;
+                    row.speedUp.classList.add('pulse-glow');
+                    setTimeout(() => row.speedUp.classList.remove('pulse-glow'), 400);
+                }
+            }
+
+            // 3. Hydrate Total Traffic
+            if (row.traffic) {
+                if (row.traffic.innerText !== client.traffic) {
+                    row.traffic.innerText = client.traffic;
+                }
+            }
+
+            // 4. Hydrate Last Seen status
+            if (row.seen) {
+                if (row.seen.innerText !== client.seen) {
+                    row.seen.innerText = client.seen;
+                }
+            }
+
+            // 5. Hydrate Status Badge (Online/Offline)
+            if (row.status) {
+                const dbStatus = this.clientDbStatuses.get(Number(client.id)) || 'active';
+                const connStatus = client.online ? 'online' : 'offline';
+                const badgeHtml = NK.renderStatusBadge(dbStatus, connStatus, this.labels);
+                if (row.status.innerHTML.trim() !== badgeHtml.trim()) {
+                    row.status.innerHTML = badgeHtml;
+                }
+            }
+        });
     }
 
     processJobEvent(event) {
@@ -784,10 +958,12 @@ class ServerView {
             if (document.visibilityState === 'visible') {
                 this.performSearch(true);
                 this.initBeszel();
+                this.subscribeTelemetry();
                 if (this.serverStatus === 'deploying') {
                     this.startPolling();
                 }
             } else {
+                this.unsubscribeTelemetry();
                 if (this.transitionPoll) {
                     clearTimeout(this.transitionPoll);
                     this.transitionPoll = null;

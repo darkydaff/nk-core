@@ -920,6 +920,11 @@ class VpnClient {
             return 0;
         }
 
+        // Bypassing legacy active polling for servers migrated to the push telemetry model
+        if (!empty($serverData['telemetry_token'])) {
+            return 0;
+        }
+
         // 1. Sync traffic via ServerMonitoring to prevent counter resets and double counting
         try {
             require_once __DIR__ . '/ServerMonitoring.php';
