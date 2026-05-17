@@ -331,7 +331,8 @@ while True:
                         "public_key": parts[1],
                         "bytes_received": int(parts[6]),
                         "bytes_sent": int(parts[7]),
-                        "last_handshake": int(parts[5])
+                        "latest_handshake": int(parts[5]),
+                        "endpoint_ip": parts[3].split(":")[0] if ":" in parts[3] else (None if parts[3] == "(none)" else parts[3])
                     })
         
         payload = {
