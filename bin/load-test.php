@@ -103,8 +103,8 @@ function runSimulationLoop($db, $nodes, $clients, $ticks, $delay, $dbDelay, $cen
         for ($i = 1; $i <= $nodes; $i++) {
             $token = hash('sha256', "loadtest_server_token_" . $i . "_" . random_bytes(8));
             $stmt = $db->prepare("
-                INSERT INTO vpn_servers (user_id, name, host, port, username, password, status, telemetry_token)
-                VALUES (1, ?, '127.0.0.1', 22, 'root', 'password', 'active', ?)
+                INSERT INTO vpn_servers (user_id, name, host, port, username, password, status, telemetry_token, telemetry_mode)
+                VALUES (1, ?, '127.0.0.1', 22, 'root', 'password', 'active', ?, 'push')
             ");
             $stmt->execute(["Mock Load Server {$i}", $token]);
             $serverId = $db->lastInsertId();

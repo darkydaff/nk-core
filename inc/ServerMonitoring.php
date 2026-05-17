@@ -25,9 +25,9 @@ class ServerMonitoring
      */
     public function collectClientMetrics(): array
     {
-        if (!empty($this->serverData['telemetry_token'])) {
-            // Server has push telemetry enabled. Avoid SSH polling to prevent DB locking,
-            // baseline corruption, and redundant CPU overhead.
+        // 1. Hard Mutual Exclusion: Telemetry Authority Lock
+        $mode = $this->serverData['telemetry_mode'] ?? 'ssh';
+        if ($mode !== 'ssh') {
             return [
                 'results' => [],
                 'peer_stats' => [],
@@ -35,6 +35,21 @@ class ServerMonitoring
                 'active_peer_count' => 0,
                 'using_push_telemetry' => true
             ];
+        }
+
+        // 2. Fail-Safe Migration Lockout Window
+        // If push telemetry was received in the last 5 minutes, absolutely lock out SSH collector
+        if (!empty($this->serverData['last_telemetry_at'])) {
+            $lastTelemetry = strtotime($this->serverData['last_telemetry_at']);
+            if (time() - $lastTelemetry < 300) {
+                return [
+                    'results' => [],
+                    'peer_stats' => [],
+                    'db_client_count' => 0,
+                    'active_peer_count' => 0,
+                    'lockout_active' => true
+                ];
+            }
         }
 
         $clients = VpnClient::listByServer($this->serverData['id']);

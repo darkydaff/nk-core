@@ -68,13 +68,20 @@ try {
 
 try {
     // 3. Authenticate server node token via indexed search
-    $serverStmt = $db->prepare("SELECT id, last_telemetry_at, server_health_score, consecutive_active_ticks, consecutive_idle_ticks, telemetry_state, replayed_packets_count, control_loop_damping FROM vpn_servers WHERE telemetry_token = ? AND deleted_at IS NULL LIMIT 1");
+    $serverStmt = $db->prepare("SELECT id, telemetry_mode, last_telemetry_at, server_health_score, consecutive_active_ticks, consecutive_idle_ticks, telemetry_state, replayed_packets_count, control_loop_damping FROM vpn_servers WHERE telemetry_token = ? AND deleted_at IS NULL LIMIT 1");
     $serverStmt->execute([$token]);
     $server = $serverStmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$server) {
         http_response_code(401);
         echo "15";
+        exit;
+    }
+
+    if ($server['telemetry_mode'] !== 'push') {
+        // Strict Telemetry Authority Lock: Push is disabled/locked for this server
+        http_response_code(403);
+        echo "15"; // Back off pushing until mode is promoted to push
         exit;
     }
 
