@@ -368,8 +368,12 @@ while True:
                 interval = int(resp)
             else:
                 interval = 15
+            sys.stdout.write(f"[{time.strftime('%H:%M:%S')}] Telemetry pushed successfully. Interval: {interval}s\n")
+            sys.stdout.flush()
                 
     except Exception as e:
+        sys.stderr.write(f"[{time.strftime('%H:%M:%S')}] Error: {str(e)}\n")
+        sys.stderr.flush()
         interval = 15
         
     time.sleep(interval)
