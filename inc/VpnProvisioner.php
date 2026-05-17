@@ -268,17 +268,20 @@ class VpnProvisioner
     private function installTelemetryAgent(): void
     {
         $serverData = $this->getData();
-        if (($serverData['telemetry_mode'] ?? 'ssh') !== 'push') {
-            return;
-        }
+        $pdo = DB::conn();
 
+        // Auto-promote all servers to push mode and generate a telemetry token during deployment/adoption
         $token = $serverData['telemetry_token'] ?? '';
         if (empty($token)) {
             $token = bin2hex(random_bytes(32));
-            $pdo = DB::conn();
-            $pdo->prepare('UPDATE vpn_servers SET telemetry_token = ? WHERE id = ?')
-                ->execute([$token, $this->getId()]);
+            $pdo->prepare('UPDATE vpn_servers SET telemetry_token = ?, telemetry_mode = ? WHERE id = ?')
+                ->execute([$token, 'push', $this->getId()]);
             $serverData['telemetry_token'] = $token;
+            $serverData['telemetry_mode'] = 'push';
+        } elseif (($serverData['telemetry_mode'] ?? 'ssh') !== 'push') {
+            $pdo->prepare('UPDATE vpn_servers SET telemetry_mode = ? WHERE id = ?')
+                ->execute(['push', $this->getId()]);
+            $serverData['telemetry_mode'] = 'push';
         }
 
         // Auto-detect the panel host address using a secure waterfall mechanism
