@@ -25,6 +25,18 @@ class ServerMonitoring
      */
     public function collectClientMetrics(): array
     {
+        if (!empty($this->serverData['telemetry_token'])) {
+            // Server has push telemetry enabled. Avoid SSH polling to prevent DB locking,
+            // baseline corruption, and redundant CPU overhead.
+            return [
+                'results' => [],
+                'peer_stats' => [],
+                'db_client_count' => 0,
+                'active_peer_count' => 0,
+                'using_push_telemetry' => true
+            ];
+        }
+
         $clients = VpnClient::listByServer($this->serverData['id']);
         if (empty($clients)) {
             return ['results' => [], 'peer_stats' => []];
