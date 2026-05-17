@@ -107,22 +107,25 @@ class BeszelClient {
      */
     public function getSystemByIp(string $ip, string $name = ''): ?array {
         $systems = $this->getSystems();
+        $ip = trim($ip);
         
         foreach ($systems as $system) {
+            $sysHost = isset($system['host']) ? trim($system['host']) : '';
+            $sysName = isset($system['name']) ? trim($system['name']) : '';
+
             // A. Match by exact IP
-            if (isset($system['host']) && $system['host'] === $ip) {
+            if ($sysHost === $ip) {
                 return $this->hydrateSystemStats($system);
             }
             
             // B. Match by case-insensitive name
-            if (!empty($name) && isset($system['name']) && strtolower($system['name']) === strtolower($name)) {
+            if (!empty($name) && strtolower($sysName) === strtolower(trim($name))) {
                 return $this->hydrateSystemStats($system);
             }
             
             // C. Match by DNS-resolved host IP
-            $host = $system['host'] ?? '';
-            if (!empty($host) && filter_var($host, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) {
-                $resolvedIp = gethostbyname($host);
+            if (!empty($sysHost) && filter_var($sysHost, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) {
+                $resolvedIp = gethostbyname($sysHost);
                 if ($resolvedIp === $ip) {
                     return $this->hydrateSystemStats($system);
                 }
