@@ -158,7 +158,7 @@ class ProxyServer
             require_once __DIR__ . '/DeploymentService.php';
             
             $containerName = '3proxy';
-            $runOptions = '--user root --network host -v /etc/3proxy/3proxy.cfg:/etc/3proxy/3proxy.cfg -v /var/log/3proxy:/var/log/3proxy';
+            $runOptions = '--user 0 --network host -v /etc/3proxy/3proxy.cfg:/etc/3proxy/3proxy.cfg -v /var/log/3proxy:/var/log/3proxy';
             
             DeploymentService::deployDockerContainer($this, $containerName, '3proxy/3proxy:latest', $runOptions);
         } else {
