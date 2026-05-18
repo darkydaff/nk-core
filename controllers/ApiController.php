@@ -774,6 +774,7 @@ class ApiController {
         $user = $this->requireAnyAuth();
         if (!$user || $user['role'] !== 'admin') {
             $this->respond(['error' => 'Forbidden'], 403);
+            return;
         }
 
         try {
@@ -834,6 +835,7 @@ class ApiController {
         $user = $this->requireAnyAuth();
         if (!$user || $user['role'] !== 'admin') {
             $this->respond(['error' => 'Forbidden'], 403);
+            return;
         }
 
         $db = DB::conn();
@@ -914,6 +916,7 @@ class ApiController {
         $user = $this->requireAnyAuth();
         if (!$user || $user['role'] !== 'admin') {
             $this->respond(['error' => 'Forbidden'], 403);
+            return;
         }
 
         $db = DB::conn();
@@ -937,7 +940,9 @@ class ApiController {
             // Programmatically execute a packet replay if payload_id is specified
             $payloadId = (int)($_GET['payload_id'] ?? 0);
             if ($payloadId > 0) {
-                $log = $db->query("SELECT * FROM telemetry_replay_logs WHERE id = {$payloadId}")->fetch(PDO::FETCH_ASSOC);
+                $logStmt = $db->prepare("SELECT * FROM telemetry_replay_logs WHERE id = ?");
+                $logStmt->execute([$payloadId]);
+                $log = $logStmt->fetch(PDO::FETCH_ASSOC);
                 if (!$log) {
                     $this->respond(['error' => 'Replay log entry not found'], 404);
                     return;
@@ -1044,6 +1049,7 @@ class ApiController {
         $user = $this->requireAnyAuth();
         if (!$user || $user['role'] !== 'admin') {
             $this->respond(['error' => 'Forbidden'], 403);
+            return;
         }
 
         try {

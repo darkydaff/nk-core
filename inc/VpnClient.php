@@ -145,9 +145,7 @@ class VpnClient {
         
         try {
             // Set status to VERIFYING
-            $pdo = DB::conn();
-            $pdo->prepare('UPDATE vpn_clients SET status = ? WHERE id = ?')
-                ->execute([ClientStatus::VERIFYING->value, $this->clientId]);
+            $this->setStatus(ClientStatus::VERIFYING);
 
             require_once __DIR__ . '/VpnConfigRenderer.php';
             $renderer = new VpnConfigRenderer($server);
@@ -179,9 +177,7 @@ class VpnClient {
             $this->data['status'] = ClientStatus::ACTIVE;
             return true;
         } catch (Exception $e) {
-            $pdo = DB::conn();
-            $pdo->prepare('UPDATE vpn_clients SET status = ? WHERE id = ?')
-                ->execute([ClientStatus::ERROR->value, $this->clientId]);
+            $this->setStatus(ClientStatus::ERROR);
             throw $e;
         }
     }
@@ -336,40 +332,10 @@ class VpnClient {
      * Add client to server using official method (append + wg syncconf)
      */
     public static function addClientToServer(array|VpnServer $server, string $publicKey, string $clientIP, string $privateKey = '', string $name = ''): void {
-        $serverData = is_array($server) ? $server : $server->getData();
-        $containerName = $serverData['container_name'];
-        
-        // 1. Get current config
-        $readCmd = "docker exec -i {$containerName} cat /opt/amnezia/awg/wg0.conf";
-        $currentConfig = self::executeServerCommand($server, $readCmd, true);
-        
-        // 2. Check if peer already exists (IDEMPOTENCY)
-        if (strpos($currentConfig, $publicKey) !== false) {
-            return; 
-        }
-
-        // 3. Build full new config
-        $newPeer = "\n# Name = " . ($name ?: $clientIP) . "\n";
-        $newPeer .= "[Peer]\n";
-        $newPeer .= "PublicKey = {$publicKey}\n";
-        $newPeer .= "PresharedKey = {$serverData['preshared_key']}\n";
-        $newPeer .= "AllowedIPs = {$clientIP}/32\n";
-        
-        $fullConfig = rtrim($currentConfig) . $newPeer;
-        $base64 = base64_encode($fullConfig);
-        
-        // 4. ATOMIC WRITE: Write to temp, then move
-        $writeCmd = sprintf(
-            "docker exec -i %s bash -c " . escapeshellarg(
-                "echo " . escapeshellarg($base64) . " | base64 -d > /opt/amnezia/awg/wg0.conf.tmp && " .
-                "mv /opt/amnezia/awg/wg0.conf.tmp /opt/amnezia/awg/wg0.conf && " .
-                "chmod 600 /opt/amnezia/awg/wg0.conf && " .
-                "/usr/local/bin/awg syncconf wg0 <(/usr/local/bin/awg-quick strip /opt/amnezia/awg/wg0.conf)"
-            ),
-            $containerName
-        );
-        
-        self::executeServerCommand($server, $writeCmd, true);
+        $serverObj = is_array($server) ? new VpnServer($server['id']) : $server;
+        require_once __DIR__ . '/VpnConfigRenderer.php';
+        $renderer = new VpnConfigRenderer($serverObj);
+        $renderer->syncDeclarative();
         
         // Update clientsTable with private key for discovery resilience
         self::updateClientsTable($server, $publicKey, $name ?: $clientIP, $privateKey);
@@ -511,9 +477,7 @@ class VpnClient {
         }
         
         // Set to DELETING status first
-        $pdo = DB::conn();
-        $pdo->prepare('UPDATE vpn_clients SET status = ? WHERE id = ?')
-            ->execute([ClientStatus::DELETING->value, $this->clientId]);
+        $this->setStatus(ClientStatus::DELETING);
             
         // Queue the infrastructure removal + DB cleanup
         require_once __DIR__ . '/Queue.php';
@@ -530,39 +494,12 @@ class VpnClient {
      * Remove client from server WireGuard configuration
      */
     public static function removeClientFromServer(array|VpnServer $server, string $publicKey): void {
-        $serverData = is_array($server) ? $server : $server->getData();
-        $containerName = $serverData['container_name'];
-        
-        // 1. UPDATE CONFIG (Desired State)
-        $readCmd = sprintf("docker exec -i %s cat /opt/amnezia/awg/wg0.conf", $containerName);
-        $config = self::executeServerCommand($server, $readCmd, true);
-        $newConfig = self::removePeerFromConfig($config, $publicKey);
-        
-        $base64Config = base64_encode($newConfig);
-        $writeCmd = sprintf(
-            "docker exec -i %s sh -c " . escapeshellarg(
-                "echo " . escapeshellarg($base64Config) . " | base64 -d > /opt/amnezia/awg/wg0.conf.tmp && " .
-                "mv /opt/amnezia/awg/wg0.conf.tmp /opt/amnezia/awg/wg0.conf && " .
-                "chmod 600 /opt/amnezia/awg/wg0.conf"
-            ),
-            $containerName
-        );
-        self::executeServerCommand($server, $writeCmd, true);
+        $serverObj = is_array($server) ? new VpnServer($server['id']) : $server;
+        require_once __DIR__ . '/VpnConfigRenderer.php';
+        $renderer = new VpnConfigRenderer($serverObj);
+        $renderer->syncDeclarative();
 
-        // 2. APPLY (syncconf)
-        $syncCmd = sprintf(
-            "docker exec -i %s bash -c '/usr/local/bin/awg syncconf wg0 <(/usr/local/bin/awg-quick strip /opt/amnezia/awg/wg0.conf)'",
-            $containerName
-        );
-        self::executeServerCommand($server, $syncCmd, true);
-        
-        // 3. VERIFICATION (Retry loop)
-        $verified = self::verifyPeerInRuntime($server, $publicKey, false);
-        if (!$verified) {
-            throw new Exception("Runtime removal failed: Peer {$publicKey} still exists in kernel memory after 5 attempts.");
-        }
-
-        // 4. METADATA REMOVAL
+        // METADATA REMOVAL
         self::removeFromClientsTable($server, $publicKey);
     }
     
@@ -797,7 +734,11 @@ class VpnClient {
                 if (time() - $lastTelemetry < 300) {
                     return false;
                 }
-            } catch (\Throwable $e) {}
+            } catch (\Throwable $e) {
+                if (class_exists('Logger')) {
+                    \Logger::error('Unhandled exception', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+                }
+            }
         }
 
         // 1. Sync traffic via ServerMonitoring to prevent counter resets and double counting
@@ -862,52 +803,17 @@ class VpnClient {
         $cmd = sprintf("docker exec -i %s /usr/local/bin/awg show all dump", $containerName);
         $output = self::executeServerCommand($serverData, $cmd, true);
         
-        $peers = [];
-        $lines = explode("\n", trim($output));
+        require_once __DIR__ . '/WgDumpParser.php';
+        $rawPeers = WgDumpParser::parse($output);
         
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if (empty($line)) continue;
-            
-            // Split by any whitespace (tabs or spaces) to be more resilient
-            $parts = preg_split('/\s+/', $line);
-            $count = count($parts);
-            
-            // Search for the Public Key (44 chars ending in =) to identify the peer.
-            $isKey0 = (strlen($parts[0]) === 44 && str_ends_with($parts[0], '='));
-            $isKey1 = (isset($parts[1]) && strlen($parts[1]) === 44 && str_ends_with($parts[1], '='));
-
-            if ($isKey0) {
-                $offset = 0;
-            } elseif ($isKey1) {
-                $offset = 1;
-            } else {
-                continue;
-            }
-
-            if ($count < (5 + $offset)) continue;
-
-            $publicKey = $parts[0 + $offset];
-            $endpoint = $parts[2 + $offset] ?? '(none)';
-            $handshake = (int)($parts[4 + $offset] ?? 0);
-            $bytesRx = (int)($parts[5 + $offset] ?? 0);
-            $bytesTx = (int)($parts[6 + $offset] ?? 0);
-            
-            // Clean endpoint IP (strip port, handle IPv6)
-            $externalIp = $endpoint;
-            if ($endpoint !== '(none)') {
-                if (strpos($endpoint, ']:') !== false) { // IPv6 [addr]:port
-                    $externalIp = substr($endpoint, 1, strpos($endpoint, ']:') - 1);
-                } elseif (strpos($endpoint, ':') !== false) { // IPv4 addr:port
-                    $externalIp = explode(':', $endpoint)[0];
-                }
-            }
-            
+        // Transform to the format expected by syncAllStatsForServer
+        $peers = [];
+        foreach ($rawPeers as $publicKey => $peerData) {
             $peers[$publicKey] = [
-                'bytes_sent' => $bytesRx,       // client upload
-                'bytes_received' => $bytesTx,   // client download
-                'last_handshake' => $handshake,
-                'endpoint' => $externalIp,
+                'bytes_sent' => $peerData['bytes_received'],     // client upload (server rx)
+                'bytes_received' => $peerData['bytes_sent'],     // client download (server tx)
+                'last_handshake' => $peerData['last_handshake'],
+                'endpoint' => WgDumpParser::cleanEndpoint($peerData['endpoint']),
             ];
         }
         
@@ -1310,67 +1216,25 @@ public static function getClientsOverLimit(): array {
             $ip = (strpos($ip, ']:') !== false) ? substr($ip, 1, strpos($ip, ']:') - 1) : explode(':', $ip)[0];
         }
 
-        // First try ip-api.com (HTTP only for free tier)
-        $fields = 'status,message,country,countryCode,city,isp,org,lat,lon,query';
-        $url = "http://ip-api.com/json/{$ip}?fields={$fields}";
+        require_once __DIR__ . '/GeoIpClient.php';
+        $geo = GeoIpClient::lookup($ip);
         
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-        curl_setopt($ch, CURLOPT_USERAGENT, 'NK-Panel/1.0');
-        
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        // curl_close is no longer needed in PHP 8.0+
-        
-        if ($httpCode === 200 && $response) {
-            $data = json_decode($response, true);
-            if (($data['status'] ?? '') === 'success') {
-                return $data;
-            }
-            if (class_exists('Logger')) {
-                Logger::warning("GeoIP lookup (ip-api.com) failed for {$ip}: " . ($data['message'] ?? 'Unknown error'));
-            }
-        } else {
-            if (class_exists('Logger')) {
-                Logger::warning("GeoIP lookup (ip-api.com) unreachable for {$ip}. HTTP: {$httpCode}, Error: {$error}");
-            }
+        if ($geo === null) {
+            return null;
         }
 
-        // Fallback to freeipapi.com (Supports HTTPS)
-        if (class_exists('Logger')) {
-            Logger::info("Trying fallback GeoIP (freeipapi.com) for {$ip}");
-        }
-        
-        $url = "https://freeipapi.com/api/json/{$ip}";
-        $ch = curl_init($url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
-        curl_setopt($ch, CURLOPT_USERAGENT, 'NK-Panel/1.0');
-        
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        // curl_close is no longer needed in PHP 8.0+
-        
-        if ($httpCode === 200 && $response) {
-            $data = json_decode($response, true);
-            if (isset($data['countryName'])) {
-                return [
-                    'status' => 'success',
-                    'country' => $data['countryName'],
-                    'countryCode' => $data['countryCode'],
-                    'city' => $data['cityName'],
-                    'isp' => $data['as'] ?? 'Unknown',
-                    'org' => $data['as'] ?? 'Unknown',
-                    'lat' => $data['latitude'] ?? null,
-                    'lon' => $data['longitude'] ?? null,
-                    'query' => $ip
-                ];
-            }
-        }
-
-        return null;
+        // Map to legacy return format for backward compatibility
+        return [
+            'status' => 'success',
+            'country' => $geo['country'],
+            'countryCode' => $geo['country_code'],
+            'city' => $geo['city'],
+            'isp' => $geo['isp'] ?? 'Unknown',
+            'org' => $geo['org'] ?? 'Unknown',
+            'lat' => $geo['lat'] ?? null,
+            'lon' => $geo['lon'] ?? null,
+            'query' => $ip
+        ];
     }
 
     /**

@@ -24,7 +24,7 @@ class VpnConfigRenderer
 
         // Fetch all active clients for this server
         $pdo = DB::conn();
-        $stmt = $pdo->prepare("SELECT * FROM vpn_clients WHERE server_id = ? AND status = 'active' AND deleted_at IS NULL ORDER BY ip_address ASC");
+        $stmt = $pdo->prepare("SELECT * FROM vpn_clients WHERE server_id = ? AND status = 'active' AND deleted_at IS NULL ORDER BY client_ip ASC");
         $stmt->execute([$this->server->getId()]);
         $clients = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -33,7 +33,12 @@ class VpnConfigRenderer
         
         $awgParams = [];
         if (!empty($serverData['awg_params'])) {
-            $awgParams = json_decode($serverData['awg_params'], true) ?: [];
+            $rawAwgParams = json_decode($serverData['awg_params'], true) ?: [];
+            $allowedKeys = ['Jc','Jmin','Jmax','S1','S2','S3','S4','H1','H2','H3','H4','I1','I2','I3','I4'];
+            $awgParams = array_intersect_key(
+                $rawAwgParams,
+                array_flip($allowedKeys)
+            );
         }
         $serverData['awg_params'] = $awgParams;
 

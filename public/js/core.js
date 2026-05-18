@@ -1,5 +1,12 @@
 /* public/js/core.js */
 window.NK = {
+    // HTML Escape utility (prevents XSS in innerHTML contexts)
+    escapeHtml: function(str) {
+        if (typeof str !== 'string') return str;
+        const div = document.createElement('div');
+        div.appendChild(document.createTextNode(str));
+        return div.innerHTML;
+    },
     // Global Toast System
     toast: function(message, type = 'info') {
         let toastContainer = document.getElementById('toast-container');
@@ -40,7 +47,7 @@ window.NK = {
         };
 
         toast.className = `flex items-center p-4 rounded-xl border ${colors[type]} shadow-2xl transition-all duration-300 transform translate-x-8 opacity-0 w-full backdrop-blur-md`;
-        toast.innerHTML = `<i class="fas ${icons[type]} mr-3 flex-shrink-0"></i><span class="text-sm font-bold tracking-tight">${message}</span>`;
+        toast.innerHTML = `<i class="fas ${icons[type]} mr-3 flex-shrink-0"></i><span class="text-sm font-bold tracking-tight">${this.escapeHtml(message)}</span>`;
         
         // Add to top of list
         toastContainer.prepend(toast);
@@ -219,10 +226,12 @@ window.NK = {
     },
 
     highlightMatch: function(text, query) {
-        if (!query || !text) return text;
-        const escapedQuery = query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        if (!query || !text) return this.escapeHtml(text);
+        const safeText = this.escapeHtml(text);
+        const safeQuery = this.escapeHtml(query);
+        const escapedQuery = safeQuery.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
         const regex = new RegExp(`(${escapedQuery})`, 'gi');
-        return text.replace(regex, '<mark class="bg-primary/20 text-primary border border-primary/30 rounded px-0.5 font-bold">$1</mark>');
+        return safeText.replace(regex, '<mark class="bg-primary/20 text-primary border border-primary/30 rounded px-0.5 font-bold">$1</mark>');
     },
 
     // Senior-Grade Modal Accessibility Focus Trap System

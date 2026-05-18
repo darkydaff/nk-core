@@ -133,6 +133,8 @@ while (true) {
                         ->execute([$type, $payload['server_id'] ?? null, json_encode($payload), $errorSummary, $reserves, $exitCode, $durationMs ?? null, $hostname, $classification['category'], (int)$classification['retryable'], $classification['severity']]);
                 }
                 
+                // NOTE: Raw SQL intentional — crash recovery path bypasses state machine
+                // because the domain model may not be loadable in a failure state
                 if ($type === 'provision_server' && isset($payload['server_id'])) {
                     $pdo->prepare("UPDATE vpn_servers SET status = 'error', error_message = ? WHERE id = ?")
                         ->execute([$e->getMessage(), $payload['server_id']]);

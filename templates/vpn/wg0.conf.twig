@@ -16,6 +16,6 @@ PublicKey = {{ client.public_key }}
 {% if client.preshared_key %}
 PresharedKey = {{ client.preshared_key }}
 {% endif %}
-AllowedIPs = {{ client.ip_address }}/32
+AllowedIPs = {{ client.client_ip }}/32
 
 {% endfor %}

@@ -47,7 +47,7 @@ try {
             $jobId = isset($payload['job_id']) ? (int)$payload['job_id'] : null;
             $lockName = "server:{$serverId}:deploy";
             
-            if (!Lock::acquire($lockName, 600)) {
+            if (!Lock::acquire($lockName, 1200)) {
                 // Exit with code 2 to indicate temporary lock (should retry)
                 exit(2);
             }
@@ -129,6 +129,10 @@ try {
                 $client = new VpnClient($clientId);
                 $clientData = $client->getData();
                 
+                $pdo = DB::conn();
+                $pdo->prepare('UPDATE vpn_clients SET status = ? WHERE id = ?')
+                    ->execute([ClientStatus::DISABLED->value, $clientId]);
+                
                 if ($clientData) {
                     $server = new VpnServer($serverId);
                     VpnClient::removeClientFromServer($server->getData(), $clientData['public_key']);
@@ -151,14 +155,14 @@ try {
                 $client = new VpnClient($clientId);
                 $clientData = $client->getData();
                 
+                $pdo = DB::conn();
+                $pdo->prepare('UPDATE vpn_clients SET deleted_at = NOW(), status = ? WHERE id = ?')
+                    ->execute([ClientStatus::DELETED->value, $clientId]);
+
                 if ($clientData) {
                     $server = new VpnServer($serverId);
                     VpnClient::removeClientFromServer($server->getData(), $clientData['public_key']);
                 }
-                
-                $pdo = DB::conn();
-                $pdo->prepare('UPDATE vpn_clients SET deleted_at = NOW(), status = ? WHERE id = ?')
-                    ->execute([ClientStatus::DELETED->value, $clientId]);
                     
                 Logger::channel('deployments')->info('Client deletion successful', ['client_id' => $clientId, 'server_id' => $serverId]);
             } finally {
@@ -214,12 +218,12 @@ try {
 
 } catch (\Throwable $e) {
     // Classification: Permanent vs Transient
-    $isPermanent = (
-        $e instanceof \InvalidArgumentException || 
-        strpos($e->getMessage(), 'Validation failed') !== false ||
-        strpos($e->getMessage(), 'already exists') !== false ||
-        strpos($e->getMessage(), 'not found') !== false
-    );
+    $isPermanent = false;
+    if ($e instanceof JobException) {
+        $isPermanent = in_array($e->failureType, [JobFailureType::PERMANENT, JobFailureType::VALIDATION]);
+    } else {
+        $isPermanent = ($e instanceof \InvalidArgumentException);
+    }
 
     fwrite(STDERR, $e->getMessage() . "\n" . $e->getTraceAsString() . "\n");
 

@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/WgDumpParser.php';
 
 /**
  * ServerMonitoring - Collect and store server metrics
@@ -52,7 +53,11 @@ class ServerMonitoring
                         'lockout_active' => true
                     ];
                 }
-            } catch (\Throwable $e) {}
+            } catch (\Throwable $e) {
+                if (class_exists('Logger')) {
+                    \Logger::error('Unhandled exception', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+                }
+            }
         }
 
         $clients = VpnClient::listByServer($this->serverData['id']);
@@ -140,62 +145,11 @@ class ServerMonitoring
 
     /**
      * Parse `awg show all dump` output into a map of publicKey => peer data.
-     * 
-     * Dump format per line (tab-separated):
-     * Server line:  [iface] privateKey  publicKey  listenPort  fwmark
-     * Peer line:    [iface] publicKey  presharedKey  endpoint  allowedIPs  latestHandshake  transferRx  transferTx  persistentKeepalive
+     * Delegates to WgDumpParser for single source of truth.
      */
     private function parseDump(string $output): array
     {
-        $peers = [];
-        $lines = explode("\n", trim($output));
-
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if (empty($line)) continue;
-
-            // Split by any whitespace (tabs or spaces) to be more resilient
-            $parts = preg_split('/\s+/', $line);
-            $count = count($parts);
-            
-            // AmneziaWG adds many columns for obfuscation. Standard WG is 8-9.
-            // We search for the Public Key (44 chars ending in =) to identify the peer.
-            $isKey0 = (strlen($parts[0]) === 44 && str_ends_with($parts[0], '='));
-            $isKey1 = (isset($parts[1]) && strlen($parts[1]) === 44 && str_ends_with($parts[1], '='));
-
-            if ($isKey0) {
-                // Peer line, no interface prefix
-                $offset = 0;
-            } elseif ($isKey1) {
-                // Peer line, with interface prefix
-                $offset = 1;
-            } else {
-                continue; // Interface line or unrecognized format
-            }
-
-            // Standard WireGuard indices relative to the key:
-            // 0: publicKey
-            // 1: presharedKey
-            // 2: endpoint
-            // 3: allowedIPs
-            // 4: latestHandshake
-            // 5: transferRx
-            // 6: transferTx
-            // 7: persistentKeepalive
-            
-            if ($count < (5 + $offset)) continue; // Not enough data for stats
-
-            $publicKey = $parts[0 + $offset];
-            $peers[$publicKey] = [
-                'preshared_key' => $parts[1 + $offset] ?? '(none)',
-                'endpoint'      => $parts[2 + $offset] ?? '(none)',
-                'allowed_ips'   => $parts[3 + $offset] ?? '(none)',
-                'last_handshake'=> (int)($parts[4 + $offset] ?? 0),
-                'bytes_sent'    => (float)($parts[6 + $offset] ?? 0), // tx = client received
-                'bytes_received'=> (float)($parts[5 + $offset] ?? 0), // rx = client sent
-            ];
-        }
-        return $peers;
+        return WgDumpParser::parse($output);
     }
 
     /**
@@ -298,14 +252,7 @@ class ServerMonitoring
 
     // Clean endpoint IP (strip port, handle IPv6)
     $endpoint = $stats['endpoint'] ?? '(none)';
-    $externalIp = $endpoint;
-    if ($endpoint !== '(none)' && !empty($endpoint)) {
-        if (strpos($endpoint, ']:') !== false) { // IPv6 [addr]:port
-            $externalIp = substr($endpoint, 1, strpos($endpoint, ']:') - 1);
-        } elseif (strpos($endpoint, ':') !== false) { // IPv4 addr:port
-            $externalIp = explode(':', $endpoint)[0];
-        }
-    }
+    $externalIp = WgDumpParser::cleanEndpoint($endpoint);
 
     $stmt->execute([
         'bs'   => $stats['diff_sent'],

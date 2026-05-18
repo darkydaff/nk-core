@@ -137,7 +137,11 @@ try {
                     INSERT INTO telemetry_replay_logs (server_id, payload, status, latency_ms)
                     VALUES (?, ?, 'replayed', ?)
                 ")->execute([$serverId, $json, (microtime(true) - $startTime) * 1000.0]);
-            } catch (\Throwable $e) {}
+            } catch (\Throwable $e) {
+                if (class_exists('Logger')) {
+                    \Logger::error('Unhandled exception', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+                }
+            }
 
             header("X-Telemetry-Decision-Path: " . json_encode($decisionPath));
             echo "15";
@@ -481,7 +485,11 @@ try {
                 INSERT INTO telemetry_state_transitions (server_id, from_state, to_state, trigger_event, instability_weight)
                 VALUES (?, ?, ?, ?, ?)
             ")->execute([$serverId, $currentTelemetryState, $targetTelemetryState, $triggerEvent, $instabilityWeight]);
-        } catch (\Throwable $e) {}
+        } catch (\Throwable $e) {
+            if (class_exists('Logger')) {
+                \Logger::error('Unhandled exception', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            }
+        }
     }
 
     // Fetch last 10 transitions to calculate Shannon loop entropy
@@ -534,7 +542,11 @@ try {
         $saveBaselineStmt->execute([$serverId, 'ingest_latency', $newBaseIngest]);
         $saveBaselineStmt->execute([$serverId, 'db_time', $newBaseDb]);
         $saveBaselineStmt->execute([$serverId, 'centrifugo_time', $newBaseCent]);
-    } catch (\Throwable $e) {}
+    } catch (\Throwable $e) {
+        if (class_exists('Logger')) {
+            \Logger::error('Unhandled exception', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+        }
+    }
 
     // 10. DEFERRED DIAGNOSTICS & SYSTEM METRICS REGISTRY WRITE (Single row write update!)
     $db->prepare("
@@ -582,7 +594,11 @@ try {
                 INSERT INTO telemetry_replay_logs (server_id, payload, status, latency_ms)
                 VALUES (?, ?, 'captured', ?)
             ")->execute([$serverId, $json, $totalIngestTime]);
-        } catch (\Throwable $e) {}
+        } catch (\Throwable $e) {
+            if (class_exists('Logger')) {
+                \Logger::error('Unhandled exception', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            }
+        }
     }
 
     // Output decision path in header
@@ -597,7 +613,11 @@ try {
     }
     try {
         @file_put_contents('/var/log/nk-panel/telemetry_error.log', $e->getMessage() . "\n" . $e->getTraceAsString());
-    } catch (\Throwable $err) {}
+    } catch (\Throwable $err) {
+        if (class_exists('Logger')) {
+            \Logger::error('Unhandled exception', ['message' => $err->getMessage(), 'trace' => $err->getTraceAsString()]);
+        }
+    }
     // Fail gracefully back to default interval
     http_response_code(500);
     echo "15";

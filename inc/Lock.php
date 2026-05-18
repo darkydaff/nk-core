@@ -37,4 +37,31 @@ class Lock
         $pdo = DB::conn();
         $pdo->prepare("DELETE FROM job_locks WHERE name = ?")->execute([$name]);
     }
+
+    /**
+     * Extend (renew) an existing lock's TTL.
+     * Use during long-running operations to prevent premature expiry.
+     * 
+     * @param string $name Lock name
+     * @param int $ttl New TTL in seconds from now
+     * @return bool True if lock was extended, false if lock doesn't exist
+     */
+    public static function extend(string $name, int $ttl = 300): bool
+    {
+        $pdo = DB::conn();
+        $stmt = $pdo->prepare("UPDATE job_locks SET expires_at = DATE_ADD(NOW(), INTERVAL ? SECOND) WHERE name = ?");
+        $stmt->execute([$ttl, $name]);
+        return $stmt->rowCount() > 0;
+    }
+
+    /**
+     * Check if a lock is currently held (for diagnostics/monitoring)
+     */
+    public static function isHeld(string $name): bool
+    {
+        $pdo = DB::conn();
+        $stmt = $pdo->prepare("SELECT 1 FROM job_locks WHERE name = ? AND expires_at > NOW()");
+        $stmt->execute([$name]);
+        return (bool)$stmt->fetchColumn();
+    }
 }

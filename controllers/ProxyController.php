@@ -141,7 +141,11 @@ class ProxyController
         $proxy = $stmt->fetch();
 
         if ($proxy) {
-            $pdo->prepare('UPDATE http_proxies SET status = ? WHERE id = ?')->execute(['paused', $id]);
+            $currentStatus = ProxyStatus::tryFrom($proxy['status']) ?? ProxyStatus::ERROR;
+            if (!$currentStatus->canTransitionTo(ProxyStatus::PAUSED)) {
+                return $this->respond(false, "Invalid proxy state transition");
+            }
+            $pdo->prepare('UPDATE http_proxies SET status = ? WHERE id = ?')->execute([ProxyStatus::PAUSED->value, $id]);
             unlockSession();
             try {
                 $proxyServer = new ProxyServer($proxy['server_id']);
@@ -167,7 +171,11 @@ class ProxyController
         $proxy = $stmt->fetch();
 
         if ($proxy) {
-            $pdo->prepare('UPDATE http_proxies SET status = ? WHERE id = ?')->execute([ServerStatus::ACTIVE->value, $id]);
+            $currentStatus = ProxyStatus::tryFrom($proxy['status']) ?? ProxyStatus::ERROR;
+            if (!$currentStatus->canTransitionTo(ProxyStatus::ACTIVE)) {
+                return $this->respond(false, "Invalid proxy state transition");
+            }
+            $pdo->prepare('UPDATE http_proxies SET status = ? WHERE id = ?')->execute([ProxyStatus::ACTIVE->value, $id]);
             unlockSession();
             try {
                 $proxyServer = new ProxyServer($proxy['server_id']);
@@ -193,7 +201,11 @@ class ProxyController
         $proxy = $stmt->fetch();
 
         if ($proxy) {
-            $pdo->prepare('UPDATE http_proxies SET deleted_at = NOW(), status = ? WHERE id = ?')->execute(['deleted', $id]);
+            $currentStatus = ProxyStatus::tryFrom($proxy['status']) ?? ProxyStatus::ERROR;
+            if (!$currentStatus->canTransitionTo(ProxyStatus::DELETED)) {
+                return $this->respond(false, "Invalid proxy state transition");
+            }
+            $pdo->prepare('UPDATE http_proxies SET deleted_at = NOW(), status = ? WHERE id = ?')->execute([ProxyStatus::DELETED->value, $id]);
             unlockSession();
             try {
                 $proxyServer = new ProxyServer($proxy['server_id']);

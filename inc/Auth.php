@@ -123,7 +123,7 @@ class Auth {
     $pdo = DB::conn();
     // Soft delete user
     $stmt = $pdo->prepare('UPDATE users SET deleted_at = NOW(), status = ? WHERE id = ?');
-    return $stmt->execute([ClientStatus::DELETED->value, $userId]);
+    return $stmt->execute(['disabled', $userId]);
   }
 
   public static function setRole(int $userId, UserRole $role): bool {

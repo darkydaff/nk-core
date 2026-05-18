@@ -64,17 +64,18 @@ RUN mkdir -p /var/www/html/storage/cache/twig
 # Build Tailwind CSS (moved to start.sh to support volume mounts)
 RUN npm install && npx update-browserslist-db@latest
 
-# Create SSH ControlMaster socket directory
-RUN mkdir -p /tmp/ssh_mux
+# Create SSH ControlMaster socket directory (restricted, not in /tmp)
+RUN mkdir -p /var/run/nk-core/ssh_mux
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html/public \
     && chown -R www-data:www-data /var/www/html/storage \
-    && chown -R www-data:www-data /tmp/ssh_mux
+    && chown -R www-data:www-data /var/run/nk-core
 
 # Setup cron jobs
 RUN echo "* * * * * www-data cd /var/www/html && /usr/local/bin/php bin/run_backup.php --cron >> /var/log/cron.log 2>&1" > /etc/cron.d/amnezia-cron \
+    && echo "*/2 * * * * www-data cd /var/www/html && /usr/local/bin/php bin/reap_zombie_jobs.php >> /var/log/cron.log 2>&1" >> /etc/cron.d/amnezia-cron \
     && chmod 0644 /etc/cron.d/amnezia-cron \
     && touch /var/log/cron.log \
     && chown www-data:www-data /var/log/cron.log

@@ -137,17 +137,9 @@ class VpnServer
         }
 
         try {
-            $url = "http://ip-api.com/json/{$ip}?fields=status,message,country,countryCode,city,isp,org,query";
-            $ch = curl_init();
-            curl_setopt($ch, CURLOPT_URL, $url);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-            $response = curl_exec($ch);
-
-            if (!$response) return false;
-
-            $geo = json_decode($response, true);
-            if (($geo['status'] ?? '') !== 'success') return false;
+            require_once __DIR__ . '/GeoIpClient.php';
+            $geo = GeoIpClient::lookup($ip);
+            if (!$geo) return false;
 
             $pdo = DB::conn();
             $stmt = $pdo->prepare('
@@ -158,7 +150,7 @@ class VpnServer
             
             $stmt->execute([
                 $geo['country'] ?? null,
-                $geo['countryCode'] ?? null,
+                $geo['country_code'] ?? null,
                 $geo['city'] ?? null,
                 $geo['isp'] ?? null,
                 $geo['org'] ?? null,
@@ -454,8 +446,7 @@ class VpnServer
         $pdo = DB::conn();
         
         // 1. Mark as deleting in DB
-        $stmt = $pdo->prepare('UPDATE vpn_servers SET status = ? WHERE id = ?');
-        $stmt->execute([ServerStatus::DELETING->value, $this->serverId]);
+        $this->setStatus(ServerStatus::DELETING);
 
         // 2. Queue for remote cleanup
         require_once __DIR__ . '/Queue.php';
@@ -532,7 +523,7 @@ class VpnServer
         $stmtProxies->execute(['deleted', $this->serverId]);
 
         $stmtServer = $pdo->prepare('UPDATE vpn_servers SET deleted_at = NOW(), status = ? WHERE id = ?');
-        $stmtServer->execute([ServerStatus::STOPPED->value, $this->serverId]);
+        $stmtServer->execute([ServerStatus::DELETED->value, $this->serverId]);
     }
 
     /**
@@ -822,7 +813,7 @@ class VpnServer
      */
     public function syncClientsWithServer(): void
     {
-        if (!$this->data || $this->data['status'] !== ServerStatus::ACTIVE)
+        if (!$this->data || $this->data['status'] !== ServerStatus::ACTIVE->value)
             return;
 
         $containerName = $this->data['container_name'];

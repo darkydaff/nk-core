@@ -1,14 +1,18 @@
 <?php
 class DB {
   private static ?PDO $pdo = null;
+  private static int $lastPingAt = 0;
 
   public static function conn(): PDO {
     if (self::$pdo) {
-      // Verify connection is still alive (handles long-running processes)
-      try {
-        self::$pdo->query('SELECT 1');
-      } catch (\Throwable $e) {
-        self::$pdo = null; // Force reconnect
+      // Only verify connection if >30s since last check (avoids per-request overhead)
+      if (time() - self::$lastPingAt > 30) {
+        try {
+          self::$pdo->query('SELECT 1');
+          self::$lastPingAt = time();
+        } catch (\Throwable $e) {
+          self::$pdo = null; // Force reconnect
+        }
       }
     }
     if (self::$pdo) return self::$pdo;

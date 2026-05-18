@@ -1,0 +1,55 @@
+name: NK-CORE Pre-flight Checks
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  validate-schema:
+    runs-on: ubuntu-latest
+    
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: nkcore_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.2'
+        extensions: pdo, pdo_mysql
+
+    - name: Prepare Test Environment
+      run: |
+        # Create a test .env file
+        echo "DB_HOST=127.0.0.1" > .env
+        echo "DB_PORT=3306" >> .env
+        echo "DB_NAME=nkcore_test" >> .env
+        echo "DB_USER=root" >> .env
+        echo "DB_PASS=root" >> .env
+
+    - name: Run Database Migrations
+      run: |
+        # Load all migrations in order
+        for file in $(ls migrations/*.sql | sort); do
+          echo "Applying $file..."
+          mysql -h 127.0.0.1 -u root -proot nkcore_test < "$file"
+        done
+
+    - name: Run Schema Contract Validator
+      run: |
+        php bin/pre_flight_check.php

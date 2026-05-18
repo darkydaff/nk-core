@@ -127,7 +127,7 @@ class SshClient
      */
     private function ensureMux(): void
     {
-        $muxDir = '/tmp/ssh_mux';
+        $muxDir = '/var/run/nk-core/ssh_mux';
         if (!is_dir($muxDir)) {
             @mkdir($muxDir, 0700, true);
         }
@@ -136,78 +136,78 @@ class SshClient
         // We remove getmypid() to allow multiple PHP processes (like queue workers)
         // to share the same background master connection.
         $socketPath = $muxDir . '/nk_' . md5($this->config->host . ':' . $this->config->port);
+        $lockPath = $socketPath . '.lock';
 
-        // If we already have a socket path set but it doesn't match current PID (shouldn't happen with getmypid() but for safety)
-        // or if we have a stale file on disk from a previous crashed process with the same PID.
-        if (file_exists($socketPath)) {
-            // Check if the master is actually alive and responsive
-            $checkCmd = sprintf(
-                'ssh -o ControlPath=%s -O check dummy 2>&1',
-                escapeshellarg($socketPath)
-            );
-            $checkOut = (string)shell_exec($checkCmd);
-            if (stripos($checkOut, 'Master running') !== false) {
-                $this->muxSocket = $socketPath;
-                return; // Already open and alive
-            }
-            
-            // If we get here, the socket exists but the master is dead or unresponsive
-            if (class_exists('Logger')) {
-                Logger::warning("Stale SSH Mux socket found, cleaning up", ['socket' => $socketPath, 'output' => trim($checkOut)]);
-            }
-            
-            // Try to kill the master process officially, then force unlink
-            $killCmd = sprintf('ssh -o ControlPath=%s -O exit dummy 2>&1', escapeshellarg($socketPath));
-            @shell_exec($killCmd);
-            @unlink($socketPath);
+        $fp = fopen($lockPath, 'c');
+        if (!flock($fp, LOCK_EX)) {
+            throw new \RuntimeException("SSH mux locked by another worker");
         }
 
-        $this->muxSocket = $socketPath;
-
-        [$authPrefix, $authOpts, $keyFile] = $this->buildSshAuth();
-        $sshOpts = array_merge($this->buildSshOptions(), $authOpts, [
-            '-o ControlMaster=yes',
-            '-o ControlPersist=600',
-            sprintf('-o ControlPath=%s', escapeshellarg($this->muxSocket)),
-            '-N',
-            '-f', // Go to background
-        ]);
-
-        $cmd = trim(sprintf(
-            '%s ssh %s %s@%s',
-            $authPrefix,
-            implode(' ', $sshOpts),
-            escapeshellarg($this->config->username),
-            escapeshellarg($this->config->host)
-        ));
-
-        $muxOut = shell_exec($cmd . ' 2>&1');
-        
-        // Clean up temp key file if one was created
-        if ($keyFile && file_exists($keyFile)) {
-            @unlink($keyFile);
-        }
-        
-        // Give the master a moment to establish and create the socket file
-        for ($i = 0; $i < 10; $i++) {
-            if (file_exists($this->muxSocket)) break;
-            usleep(100000); // 100ms * 10 = 1s max wait
-        }
-
-        if (!file_exists($this->muxSocket)) {
-            if ($muxOut && trim($muxOut)) {
-                if (class_exists('Logger')) {
-                    Logger::warning("SSH Mux establishment failed", [
-                        'host' => $this->config->host,
-                        'output' => trim($muxOut)
-                    ]);
+        try {
+            if (file_exists($socketPath)) {
+                $checkCmd = sprintf('ssh -o ControlPath=%s -O check dummy 2>&1', escapeshellarg($socketPath));
+                $checkOut = (string)shell_exec($checkCmd);
+                if (stripos($checkOut, 'Master running') !== false) {
+                    $this->muxSocket = $socketPath;
+                    return; 
                 }
+                
+                if (class_exists('Logger')) {
+                    Logger::warning("Stale SSH Mux socket found, cleaning up", ['socket' => $socketPath, 'output' => trim($checkOut)]);
+                }
+                
+                $killCmd = sprintf('ssh -o ControlPath=%s -O exit dummy 2>&1', escapeshellarg($socketPath));
+                @shell_exec($killCmd);
+                @unlink($socketPath);
             }
-            $this->muxSocket = null;
-            $this->muxOwner = false;
-            // Fall back to per-command connections
-        } else {
-            $this->muxOwner = true;
+
+            $this->muxSocket = $socketPath;
+
+            [$authPrefix, $authOpts, $keyFile] = $this->buildSshAuth();
+            $sshOpts = array_merge($this->buildSshOptions(), $authOpts, [
+                '-o ControlMaster=yes',
+                '-o ControlPersist=600',
+                sprintf('-o ControlPath=%s', escapeshellarg($this->muxSocket)),
+                '-N',
+                '-f', 
+            ]);
+
+            $cmd = trim(sprintf(
+                '%s ssh %s %s@%s',
+                $authPrefix,
+                implode(' ', $sshOpts),
+                escapeshellarg($this->config->username),
+                escapeshellarg($this->config->host)
+            ));
+
+            $muxOut = shell_exec($cmd . ' 2>&1');
+            
+            if ($keyFile && file_exists($keyFile)) {
+                @unlink($keyFile);
+            }
+            
+            for ($i = 0; $i < 10; $i++) {
+                if (file_exists($this->muxSocket)) break;
+                usleep(100000); 
+            }
+
+            if (!file_exists($this->muxSocket)) {
+                if ($muxOut && trim($muxOut)) {
+                    if (class_exists('Logger')) {
+                        Logger::warning("SSH Mux establishment failed", [
+                            'host' => $this->config->host,
+                            'output' => trim($muxOut)
+                        ]);
+                    }
+                }
+                $this->muxSocket = null;
+                $this->muxOwner = false;
+            } else {
+                $this->muxOwner = true;
+            }
+        } finally {
+            flock($fp, LOCK_UN);
+            fclose($fp);
         }
     }
 
@@ -328,10 +328,15 @@ class SshClient
                 ]);
             }
 
-            $rawOutput = (string)shell_exec($sshCommand);
-
-            if (isset($keyFile) && $keyFile && file_exists($keyFile)) {
-                @unlink($keyFile);
+            $rawOutput = '';
+            try {
+                $rawOutput = (string)shell_exec($sshCommand);
+            } finally {
+                // Guarantee key cleanup even on fatal errors
+                if (isset($keyFile) && $keyFile && file_exists($keyFile)) {
+                    @unlink($keyFile);
+                    $keyFile = null;
+                }
             }
 
             // Check for specific transient errors that warrant a retry

@@ -122,7 +122,7 @@ class ProxyServer
 
         // Add proxy rules
         foreach ($proxies as $proxy) {
-            if ($proxy['status'] === ServerStatus::ACTIVE->value || $proxy['status'] === 'active') {
+            if ($proxy['status'] === ProxyStatus::ACTIVE->value || $proxy['status'] === 'active') {
                 $config .= "auth strong\n";
                 $config .= "allow " . $proxy['username'] . "\n";
                 $type = ProxyType::tryFrom($proxy['type'] ?? 'http') ?? ProxyType::HTTP;

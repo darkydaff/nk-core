@@ -114,6 +114,8 @@ class VpnProvisioner
             });
             
             $this->currentPhase = 'BUILDING';
+            // Extend lock before longest step — Docker build can take 10+ minutes
+            Lock::extend("server:{$this->getId()}:deploy", 1200);
             $this->runProvisioningStep("Building Image...", 'build_image', fn() => $this->buildDockerImage($forceRebuild));
             
             $this->currentPhase = 'STARTING';
