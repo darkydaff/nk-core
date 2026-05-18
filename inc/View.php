@@ -36,8 +36,12 @@ class View {
   }
 
   public static function render(string $template, array $vars = []): void {
+    echo self::fetch($template, $vars);
+  }
+
+  public static function fetch(string $template, array $vars = []): string {
     if (!self::$twig) throw new RuntimeException('Twig is not initialized');
-    echo self::$twig->render($template, $vars);
+    return self::$twig->render($template, $vars);
   }
 
   public static function getFlag(string $code): string {

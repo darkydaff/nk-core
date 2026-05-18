@@ -1,0 +1,21 @@
+[Interface]
+PrivateKey = {{ server.server_private_key }}
+Address = {{ server.vpn_subnet_base }}.1/24
+ListenPort = {{ server.vpn_port }}
+MTU = 1280
+
+{% for key, value in server.awg_params %}
+{% if value is not null and value != '' and key != 'mimicry_type' %}
+{{ key }} = {{ value }}
+{% endif %}
+{% endfor %}
+
+{% for client in clients %}
+[Peer]
+PublicKey = {{ client.public_key }}
+{% if client.preshared_key %}
+PresharedKey = {{ client.preshared_key }}
+{% endif %}
+AllowedIPs = {{ client.ip_address }}/32
+
+{% endfor %}

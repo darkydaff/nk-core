@@ -135,17 +135,26 @@ class VpnClient {
     }
 
     /**
-     * Synchronize client to remote server (Idempotent)
+     * Synchronize client to remote server (Declarative)
      */
     public function syncToRemote(): bool
     {
         if (!$this->data) return false;
         
         $server = new VpnServer((int)$this->data['server_id']);
-        $serverData = $server->getData();
         
         try {
+            // Set status to VERIFYING
+            $pdo = DB::conn();
+            $pdo->prepare('UPDATE vpn_clients SET status = ? WHERE id = ?')
+                ->execute([ClientStatus::VERIFYING->value, $this->clientId]);
+
+            require_once __DIR__ . '/VpnConfigRenderer.php';
+            $renderer = new VpnConfigRenderer($server);
+            $renderer->syncDeclarative();
+
             // Build client configuration
+            $serverData = $server->getData();
             $awgParams = $serverData['awg_params'] ?? [];
             if (is_string($awgParams)) {
                 $awgParams = json_decode($awgParams, true) ?: [];
@@ -163,22 +172,7 @@ class VpnClient {
                 $this->data['name']
             );
 
-            // Add to WireGuard
-            self::addClientToServer($server, $this->data['public_key'], $this->data['client_ip'], $this->data['private_key'], $this->data['name']);
-            
-            // Set status to VERIFYING
-            $pdo = DB::conn();
-            $pdo->prepare('UPDATE vpn_clients SET status = ? WHERE id = ?')
-                ->execute([ClientStatus::VERIFYING->value, $this->clientId]);
-
-            // VERIFICATION: Check if peer is actually in the running interface
-            $verified = self::verifyPeerInRuntime($server, $this->data['public_key'], true, $this->data['client_ip']);
-            if (!$verified) {
-                throw new Exception("Infrastructure verification failed: Peer {$this->data['public_key']} not active or misconfigured in kernel interface after 5 attempts.");
-            }
-
             // Update DB to ACTIVE
-            $pdo = DB::conn();
             $stmt = $pdo->prepare('UPDATE vpn_clients SET status = ?, config = ? WHERE id = ?');
             $stmt->execute([ClientStatus::ACTIVE->value, $config, $this->clientId]);
             
