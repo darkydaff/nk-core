@@ -37,6 +37,9 @@ require_once __DIR__ . '/../../inc/JWT.php';
 // Load environment configuration
 Config::load(__DIR__ . '/../../.env');
 
+// Set default timezone to Moscow (GMT+3) to match the rest of the application and database connection
+date_default_timezone_set('Europe/Moscow');
+
 // 2. Validate token header (allow X-Telemetry-Token or Authorization Bearer fallback)
 $token = $_SERVER['HTTP_X_TELEMETRY_TOKEN'] ?? '';
 if (empty($token) && isset($_SERVER['HTTP_AUTHORIZATION'])) {

@@ -366,8 +366,8 @@ while True:
                 if len(parts) >= 8:
                     peers.append({
                         "public_key": parts[1],
-                        "bytes_received": int(parts[6]),
-                        "bytes_sent": int(parts[7]),
+                        "bytes_sent": int(parts[6]),
+                        "bytes_received": int(parts[7]),
                         "latest_handshake": int(parts[5]),
                         "endpoint_ip": parts[3].split(":")[0] if ":" in parts[3] else (None if parts[3] == "(none)" else parts[3])
                     })
