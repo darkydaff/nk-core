@@ -251,6 +251,11 @@ Router::post('/proxies/{id}/delete', ['ProxyController', 'delete']);
 Router::post('/proxies/{id}/check', ['ProxyController', 'check']);
 Router::post('/proxies/sync-all', ['ProxyController', 'syncAll']);
 
+// Jobs / DLQ
+require_once __DIR__ . '/../controllers/JobController.php';
+Router::get('/jobs/dlq', ['JobController', 'dlqIndex']);
+Router::post('/jobs/{id}/retry', ['JobController', 'retry']);
+
 /**
  * SETTINGS ROUTES
  */

@@ -66,6 +66,9 @@
             <a href="/proxies" class="sidebar-item {% if current_uri == '/proxies' %}active{% endif %}">
                 <i class="fas fa-shield-alt w-5 mr-3"></i>{{ t('menu.proxies')|default('Proxies') }}
             </a>
+            <a href="/jobs/dlq" class="sidebar-item {% if current_uri == '/jobs/dlq' %}active{% endif %}">
+                <i class="fas fa-biohazard w-5 mr-3"></i>Queue Health
+            </a>
         </nav>
 
         <div class="p-4 mt-auto border-t border-sidebar-border/30">
