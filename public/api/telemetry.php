@@ -595,6 +595,9 @@ try {
     if (isset($db) && $db->inTransaction()) {
         $db->rollBack();
     }
+    try {
+        @file_put_contents('/var/log/nk-panel/telemetry_error.log', $e->getMessage() . "\n" . $e->getTraceAsString());
+    } catch (\Throwable $err) {}
     // Fail gracefully back to default interval
     http_response_code(500);
     echo "15";
