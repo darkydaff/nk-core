@@ -177,12 +177,12 @@ try {
 
     if ($isActivelyViewed) {
         $consecutiveIdle = 0;
-        $consecutiveActive++;
+        $consecutiveActive = min(100, $consecutiveActive + 1);
         $nextInterval = ($consecutiveActive >= 3) ? 5 : 15;
         $decisionPath[] = "hysteresis_active_ticks={$consecutiveActive}, consecutive active ticks required >= 3 for ACTIVE_5S state, current_interval={$nextInterval}";
     } else {
         $consecutiveActive = 0;
-        $consecutiveIdle++;
+        $consecutiveIdle = min(100, $consecutiveIdle + 1);
         $nextInterval = ($consecutiveIdle >= 3) ? 15 : 5;
         $decisionPath[] = "hysteresis_idle_ticks={$consecutiveIdle}, consecutive idle ticks required >= 3 for IDLE_15S state, current_interval={$nextInterval}";
     }
