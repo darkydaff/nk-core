@@ -16,7 +16,7 @@ class JobController {
         // Fetch failed jobs (quarantined)
         $stmt = $pdo->query("
             SELECT j.*, 
-                   s.name as server_name, s.ip_address 
+                   s.name as server_name, s.host 
             FROM jobs j
             LEFT JOIN vpn_servers s ON j.server_id = s.id
             WHERE j.status = 'error'
