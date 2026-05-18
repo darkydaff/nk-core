@@ -16,6 +16,8 @@ require_once __DIR__ . '/../inc/EventBus.php';
 
 use Pheanstalk\Pheanstalk;
 use Pheanstalk\Values\TubeName;
+use Symfony\Component\Process\Process;
+use Symfony\Component\Process\Exception\ProcessTimedOutException;
 
 // Disable time limit for the worker
 set_time_limit(0);
@@ -53,10 +55,22 @@ while (true) {
 
         // Spawn isolated process to handle the job
         $processScript = __DIR__ . '/process_job.php';
-        $cmd = 'php ' . escapeshellarg($processScript) . ' ' . escapeshellarg($job->getData());
         
-        exec($cmd . ' 2>&1', $output, $exitCode);
-        $outputStr = implode("\n", $output);
+        $process = new Process(['php', $processScript, $job->getData()]);
+        
+        // Hard execution timeout: 600 seconds (10 minutes).
+        // This stops stuck SSH sessions or zombie processes from halting deployments forever.
+        $process->setTimeout(600);
+        $process->setIdleTimeout(120); // Fail if no output for 2 minutes
+        
+        try {
+            $process->run();
+        } catch (ProcessTimedOutException $e) {
+            throw new Exception("Job execution timeout exceeded: " . $e->getMessage());
+        }
+
+        $exitCode = $process->getExitCode();
+        $outputStr = trim($process->getErrorOutput() . "\n" . $process->getOutput());
 
         if ($exitCode === 0) {
             // Job succeeded, delete it from the queue

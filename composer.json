@@ -18,7 +18,8 @@
     "ext-json": "*",
     "ext-curl": "*",
     "ext-gd": "*",
-    "ext-sodium": "*"
+    "ext-sodium": "*",
+    "symfony/process": "^8.0"
   },
   "autoload": {
     "psr-4": {
