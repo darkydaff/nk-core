@@ -40,16 +40,19 @@ class ServerMonitoring
         // 2. Fail-Safe Migration Lockout Window
         // If push telemetry was received in the last 5 minutes, absolutely lock out SSH collector
         if (!empty($this->serverData['last_telemetry_at'])) {
-            $lastTelemetry = strtotime($this->serverData['last_telemetry_at']);
-            if (time() - $lastTelemetry < 300) {
-                return [
-                    'results' => [],
-                    'peer_stats' => [],
-                    'db_client_count' => 0,
-                    'active_peer_count' => 0,
-                    'lockout_active' => true
-                ];
-            }
+            try {
+                $dt = new DateTime($this->serverData['last_telemetry_at'], new DateTimeZone('Europe/Moscow'));
+                $lastTelemetry = $dt->getTimestamp();
+                if (time() - $lastTelemetry < 300) {
+                    return [
+                        'results' => [],
+                        'peer_stats' => [],
+                        'db_client_count' => 0,
+                        'active_peer_count' => 0,
+                        'lockout_active' => true
+                    ];
+                }
+            } catch (\Throwable $e) {}
         }
 
         $clients = VpnClient::listByServer($this->serverData['id']);

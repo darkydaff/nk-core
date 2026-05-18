@@ -123,6 +123,7 @@ class ProxyServer
         // Add proxy rules
         foreach ($proxies as $proxy) {
             if ($proxy['status'] === ServerStatus::ACTIVE->value || $proxy['status'] === 'active') {
+                $config .= "auth strong\n";
                 $config .= "allow " . $proxy['username'] . "\n";
                 $type = ProxyType::tryFrom($proxy['type'] ?? 'http') ?? ProxyType::HTTP;
                 if ($type === ProxyType::SOCKS5) {
@@ -157,7 +158,7 @@ class ProxyServer
             require_once __DIR__ . '/DeploymentService.php';
             
             $containerName = '3proxy';
-            $runOptions = '--network host -v /etc/3proxy/3proxy.cfg:/etc/3proxy/3proxy.cfg -v /var/log/3proxy:/var/log/3proxy';
+            $runOptions = '--user root --network host -v /etc/3proxy/3proxy.cfg:/etc/3proxy/3proxy.cfg -v /var/log/3proxy:/var/log/3proxy';
             
             DeploymentService::deployDockerContainer($this, $containerName, '3proxy/3proxy:latest', $runOptions);
         } else {

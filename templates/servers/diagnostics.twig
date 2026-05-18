@@ -378,7 +378,7 @@
             if (parseFloat(node.last_db_time_ms) > 15.0) dbViolations++;
             if (parseFloat(node.last_centrifugo_time_ms) > 10.0) wsViolations++;
 
-            const lastTelemetry = node.last_telemetry_at ? Math.floor(Date.parse(node.last_telemetry_at) / 1000) : 0;
+            const lastTelemetry = node.last_telemetry_ts ? parseInt(node.last_telemetry_ts) : 0;
             if (now - lastTelemetry > 30) freshnessViolations++;
         });
 

@@ -779,7 +779,7 @@ class ApiController {
         try {
             $db = DB::conn();
             $stmt = $db->query("
-                SELECT id, name, host, last_telemetry_at, 
+                SELECT id, name, host, last_telemetry_at, UNIX_TIMESTAMP(last_telemetry_at) as last_telemetry_ts,
                        last_ingest_latency_ms, last_db_time_ms, last_centrifugo_time_ms,
                        total_ingest_count, backpressure_count, circuit_breaker_count,
                        replayed_packets_count, server_health_score, last_failure_reasons,
@@ -810,7 +810,8 @@ class ApiController {
                 }
                 
                 // Check if offline (no telemetry for > 60s)
-                if (empty($node['last_telemetry_at']) || (time() - strtotime($node['last_telemetry_at'])) > 60) {
+                $lastTs = $node['last_telemetry_ts'] ? (int)$node['last_telemetry_ts'] : 0;
+                if ($lastTs === 0 || (time() - $lastTs) > 60) {
                     $status = '⚫ Offline';
                     $node['server_health_score'] = 0;
                     $node['reasons'] = array_values(array_unique(array_merge($node['reasons'], ['heartbeat_timeout'])));

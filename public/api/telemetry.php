@@ -77,7 +77,7 @@ try {
 
 try {
     // 3. Authenticate server node token via indexed search
-    $serverStmt = $db->prepare("SELECT id, telemetry_mode, last_telemetry_at, server_health_score, consecutive_active_ticks, consecutive_idle_ticks, telemetry_state, replayed_packets_count, control_loop_damping FROM vpn_servers WHERE telemetry_token = ? AND deleted_at IS NULL LIMIT 1");
+    $serverStmt = $db->prepare("SELECT id, telemetry_mode, UNIX_TIMESTAMP(last_telemetry_at) as last_telemetry_ts, server_health_score, consecutive_active_ticks, consecutive_idle_ticks, telemetry_state, replayed_packets_count, control_loop_damping FROM vpn_servers WHERE telemetry_token = ? AND deleted_at IS NULL LIMIT 1");
     $serverStmt->execute([$token]);
     $server = $serverStmt->fetch(PDO::FETCH_ASSOC);
 
@@ -114,8 +114,8 @@ try {
     $sloCentLimit = max(10.0, $baseCent * 2.0);
 
     // C. REPLAY & MONOTONIC TIMESTAMP PROTECTION: Guard against out-of-order/replayed packages
-    if (!empty($server['last_telemetry_at'])) {
-        $lastTelemetryTime = strtotime($server['last_telemetry_at']);
+    if (!empty($server['last_telemetry_ts'])) {
+        $lastTelemetryTime = (int)$server['last_telemetry_ts'];
         if ($timestamp <= $lastTelemetryTime) {
             $failureReasons = ["replay_detected"];
             $decisionPath = [

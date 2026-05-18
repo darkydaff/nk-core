@@ -797,10 +797,13 @@ class VpnClient {
             return false;
         }
         if (!empty($serverData['last_telemetry_at'])) {
-            $lastTelemetry = strtotime($serverData['last_telemetry_at']);
-            if (time() - $lastTelemetry < 300) {
-                return false;
-            }
+            try {
+                $dt = new DateTime($serverData['last_telemetry_at'], new DateTimeZone('Europe/Moscow'));
+                $lastTelemetry = $dt->getTimestamp();
+                if (time() - $lastTelemetry < 300) {
+                    return false;
+                }
+            } catch (\Throwable $e) {}
         }
 
         // 1. Sync traffic via ServerMonitoring to prevent counter resets and double counting
