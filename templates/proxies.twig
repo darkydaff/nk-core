@@ -83,19 +83,19 @@
 							</div>
 						</div>
 						<div class="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
-							<button onclick="checkProxy({{ proxy.id }}, this)" class="w-9 h-9 min-w-[2.25rem] rounded-xl bg-sky-500/5 text-sky-600 dark:text-sky-400 hover:bg-sky-500 hover:text-white transition-all flex items-center justify-center border border-sky-500/10" title="{{ t('proxies.test_connection')|default('Test Connection') }}">
+								<button onclick="checkProxy({{ proxy.id }}, this)" class="w-9 h-9 min-w-[2.25rem] rounded-xl bg-sky-500/5 text-sky-600 dark:text-sky-400 hover:bg-sky-500 hover:text-white transition-all flex items-center justify-center border border-sky-500/10" title="{{ t('proxies.test_connection')|default('Test Connection') }}" aria-label="{{ t('proxies.test_connection')|default('Test Connection') }}">
 								<i class="fas fa-plug-circle-check text-sm"></i>
 							</button>
 							{% if proxy.status == 'active' %}
-								<button onclick="handleAjaxAction('/proxies/{{ proxy.id }}/pause')" class="w-9 h-9 min-w-[2.25rem] rounded-xl bg-amber-500/5 text-amber-600 dark:text-amber-400 hover:bg-amber-500 hover:text-white transition-all flex items-center justify-center border border-amber-500/10" title="{{ t('common.revoke')|default('Revoke') }}">
+									<button onclick="handleAjaxAction('/proxies/{{ proxy.id }}/pause')" class="w-9 h-9 min-w-[2.25rem] rounded-xl bg-amber-500/5 text-amber-600 dark:text-amber-400 hover:bg-amber-500 hover:text-white transition-all flex items-center justify-center border border-amber-500/10" title="{{ t('common.revoke')|default('Revoke') }}" aria-label="{{ t('common.revoke')|default('Revoke') }}">
 									<i class="fas fa-user-slash text-sm"></i>
 								</button>
 							{% else %}
-								<button onclick="handleAjaxAction('/proxies/{{ proxy.id }}/resume')" class="w-9 h-9 min-w-[2.25rem] rounded-xl bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all flex items-center justify-center border border-emerald-500/10" title="{{ t('common.restore')|default('Restore') }}">
+									<button onclick="handleAjaxAction('/proxies/{{ proxy.id }}/resume')" class="w-9 h-9 min-w-[2.25rem] rounded-xl bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all flex items-center justify-center border border-emerald-500/10" title="{{ t('common.restore')|default('Restore') }}" aria-label="{{ t('common.restore')|default('Restore') }}">
 									<i class="fas fa-user-check text-sm"></i>
 								</button>
 							{% endif %}
-							<button onclick="handleAjaxAction('/proxies/{{ proxy.id }}/delete', {}, '{{ t('proxies.delete_confirm') }}')" class="w-9 h-9 min-w-[2.25rem] rounded-xl bg-rose-500/5 text-rose-600 dark:text-rose-400 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center border border-rose-500/10" title="{{ t('common.delete')|default('Delete') }}">
+								<button onclick="handleAjaxAction('/proxies/{{ proxy.id }}/delete', {}, '{{ t('proxies.delete_confirm') }}')" class="w-9 h-9 min-w-[2.25rem] rounded-xl bg-rose-500/5 text-rose-600 dark:text-rose-400 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center border border-rose-500/10" title="{{ t('common.delete')|default('Delete') }}" aria-label="{{ t('common.delete')|default('Delete') }}">
 								<i class="fas fa-trash-alt text-sm"></i>
 							</button>
 						</div>
@@ -280,7 +280,7 @@
 								<i class="fas fa-user absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-muted text-xs"></i>
 								<input type="text" name="username" id="proxy_username" class="input-field input-with-icon bg-slate-50 dark:bg-panel border-slate-200 dark:border-default" placeholder="{{ t('proxies.leave_blank_auto') }}">
 							</div>
-							<button type="button" onclick="generateUsername()" class="w-12 h-12 bg-slate-100 dark:bg-surface-hover text-slate-500 dark:text-muted hover:text-primary rounded-xl transition-all flex items-center justify-center shadow-sm" title="{{ t('common.generate') }}">
+								<button type="button" onclick="generateUsername()" class="w-12 h-12 bg-slate-100 dark:bg-surface-hover text-slate-500 dark:text-muted hover:text-primary rounded-xl transition-all flex items-center justify-center shadow-sm" title="{{ t('common.generate') }}" aria-label="{{ t('common.generate')|default('Generate') }}">
 								<i class="fas fa-magic"></i>
 							</button>
 						</div>
@@ -293,7 +293,7 @@
 								<i class="fas fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 dark:text-muted text-xs"></i>
 								<input type="text" name="password" id="proxy_password" class="input-field input-with-icon bg-slate-50 dark:bg-panel border-slate-200 dark:border-default" placeholder="{{ t('proxies.leave_blank_auto') }}">
 							</div>
-							<button type="button" onclick="generatePassword()" class="w-12 h-12 bg-slate-100 dark:bg-surface-hover text-slate-500 dark:text-muted hover:text-primary rounded-xl transition-all flex items-center justify-center shadow-sm" title="{{ t('common.generate') }}">
+								<button type="button" onclick="generatePassword()" class="w-12 h-12 bg-slate-100 dark:bg-surface-hover text-slate-500 dark:text-muted hover:text-primary rounded-xl transition-all flex items-center justify-center shadow-sm" title="{{ t('common.generate') }}" aria-label="{{ t('common.generate')|default('Generate') }}">
 								<i class="fas fa-magic"></i>
 							</button>
 						</div>

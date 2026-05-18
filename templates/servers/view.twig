@@ -64,7 +64,7 @@
 									</div>
 								</div>
 							{% endif %}
-							<button onclick="window.serverView.syncStats({{ server.id }})" class="w-6 h-6 rounded-full bg-surface-hover flex items-center justify-center text-muted hover:text-primary transition-all border border-surface-border/50" title="{{ t('common.recheck')|default('Recheck Connectivity') }}">
+								<button onclick="window.serverView.syncStats({{ server.id }})" class="w-6 h-6 rounded-full bg-surface-hover flex items-center justify-center text-muted hover:text-primary transition-all border border-surface-border/50" title="{{ t('common.recheck')|default('Recheck Connectivity') }}" aria-label="{{ t('common.recheck')|default('Recheck Connectivity') }}">
 								<i class="fas fa-redo-alt text-[10px]"></i>
 							</button>
 						</div>
@@ -441,7 +441,7 @@
 			<!-- Terminal chrome -->
 			<div class="flex items-center gap-2 px-4 py-3 bg-[#1e1e2e] border-b border-slate-700/50 flex-shrink-0">
 				<div class="flex gap-1.5">
-					<button onclick="window.serverView.closeLogsModal()" class="w-3 h-3 rounded-full bg-red-500 hover:bg-red-400 transition-colors" title="{{ t('common.close') }}"></button>
+						<button onclick="window.serverView.closeLogsModal()" class="w-3 h-3 rounded-full bg-red-500 hover:bg-red-400 transition-colors" title="{{ t('common.close') }}" aria-label="{{ t('common.close')|default('Close') }}"></button>
 					<span class="w-3 h-3 rounded-full bg-yellow-500"></span>
 					<span class="w-3 h-3 rounded-full bg-green-500"></span>
 				</div>
@@ -451,7 +451,7 @@
 						<input type="checkbox" id="logsAutoScroll" checked class="rounded border-slate-600 bg-slate-800 text-cyan-500 focus:ring-cyan-500/20">
 						{{ t('common.auto_scroll') }}
 					</label>
-					<button onclick="window.serverView.refreshLogs()" class="text-[10px] text-slate-400 hover:text-cyan-400 transition-colors px-2 py-1 rounded border border-slate-700 hover:border-cyan-500/40" title="{{ t('common.refresh') }}">
+						<button onclick="window.serverView.refreshLogs()" class="text-[10px] text-slate-400 hover:text-cyan-400 transition-colors px-2 py-1 rounded border border-slate-700 hover:border-cyan-500/40" title="{{ t('common.refresh') }}" aria-label="{{ t('common.refresh')|default('Refresh') }}">
 						<i class="fas fa-redo-alt mr-1"></i>{{ t('common.refresh') }}
 					</button>
 				</div>
