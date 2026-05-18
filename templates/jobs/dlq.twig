@@ -91,7 +91,7 @@
                                     </button>
                                     
                                     <form method="POST" action="/jobs/{{ job.id }}/retry" onsubmit="return confirm('Are you sure you want to requeue this job?');" class="inline">
-                                        {{ csrf_field()|raw }}
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                         <button type="submit" class="p-2 {% if job.is_retryable %}text-blue-400 hover:text-blue-300{% else %}text-gray-600 hover:text-red-400{% endif %} transition-colors" title="Force Retry">
                                             <i class="fas fa-sync-alt"></i>
                                         </button>
