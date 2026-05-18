@@ -51,213 +51,27 @@ while (true) {
             throw new Exception("Job missing 'type'");
         }
 
-        switch ($payload['type']) {
-            case 'provision_server':
-                if (empty($payload['server_id'])) {
-                    throw new Exception("Missing server_id");
-                }
-                
-                $serverId = (int)$payload['server_id'];
-                $jobId = isset($payload['job_id']) ? (int)$payload['job_id'] : null;
-                $lockName = "server:{$serverId}:deploy";
-                
-                if (!Lock::acquire($lockName, 600)) {
-                    Logger::warning("Deployment already in progress for server $serverId, skipping.");
-                    break;
-                }
-
-                $orchestration = $jobId ? new Job($jobId) : null;
-                
-                try {
-                    if ($orchestration) $orchestration->start();
-                    
-                    Logger::channel('deployments')->info('Starting server deployment', ['server_id' => $serverId, 'job_id' => $jobId]);
-                    $vpnServer = new VpnServer($serverId);
-                    if ($orchestration) $vpnServer->setJob($orchestration);
-                    
-                    $result = $vpnServer->deploy(false);
-                    
-                    if (!$result->success) {
-                        throw new Exception("Deployment failed: " . $result->errorMessage);
-                    }
-
-                    if ($orchestration) $orchestration->success($result->toArray());
-                    Logger::channel('deployments')->info('Server deployment successful', ['server_id' => $serverId]);
-                } catch (\Throwable $e) {
-                    if ($orchestration) $orchestration->fail($e->getMessage());
-                    throw $e;
-                } finally {
-                    Lock::release($lockName);
-                }
-                break;
-
-            case 'provision_client':
-                if (empty($payload['client_id'])) {
-                    throw new Exception("Missing client_id");
-                }
-                
-                $clientId = (int)$payload['client_id'];
-                $serverId = (int)($payload['server_id'] ?? 0);
-                
-                // Use a server-level lock to prevent concurrent config writes
-                $lockName = "server:{$serverId}:infra";
-
-                if (!Lock::acquire($lockName, 300)) {
-                    Logger::warning("Server #$serverId infrastructure is locked, delaying client $clientId", ['client_id' => $clientId]);
-                    $pheanstalk->release($job, 10, 30); // Retry in 30s
-                    continue 2;
-                }
-
-                try {
-                    Logger::channel('deployments')->info('Starting client provisioning', ['client_id' => $clientId, 'server_id' => $serverId]);
-                    require_once __DIR__ . '/../inc/VpnClient.php';
-                    $client = new VpnClient($clientId);
-                    $client->syncToRemote();
-                    Logger::channel('deployments')->info('Client provisioning successful', ['client_id' => $clientId, 'server_id' => $serverId]);
-                } finally {
-                    Lock::release($lockName);
-                }
-                break;
-
-            case 'delete_server':
-                if (empty($payload['server_id'])) {
-                    throw new Exception("Missing server_id");
-                }
-                $serverId = (int)$payload['server_id'];
-                
-                // Use server-level lock
-                $lockName = "server:{$serverId}:infra";
-                if (!Lock::acquire($lockName, 60)) {
-                    $pheanstalk->release($job, 10, 60);
-                    continue 2;
-                }
-
-                try {
-                    Logger::channel('deployments')->info('Starting server deletion cleanup', ['server_id' => $serverId]);
-                    
-                    $vs = new VpnServer($serverId);
-                    $vs->cleanupRemoteResources();
-                    
-                    Logger::channel('deployments')->info('Server deletion cleanup successful', ['server_id' => $serverId]);
-                } finally {
-                    Lock::release($lockName);
-                }
-                break;
-
-            case 'revoke_client':
-                if (empty($payload['client_id'])) throw new Exception("Missing client_id");
-                $clientId = (int)$payload['client_id'];
-                $serverId = (int)($payload['server_id'] ?? 0);
-                
-                $lockName = "server:{$serverId}:infra";
-                if (!Lock::acquire($lockName, 60)) {
-                    $pheanstalk->release($job, 10, 30);
-                    continue 2;
-                }
-
-                try {
-                    Logger::channel('deployments')->info('Revoking client infrastructure', ['client_id' => $clientId, 'server_id' => $serverId]);
-                    require_once __DIR__ . '/../inc/VpnClient.php';
-                    $client = new VpnClient($clientId);
-                    $clientData = $client->getData();
-                    
-                    if ($clientData) {
-                        $server = new VpnServer($serverId);
-                        VpnClient::removeClientFromServer($server->getData(), $clientData['public_key']);
-                    }
-                } finally {
-                    Lock::release($lockName);
-                }
-                break;
-
-            case 'delete_client':
-                if (empty($payload['client_id'])) throw new Exception("Missing client_id");
-                $clientId = (int)$payload['client_id'];
-                $serverId = (int)($payload['server_id'] ?? 0);
-                
-                $lockName = "server:{$serverId}:infra";
-                if (!Lock::acquire($lockName, 120)) {
-                    $pheanstalk->release($job, 10, 30);
-                    continue 2;
-                }
-
-                try {
-                    Logger::channel('deployments')->info('Deleting client infrastructure', ['client_id' => $clientId, 'server_id' => $serverId]);
-                    require_once __DIR__ . '/../inc/VpnClient.php';
-                    
-                    // We need to get the public key BEFORE we mark it as deleted if possible
-                    $client = new VpnClient($clientId);
-                    $clientData = $client->getData();
-                    
-                    if ($clientData) {
-                        $server = new VpnServer($serverId);
-                        VpnClient::removeClientFromServer($server->getData(), $clientData['public_key']);
-                    }
-                    
-                    // Final soft-delete in DB
-                    $pdo = DB::conn();
-                    $pdo->prepare('UPDATE vpn_clients SET deleted_at = NOW(), status = ? WHERE id = ?')
-                        ->execute([ClientStatus::DELETED->value, $clientId]);
-                        
-                    Logger::channel('deployments')->info('Client deletion successful', ['client_id' => $clientId, 'server_id' => $serverId]);
-                } finally {
-                    Lock::release($lockName);
-                }
-                break;
-
-            case 'sync_all_servers':
-                Logger::channel('control-plane')->info('Starting mass server sync');
-                $servers = VpnServer::listAll();
-                foreach ($servers as $serverData) {
-                    if ($serverData['status'] === 'active' || $serverData['status'] === 'error') {
-                        Queue::push('deployments', [
-                            'type' => 'sync_server',
-                            'server_id' => (int)$serverData['id']
-                        ]);
-                    }
-                }
-                break;
-
-            case 'sync_server':
-                if (empty($payload['server_id'])) {
-                    throw new Exception("Missing server_id");
-                }
-                $serverId = (int)$payload['server_id'];
-                $lockName = "server:{$serverId}:sync";
-
-                if (!Lock::acquire($lockName, 60)) {
-                    // Quietly skip if already syncing
-                    break;
-                }
-
-                try {
-                    Logger::info('Syncing server', ['server_id' => $serverId]);
-                    $vs = new VpnServer($serverId);
-                    $vs->updatePingAndStatus();
-                    $vs->updateGeoIp();
-                    VpnClient::syncAllStatsForServer($serverId);
-
-                    // Only sync proxies if this server actually has any — avoids redundant SSH connections
-                    $pxCount = DB::conn()->prepare('SELECT COUNT(*) FROM http_proxies WHERE server_id = ? AND deleted_at IS NULL');
-                    $pxCount->execute([$serverId]);
-                    if ((int)$pxCount->fetchColumn() > 0) {
-                        $proxy = new ProxyServer($serverId);
-                        $proxy->syncUsers();
-                        $proxy->updateTrafficStats();
-                    }
-                } finally {
-                    Lock::release($lockName);
-                }
-                break;
-                
-            default:
-                throw new Exception("Unknown job type: " . $payload['type']);
-        }
-
-        // Job succeeded, delete it from the queue
-        $pheanstalk->delete($job);
+        // Spawn isolated process to handle the job
+        $processScript = __DIR__ . '/process_job.php';
+        $cmd = 'php ' . escapeshellarg($processScript) . ' ' . escapeshellarg($job->getData());
         
-        Logger::channel('control-plane')->info('Job completed successfully', ['payload' => $payload]);
+        exec($cmd . ' 2>&1', $output, $exitCode);
+        $outputStr = implode("\n", $output);
+
+        if ($exitCode === 0) {
+            // Job succeeded, delete it from the queue
+            $pheanstalk->delete($job);
+            Logger::channel('control-plane')->info('Job completed successfully', ['payload' => $payload]);
+        } elseif ($exitCode === 2) {
+            // Lock active, transient failure, throw to be caught by the retry logic
+            throw new Exception("Job locked or transient failure. Output: " . $outputStr);
+        } elseif ($exitCode === 3) {
+            // Permanent failure
+            throw new \InvalidArgumentException("Permanent job failure. Output: " . $outputStr);
+        } else {
+            // Unknown or general failure (e.g. fatal error, segfault)
+            throw new Exception("Job failed with exit code {$exitCode}. Output: " . $outputStr);
+        }
 
     } catch (\Throwable $e) {
         if (isset($job)) {
