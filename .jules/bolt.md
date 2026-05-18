@@ -1,0 +1,3 @@
+## 2025-05-18 - [Database Liveness Check Bottleneck]
+**Learning:** `DB::conn()` uses `SELECT 1` to ensure the connection is alive, but was doing it on *every* call. Since `DB::conn()` is used pervasively throughout controllers, this resulted in an excessive number of redundant liveness check queries per request, creating a performance bottleneck for both the application and the DB server.
+**Action:** Implemented a 5-second throttle on the liveness check using a static `$lastCheckTime` property. When building DB layers or wrappers that manage long-running connections (e.g., workers/queues) alongside short-lived web requests, always ensure liveness checks are throttled to avoid hitting the DB aggressively on every connection acquisition.
