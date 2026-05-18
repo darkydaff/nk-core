@@ -59,18 +59,24 @@ while (true) {
         $process = new Process(['php', $processScript, $job->getData()]);
         
         // Hard execution timeout: 600 seconds (10 minutes).
-        // This stops stuck SSH sessions or zombie processes from halting deployments forever.
         $process->setTimeout(600);
-        $process->setIdleTimeout(120); // Fail if no output for 2 minutes
+        $process->setIdleTimeout(120);
+        
+        $startTime = microtime(true);
+        $exitCode = null;
+        $outputStr = '';
         
         try {
             $process->run();
+            $exitCode = $process->getExitCode();
+            $outputStr = trim($process->getErrorOutput() . "\n" . $process->getOutput());
         } catch (ProcessTimedOutException $e) {
+            $exitCode = 124; // Standard timeout exit code
+            $outputStr = "Process timed out after {$process->getTimeout()} seconds. Idle timeout was {$process->getIdleTimeout()} seconds.";
             throw new Exception("Job execution timeout exceeded: " . $e->getMessage());
+        } finally {
+            $durationMs = (int)((microtime(true) - $startTime) * 1000);
         }
-
-        $exitCode = $process->getExitCode();
-        $outputStr = trim($process->getErrorOutput() . "\n" . $process->getOutput());
 
         if ($exitCode === 0) {
             // Job succeeded, delete it from the queue
@@ -97,20 +103,37 @@ while (true) {
                 $e instanceof \InvalidArgumentException || 
                 strpos($e->getMessage(), 'Validation failed') !== false ||
                 strpos($e->getMessage(), 'already exists') !== false ||
-                strpos($e->getMessage(), 'not found') !== false
+                strpos($e->getMessage(), 'not found') !== false ||
+                ($exitCode === 3)
             );
 
             Logger::error('Job failed', [
                 'payload' => $payload ?? null,
                 'error' => $e->getMessage(),
                 'attempt' => $reserves,
-                'is_permanent' => $isPermanent
+                'is_permanent' => $isPermanent,
+                'exit_code' => $exitCode,
+                'duration_ms' => $durationMs ?? null
             ]);
 
             // Set DB state to error if max retries reached or permanent error
             if ($reserves >= 5 || $isPermanent) {
-                $type = $payload['type'] ?? '';
+                $type = $payload['type'] ?? 'unknown';
                 $pdo = DB::conn();
+                
+                // --- DLQ Quarantine ---
+                // Record the failed job in the jobs table if it isn't tracked yet
+                $jobId = $payload['job_id'] ?? null;
+                $hostname = gethostname();
+                $errorSummary = mb_substr($e->getMessage() . "\n" . ($outputStr ?? ''), 0, 5000);
+                
+                if ($jobId) {
+                    $pdo->prepare("UPDATE jobs SET status = 'error', error_summary = ?, attempts = ?, exit_code = ?, duration_ms = ?, worker_hostname = ?, completed_at = NOW() WHERE id = ?")
+                        ->execute([$errorSummary, $reserves, $exitCode, $durationMs ?? null, $hostname, $jobId]);
+                } else {
+                    $pdo->prepare("INSERT INTO jobs (type, server_id, status, payload, error_summary, attempts, exit_code, duration_ms, worker_hostname, started_at, completed_at) VALUES (?, ?, 'error', ?, ?, ?, ?, ?, ?, NOW(), NOW())")
+                        ->execute([$type, $payload['server_id'] ?? null, json_encode($payload), $errorSummary, $reserves, $exitCode, $durationMs ?? null, $hostname]);
+                }
                 
                 if ($type === 'provision_server' && isset($payload['server_id'])) {
                     $pdo->prepare("UPDATE vpn_servers SET status = 'error', error_message = ? WHERE id = ?")
