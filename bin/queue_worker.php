@@ -18,6 +18,7 @@ use Pheanstalk\Pheanstalk;
 use Pheanstalk\Values\TubeName;
 use Symfony\Component\Process\Process;
 use Symfony\Component\Process\Exception\ProcessTimedOutException;
+use Failures\FailureClassifier;
 
 // Disable time limit for the worker
 set_time_limit(0);
@@ -98,20 +99,17 @@ while (true) {
             $stats = $pheanstalk->statsJob($job);
             $reserves = (int)($stats->reserves ?? 0);
             
-            // Classification: Permanent vs Transient
-            $isPermanent = (
-                $e instanceof \InvalidArgumentException || 
-                strpos($e->getMessage(), 'Validation failed') !== false ||
-                strpos($e->getMessage(), 'already exists') !== false ||
-                strpos($e->getMessage(), 'not found') !== false ||
-                ($exitCode === 3)
-            );
+            // --- Failure Classification ---
+            $outStr = isset($process) ? ($process->getOutput() ?? '') : '';
+            $errStr = isset($process) ? ($process->getErrorOutput() ?? '') : '';
+            $classification = FailureClassifier::classify($e, $outStr, $errStr, $exitCode ?? null);
+            $isPermanent = !$classification['retryable'];
 
             Logger::error('Job failed', [
                 'payload' => $payload ?? null,
                 'error' => $e->getMessage(),
                 'attempt' => $reserves,
-                'is_permanent' => $isPermanent,
+                'classification' => $classification,
                 'exit_code' => $exitCode,
                 'duration_ms' => $durationMs ?? null
             ]);
@@ -128,11 +126,11 @@ while (true) {
                 $errorSummary = mb_substr($e->getMessage() . "\n" . ($outputStr ?? ''), 0, 5000);
                 
                 if ($jobId) {
-                    $pdo->prepare("UPDATE jobs SET status = 'error', error_summary = ?, attempts = ?, exit_code = ?, duration_ms = ?, worker_hostname = ?, completed_at = NOW() WHERE id = ?")
-                        ->execute([$errorSummary, $reserves, $exitCode, $durationMs ?? null, $hostname, $jobId]);
+                    $pdo->prepare("UPDATE jobs SET status = 'error', error_summary = ?, attempts = ?, exit_code = ?, duration_ms = ?, worker_hostname = ?, failure_category = ?, is_retryable = ?, severity = ?, completed_at = NOW() WHERE id = ?")
+                        ->execute([$errorSummary, $reserves, $exitCode, $durationMs ?? null, $hostname, $classification['category'], (int)$classification['retryable'], $classification['severity'], $jobId]);
                 } else {
-                    $pdo->prepare("INSERT INTO jobs (type, server_id, status, payload, error_summary, attempts, exit_code, duration_ms, worker_hostname, started_at, completed_at) VALUES (?, ?, 'error', ?, ?, ?, ?, ?, ?, NOW(), NOW())")
-                        ->execute([$type, $payload['server_id'] ?? null, json_encode($payload), $errorSummary, $reserves, $exitCode, $durationMs ?? null, $hostname]);
+                    $pdo->prepare("INSERT INTO jobs (type, server_id, status, payload, error_summary, attempts, exit_code, duration_ms, worker_hostname, failure_category, is_retryable, severity, started_at, completed_at) VALUES (?, ?, 'error', ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())")
+                        ->execute([$type, $payload['server_id'] ?? null, json_encode($payload), $errorSummary, $reserves, $exitCode, $durationMs ?? null, $hostname, $classification['category'], (int)$classification['retryable'], $classification['severity']]);
                 }
                 
                 if ($type === 'provision_server' && isset($payload['server_id'])) {
