@@ -9,7 +9,7 @@ require_once __DIR__ . '/../inc/Auth.php';
 class JobController {
     
     public static function dlqIndex() {
-        Auth::requireLogin();
+        requireAuth();
         
         $pdo = DB::conn();
         
@@ -42,7 +42,7 @@ class JobController {
     }
     
     public static function retry($id) {
-        Auth::requireLogin();
+        requireAuth();
         
         $pdo = DB::conn();
         $stmt = $pdo->prepare("SELECT * FROM jobs WHERE id = ? AND status = 'error'");
