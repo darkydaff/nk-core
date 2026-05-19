@@ -430,9 +430,8 @@ class ApiController {
             $clients = VpnClient::listByServer((int)$params['id']);
             $clientsData = [];
             foreach ($clients as $clientData) {
-                $client = new VpnClient($clientData['id']);
                 $clientData['status'] = ($clientData['status'] instanceof ClientStatus) ? $clientData['status']->value : $clientData['status'];
-                $clientsData[] = array_merge($clientData, ['stats' => $client->getFormattedStats()]);
+                $clientsData[] = array_merge($clientData, ['stats' => VpnClient::formatStatsForData($clientData)]);
             }
             $this->respond(['success' => true, 'clients' => $clientsData]);
         } catch (Exception $e) { $this->respond(['error' => $e->getMessage()], 500); }

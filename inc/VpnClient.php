@@ -945,13 +945,20 @@ class VpnClient {
             return ['sent' => 'N/A', 'received' => 'N/A', 'total' => 'N/A', 'last_seen' => 'Never'];
         }
         
-        $sent = $this->formatBytes($this->data['bytes_sent'] ?? 0);
-        $received = $this->formatBytes($this->data['bytes_received'] ?? 0);
-        $total = $this->formatBytes(($this->data['bytes_sent'] ?? 0) + ($this->data['bytes_received'] ?? 0));
+        return self::formatStatsForData($this->data);
+    }
+
+    /**
+     * Format stats given a client data array (avoids N+1 DB loads)
+     */
+    public static function formatStatsForData(array $data): array {
+        $sent = self::formatBytes($data['bytes_sent'] ?? 0);
+        $received = self::formatBytes($data['bytes_received'] ?? 0);
+        $total = self::formatBytes(($data['bytes_sent'] ?? 0) + ($data['bytes_received'] ?? 0));
         
         $lastSeen = 'Never';
-        if (!empty($this->data['last_handshake'])) {
-            $lastHandshake = strtotime($this->data['last_handshake']);
+        if (!empty($data['last_handshake'])) {
+            $lastHandshake = strtotime($data['last_handshake']);
             $diff = time() - $lastHandshake;
             
             if ($diff < 300) {
@@ -970,9 +977,9 @@ class VpnClient {
             'received' => $received,
             'total' => $total,
             'last_seen' => $lastSeen,
-            'is_online' => !empty($this->data['last_handshake']) && (time() - strtotime($this->data['last_handshake'])) < 300,
-            'speed_up' => self::formatSpeed((float)($this->data['speed_up_kbps'] ?? 0)),
-            'speed_down' => self::formatSpeed((float)($this->data['speed_down_kbps'] ?? 0))
+            'is_online' => !empty($data['last_handshake']) && (time() - strtotime($data['last_handshake'])) < 300,
+            'speed_up' => self::formatSpeed((float)($data['speed_up_kbps'] ?? 0)),
+            'speed_down' => self::formatSpeed((float)($data['speed_down_kbps'] ?? 0))
         ];
     }
 
@@ -986,7 +993,7 @@ class VpnClient {
     /**
      * Format bytes to human-readable string (auto-scale to MB/GB)
      */
-    private function formatBytes(int $bytes): string {
+    public static function formatBytes(int $bytes): string {
         if ($bytes >= 1073741824) {
             return number_format($bytes / 1073741824, 2) . ' GB';
         }
