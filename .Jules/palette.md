@@ -1,0 +1,3 @@
+## 2024-05-15 - Missing ARIA Labels on Icon-only Close Buttons
+**Learning:** Found a recurring accessibility issue in modal components where icon-only close buttons (e.g., `<i class="fas fa-times"></i>`) lack `aria-label`s and proper focus indicators. This makes it impossible for screen reader users to understand the button's purpose, and difficult for keyboard navigators to see when it is focused.
+**Action:** When working on modals or icon-only buttons, always ensure an `aria-label` is present on the button, `aria-hidden="true"` is set on the icon itself, and that adequate `focus:ring` utilities are applied for keyboard accessibility.
