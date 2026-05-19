@@ -41,5 +41,21 @@ CREATE TABLE job_events (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Link servers to their active jobs
-ALTER TABLE vpn_servers ADD COLUMN IF NOT EXISTS current_job_id INT UNSIGNED DEFAULT NULL;
-ALTER TABLE vpn_servers ADD CONSTRAINT fk_server_current_job FOREIGN KEY (current_job_id) REFERENCES jobs(id) ON DELETE SET NULL;
+DELIMITER //
+CREATE PROCEDURE SafeAddJobCol()
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'vpn_servers'
+          AND COLUMN_NAME = 'current_job_id'
+    ) THEN
+        ALTER TABLE vpn_servers ADD COLUMN current_job_id INT UNSIGNED DEFAULT NULL;
+        ALTER TABLE vpn_servers ADD CONSTRAINT fk_server_current_job FOREIGN KEY (current_job_id) REFERENCES jobs(id) ON DELETE SET NULL;
+    END IF;
+END //
+DELIMITER ;
+
+CALL SafeAddJobCol();
+DROP PROCEDURE SafeAddJobCol;

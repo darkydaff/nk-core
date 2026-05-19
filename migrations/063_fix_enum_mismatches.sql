@@ -14,4 +14,20 @@ ALTER TABLE vpn_clients
     MODIFY COLUMN status ENUM('provisioning','verifying','active','disabled','deleting','error','deleted') DEFAULT 'active';
 
 -- users: Add 'deleted_at' column if missing (used by Auth::deleteUser soft-delete)
-ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL DEFAULT NULL;
+DELIMITER //
+CREATE PROCEDURE SafeAddDeletedAtCol()
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'users'
+          AND COLUMN_NAME = 'deleted_at'
+    ) THEN
+        ALTER TABLE users ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL;
+    END IF;
+END //
+DELIMITER ;
+
+CALL SafeAddDeletedAtCol();
+DROP PROCEDURE SafeAddDeletedAtCol;
