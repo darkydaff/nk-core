@@ -8,17 +8,37 @@
 -- vpn_clients.user_id similarly: RESTRICT prevents losing traffic rows when a
 -- user account is hard-deleted; the admin must clean up clients first.
 
-ALTER TABLE vpn_clients
-    DROP CONSTRAINT IF EXISTS fk_vpn_clients_server_id,
-    DROP CONSTRAINT IF EXISTS fk_vpn_clients_user_id,
-    DROP CONSTRAINT IF EXISTS vpn_clients_ibfk_1,
-    DROP CONSTRAINT IF EXISTS vpn_clients_ibfk_2;
+DELIMITER //
 
-ALTER TABLE http_proxies
-    DROP CONSTRAINT IF EXISTS fk_http_proxies_user_id,
-    DROP CONSTRAINT IF EXISTS fk_http_proxies_server_id,
-    DROP CONSTRAINT IF EXISTS http_proxies_ibfk_1,
-    DROP CONSTRAINT IF EXISTS http_proxies_ibfk_2;
+CREATE PROCEDURE DropForeignKeyIfExists(IN tableName VARCHAR(255), IN fkName VARCHAR(255))
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.key_column_usage
+        WHERE table_schema = DATABASE()
+        AND table_name = tableName
+        AND constraint_name = fkName
+    ) THEN
+        SET @s = CONCAT('ALTER TABLE ', tableName, ' DROP FOREIGN KEY ', fkName);
+        PREPARE stmt FROM @s;
+        EXECUTE stmt;
+        DEALLOCATE PREPARE stmt;
+    END IF;
+END //
+
+DELIMITER ;
+
+CALL DropForeignKeyIfExists('vpn_clients', 'fk_vpn_clients_server_id');
+CALL DropForeignKeyIfExists('vpn_clients', 'fk_vpn_clients_user_id');
+CALL DropForeignKeyIfExists('vpn_clients', 'vpn_clients_ibfk_1');
+CALL DropForeignKeyIfExists('vpn_clients', 'vpn_clients_ibfk_2');
+
+CALL DropForeignKeyIfExists('http_proxies', 'fk_http_proxies_user_id');
+CALL DropForeignKeyIfExists('http_proxies', 'fk_http_proxies_server_id');
+CALL DropForeignKeyIfExists('http_proxies', 'http_proxies_ibfk_1');
+CALL DropForeignKeyIfExists('http_proxies', 'http_proxies_ibfk_2');
+
+DROP PROCEDURE DropForeignKeyIfExists;
 
 -- Re-add with RESTRICT
 ALTER TABLE vpn_clients
