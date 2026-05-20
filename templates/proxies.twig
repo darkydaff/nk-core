@@ -110,8 +110,8 @@
 									<label class="text-[10px] dark:text-slate-400 text-slate-500 uppercase font-bold tracking-wider ml-1 mb-1 block">{{ t('proxies.username') }}</label>
 									<div class="flex items-center bg-slate-50/80 dark:bg-surface-base/50 rounded-xl border border-slate-200 dark:border-default p-0.5 group-hover/field:border-primary/20 transition-colors min-w-0">
 										<span class="px-3 py-1.5 text-xs font-mono truncate flex-grow leading-none min-w-0 text-slate-700 dark:text-slate-300">{{ proxy.username }}</span>
-										<button onclick="copyToClipboard('{{ proxy.username }}', this)" class="p-1.5 text-slate-400 hover:text-primary transition-colors flex-shrink-0">
-											<i class="fas fa-copy text-[10px]"></i>
+										<button onclick="copyToClipboard('{{ proxy.username }}', this)" class="p-1.5 text-slate-400 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 dark:focus:ring-offset-surface-base rounded transition-colors flex-shrink-0" aria-label="{{ t('common.copy')|default('Copy') }}">
+											<i class="fas fa-copy text-[10px]" aria-hidden="true"></i>
 										</button>
 									</div>
 								</div>
@@ -119,8 +119,8 @@
 									<label class="text-[10px] dark:text-slate-400 text-slate-500 uppercase font-bold tracking-wider ml-1 mb-1 block">{{ t('proxies.password') }}</label>
 									<div class="flex items-center bg-slate-50/80 dark:bg-surface-base/50 rounded-xl border border-slate-200 dark:border-default p-0.5 group-hover/field:border-primary/20 transition-colors min-w-0">
 										<span class="px-3 py-1.5 text-xs font-mono truncate flex-grow leading-none min-w-0 text-slate-700 dark:text-slate-300">{{ proxy.password }}</span>
-										<button onclick="copyToClipboard('{{ proxy.password }}', this)" class="p-1.5 text-slate-400 hover:text-primary transition-colors flex-shrink-0">
-											<i class="fas fa-copy text-[10px]"></i>
+										<button onclick="copyToClipboard('{{ proxy.password }}', this)" class="p-1.5 text-slate-400 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 dark:focus:ring-offset-surface-base rounded transition-colors flex-shrink-0" aria-label="{{ t('common.copy')|default('Copy') }}">
+											<i class="fas fa-copy text-[10px]" aria-hidden="true"></i>
 										</button>
 									</div>
 								</div>
@@ -132,8 +132,8 @@
 									<label class="text-[10px] dark:text-slate-400 text-slate-500 uppercase font-bold tracking-wider ml-1 mb-1 block">{{ t('proxies.host')|default('Server IP') }}</label>
 									<div class="flex items-center bg-slate-50/80 dark:bg-surface-base/50 rounded-xl border border-slate-200 dark:border-default p-0.5 group-hover/field:border-primary/20 transition-colors min-w-0">
 										<span class="px-3 py-1.5 text-xs font-mono truncate flex-grow leading-none min-w-0 text-slate-700 dark:text-slate-300">{{ proxy.server_host }}</span>
-										<button onclick="copyToClipboard('{{ proxy.server_host }}', this)" class="p-1.5 text-slate-400 hover:text-primary transition-colors flex-shrink-0">
-											<i class="fas fa-copy text-[10px]"></i>
+										<button onclick="copyToClipboard('{{ proxy.server_host }}', this)" class="p-1.5 text-slate-400 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 dark:focus:ring-offset-surface-base rounded transition-colors flex-shrink-0" aria-label="{{ t('common.copy')|default('Copy') }}">
+											<i class="fas fa-copy text-[10px]" aria-hidden="true"></i>
 										</button>
 									</div>
 								</div>
@@ -141,8 +141,8 @@
 									<label class="text-[10px] dark:text-slate-400 text-slate-500 uppercase font-bold tracking-wider ml-1 mb-1 block">{{ t('proxies.port')|default('Port') }}</label>
 									<div class="flex items-center bg-slate-50/80 dark:bg-surface-base/50 rounded-xl border border-slate-200 dark:border-default p-0.5 group-hover/field:border-primary/20 transition-colors min-w-0">
 										<span class="px-3 py-1.5 text-xs font-mono truncate flex-grow leading-none min-w-0 text-slate-700 dark:text-slate-300">{{ proxy.port }}</span>
-										<button onclick="copyToClipboard('{{ proxy.port }}', this)" class="p-1.5 text-slate-400 hover:text-primary transition-colors flex-shrink-0">
-											<i class="fas fa-copy text-[10px]"></i>
+										<button onclick="copyToClipboard('{{ proxy.port }}', this)" class="p-1.5 text-slate-400 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 dark:focus:ring-offset-surface-base rounded transition-colors flex-shrink-0" aria-label="{{ t('common.copy')|default('Copy') }}">
+											<i class="fas fa-copy text-[10px]" aria-hidden="true"></i>
 										</button>
 									</div>
 								</div>
@@ -155,9 +155,10 @@
 										{{ full_url }}
 									</div>
 									<button onclick="copyToClipboard('{{ full_url }}', this)" 
-											class="w-10 h-10 min-w-[2.5rem] bg-slate-200 dark:bg-surface-hover hover:bg-primary hover:text-white text-slate-500 dark:text-muted transition-all rounded-xl flex items-center justify-center flex-shrink-0"
-											title="{{ t('common.copy') }}">
-										<i class="fas fa-copy"></i>
+											class="w-10 h-10 min-w-[2.5rem] bg-slate-200 dark:bg-surface-hover hover:bg-primary hover:text-white text-slate-500 dark:text-muted focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 dark:focus:ring-offset-surface-base transition-all rounded-xl flex items-center justify-center flex-shrink-0"
+											title="{{ t('common.copy') }}"
+											aria-label="{{ t('common.copy')|default('Copy') }}">
+										<i class="fas fa-copy" aria-hidden="true"></i>
 									</button>
 								</div>
 							</div>
