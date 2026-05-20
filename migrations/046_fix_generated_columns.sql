@@ -5,14 +5,77 @@
 SET GLOBAL log_bin_trust_function_creators = 1;
 
 -- 1. We must safely drop and recreate the column because altering a generated column is not supported in all MySQL versions
-ALTER TABLE vpn_clients DROP INDEX IF EXISTS unique_active_server_client_ip;
-ALTER TABLE vpn_clients DROP COLUMN IF EXISTS active_client_ip;
+DELIMITER //
+
+CREATE PROCEDURE DropIndexAndColumn()
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE()
+        AND table_name = 'vpn_clients'
+        AND index_name = 'unique_active_server_client_ip'
+    ) THEN
+        ALTER TABLE vpn_clients DROP INDEX unique_active_server_client_ip;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+        AND table_name = 'vpn_clients'
+        AND column_name = 'active_client_ip'
+    ) THEN
+        ALTER TABLE vpn_clients DROP COLUMN active_client_ip;
+    END IF;
+END //
+
+DELIMITER ;
+
+CALL DropIndexAndColumn();
+DROP PROCEDURE DropIndexAndColumn;
 
 -- 2. Add as a regular column
-ALTER TABLE vpn_clients ADD COLUMN IF NOT EXISTS active_client_ip VARCHAR(50) DEFAULT NULL;
+DELIMITER //
+
+CREATE PROCEDURE AddColumn()
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+        AND table_name = 'vpn_clients'
+        AND column_name = 'active_client_ip'
+    ) THEN
+        ALTER TABLE vpn_clients ADD COLUMN active_client_ip VARCHAR(50) DEFAULT NULL;
+    END IF;
+END //
+
+DELIMITER ;
+
+CALL AddColumn();
+DROP PROCEDURE AddColumn;
 
 -- 3. Re-add the unique index
-ALTER TABLE vpn_clients ADD UNIQUE KEY IF NOT EXISTS unique_active_server_client_ip (server_id, active_client_ip);
+DELIMITER //
+
+CREATE PROCEDURE AddUniqueIndex()
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE()
+        AND table_name = 'vpn_clients'
+        AND index_name = 'unique_active_server_client_ip'
+    ) THEN
+        ALTER TABLE vpn_clients ADD UNIQUE KEY unique_active_server_client_ip (server_id, active_client_ip);
+    END IF;
+END //
+
+DELIMITER ;
+
+CALL AddUniqueIndex();
+DROP PROCEDURE AddUniqueIndex;
 
 -- 4. Fill the column with initial data
 UPDATE vpn_clients SET active_client_ip = IF(deleted_at IS NULL, client_ip, NULL);
