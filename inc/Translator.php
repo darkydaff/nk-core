@@ -99,7 +99,7 @@ class Translator
             'common.status_offline' => ['en' => 'Offline', 'uk' => 'Офлайн', 'ru' => 'Оффлайн'],
             'common.status_revoked' => ['en' => 'Revoked', 'uk' => 'Відкликано', 'ru' => 'Отозван'],
             // New Map & Deployment keys
-            'map.fleet_distribution' => ['en' => 'Servers Distribution', 'uk' => 'Розподіл серверів', 'ru' => 'Распределение серверов'],
+            'map.fleet_distribution' => ['en' => 'Client Distribution', 'uk' => 'Розподіл клієнтів', 'ru' => 'Распределение клиентов'],
             'deployment.progress' => ['en' => 'Deployment Progress', 'uk' => 'Прогрес розгортання', 'ru' => 'Прогресс развертывания'],
             'deployment.waiting_to_start' => ['en' => 'Waiting to start...', 'uk' => 'Очікування запуску...', 'ru' => 'Ожидание запуска...'],
             'deployment.cancel' => ['en' => 'Cancel Deployment', 'uk' => 'Скасувати розгортання', 'ru' => 'Отменить развертывание'],
