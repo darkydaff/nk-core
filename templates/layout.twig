@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <!-- Blocking theme script -->
@@ -196,7 +196,7 @@
                 });
                 const data = await response.json();
                 if (data.success) {
-                    NK.toast('Fleet synchronized', 'success');
+                    NK.toast('Servers synchronized', 'success');
                     setTimeout(() => location.reload(), 1000);
                 } else {
                     NK.toast(data.error || 'Sync failed', 'error');

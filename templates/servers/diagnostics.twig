@@ -1,6 +1,6 @@
 {% extends "layout.twig" %}
 
-{% block title %}Fleet Telemetry Control Room & SLO Diagnostics{% endblock %}
+{% block title %}Servers Telemetry Control Room & SLO Diagnostics{% endblock %}
 
 {% block breadcrumbs %}
     <li><a href="/servers" class="hover:text-primary transition-colors">Servers</a></li>
@@ -45,7 +45,7 @@
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
                 </span>
-                Fleet Telemetry Operations Center
+                Servers Telemetry Operations Center
             </h1>
             <p class="text-content-secondary mt-1">Real-time closed-loop control system, SLO compliance audits, and failure modeling.</p>
         </div>
@@ -144,7 +144,7 @@
                     <tbody id="nodes-table-body" class="divide-y divide-surface-border/30 text-sm text-content-secondary">
                         <tr>
                             <td colspan="5" class="py-8 text-center text-content-muted">
-                                <i class="fas fa-circle-notch fa-spin mr-2"></i> Querying fleet diagnostics...
+                                <i class="fas fa-circle-notch fa-spin mr-2"></i> Querying server diagnostics...
                             </td>
                         </tr>
                     </tbody>
@@ -283,7 +283,7 @@
                 calculateAggregateSLOs(data.nodes);
             }
         } catch (e) {
-            console.error("Failed to sync fleet diagnostics: ", e);
+            console.error("Failed to sync server diagnostics: ", e);
         }
     }
 
@@ -292,7 +292,7 @@
         if (!tbody) return;
 
         if (nodes.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-content-muted">No nodes active in the current fleet.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-content-muted">No servers active.</td></tr>`;
             return;
         }
 

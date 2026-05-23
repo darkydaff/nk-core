@@ -2,10 +2,10 @@
 -- Date: 2026-05-24
 
 INSERT INTO translations (locale, category, key_name, translation) VALUES
--- Map Fleet Distribution
-('en', 'map', 'fleet_distribution', 'Fleet Distribution'),
-('uk', 'map', 'fleet_distribution', 'Розподіл флоту'),
-('ru', 'map', 'fleet_distribution', 'Распределение флота'),
+-- Map Servers Distribution
+('en', 'map', 'fleet_distribution', 'Servers Distribution'),
+('uk', 'map', 'fleet_distribution', 'Розподіл серверів'),
+('ru', 'map', 'fleet_distribution', 'Распределение серверов'),
 
 -- Deployment Stepper & Console
 ('en', 'deployment', 'progress', 'Deployment Progress'),
