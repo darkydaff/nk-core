@@ -33,7 +33,9 @@ class VpnConfigRenderer
         
         $awgParams = [];
         if (!empty($serverData['awg_params'])) {
-            $awgParams = json_decode($serverData['awg_params'], true) ?: [];
+            $awgParams = is_array($serverData['awg_params'])
+                ? $serverData['awg_params']
+                : (json_decode($serverData['awg_params'], true) ?: []);
         }
         $serverData['awg_params'] = $awgParams;
 
