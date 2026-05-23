@@ -1,4 +1,4 @@
-{% extends "layout.twig" %}
+﻿{% extends "layout.twig" %}
 {% block title %}{{ t('clients.title') }}: {{ client.name }}{% endblock %}
 
 {% block breadcrumbs %}
@@ -79,7 +79,7 @@
             </div>
             <div class="text-2xl font-bold font-mono"><span id="sent_val">{{ (client.bytes_sent / 1024 / 1024)|number_format(2) }}</span> <span class="text-xs text-muted">{{ t('common.mb') }}</span></div>
             <div class="text-[10px] text-primary font-bold mt-1 flex items-center">
-                <i class="fas fa-arrow-up mr-1 opacity-70"></i><span id="speed_up_val">{{ stats.speed_up|default('0 Kbps') }}</span>
+                <i class="fas fa-arrow-up mr-1 opacity-70"></i><span id="speed_up_val">{{ stats.speed_up|default('0 Kbps') }}</span>
             </div>
         </div>
         <div class="panel p-5">
@@ -89,7 +89,7 @@
             </div>
             <div class="text-2xl font-bold font-mono"><span id="received_val">{{ (client.bytes_received / 1024 / 1024)|number_format(2) }}</span> <span class="text-xs text-muted">{{ t('common.mb') }}</span></div>
             <div class="text-[10px] dark:text-emerald-400 text-emerald-600 font-bold mt-1 flex items-center">
-                <i class="fas fa-arrow-down mr-1 opacity-70"></i><span id="speed_down_val">{{ stats.speed_down|default('0 Kbps') }}</span>
+                <i class="fas fa-arrow-down mr-1 opacity-70"></i><span id="speed_down_val">{{ stats.speed_down|default('0 Kbps') }}</span>
             </div>
         </div>
         <div class="panel p-5">

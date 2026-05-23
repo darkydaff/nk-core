@@ -1,4 +1,4 @@
-{% extends "layout.twig" %}
+﻿{% extends "layout.twig" %}
 
 {% block title %}{{ t('menu.settings') }} - {{ app_name }}{% endblock %}
 
@@ -59,17 +59,17 @@
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <div class="space-y-4">
                         <div>
-                            <label class="block text-sm font-medium mb-2">{{ t('settings.current_password') }}</label>
-                            <input type="password" name="current_password" required class="input-field w-full px-4 py-2.5 font-mono">
+                            <label for="current_password" class="block text-sm font-medium mb-2">{{ t('settings.current_password') }}</label>
+                            <input type="password" id="current_password" name="current_password" required class="input-field w-full px-4 py-2.5 font-mono">
                         </div>
                         <div>
-                            <label class="block text-sm font-medium mb-2">{{ t('settings.new_password') }}</label>
-                            <input type="password" name="new_password" required minlength="6" class="input-field w-full px-4 py-2.5 font-mono">
+                            <label for="new_password" class="block text-sm font-medium mb-2">{{ t('settings.new_password') }}</label>
+                            <input type="password" id="new_password" name="new_password" required minlength="6" class="input-field w-full px-4 py-2.5 font-mono">
                             <p class="mt-1 text-xs text-muted">{{ t('settings.min_6_chars') }}</p>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium mb-2">{{ t('settings.confirm_password') }}</label>
-                            <input type="password" name="confirm_password" required minlength="6" class="input-field w-full px-4 py-2.5 font-mono">
+                            <label for="confirm_password" class="block text-sm font-medium mb-2">{{ t('settings.confirm_password') }}</label>
+                            <input type="password" id="confirm_password" name="confirm_password" required minlength="6" class="input-field w-full px-4 py-2.5 font-mono">
                         </div>
                         <div class="pt-2">
                             <button type="submit" class="btn-primary px-5 py-2.5 text-sm">
@@ -120,11 +120,11 @@
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                 <div>
                                     <label class="block text-[11px] font-medium text-secondary mb-1.5">{{ t('common.username') }}</label>
-                                    <input type="text" name="new_username" required class="input-field w-full px-3 py-2 text-sm">
+                                    <input type="text" id="new_username" name="new_username" required class="input-field w-full px-3 py-2 text-sm">
                                 </div>
                                 <div>
-                                    <label class="block text-[11px] font-medium text-secondary mb-1.5">{{ t('common.new_password') }}</label>
-                                    <input type="password" name="new_password" required class="input-field w-full px-3 py-2 text-sm">
+                                    <label for="add_user_password" class="block text-[11px] font-medium text-secondary mb-1.5">{{ t('common.new_password') }}</label>
+                                    <input type="password" id="add_user_password" name="new_password" required class="input-field w-full px-3 py-2 text-sm">
                                 </div>
                                 <div class="pt-2">
                                     <button type="submit" class="w-full btn-primary py-2 text-xs font-bold">
@@ -358,12 +358,12 @@
                         <div class="space-y-4">
                             <h3 class="text-xs font-bold text-muted uppercase tracking-widest mb-4">{{ t('settings.bot_settings') }}</h3>
                             <div>
-                                <label class="block text-sm font-medium mb-2">{{ t('settings.bot_token') }}</label>
-                                <input type="password" name="tg_bot_token" value="{{ tg_config.bot_token }}" placeholder="123456:ABC-DEF..." class="input-field w-full px-4 py-2.5 font-mono">
+                                <label for="tg_bot_token" class="block text-sm font-medium mb-2">{{ t('settings.bot_token') }}</label>
+                                <input type="password" id="tg_bot_token" name="tg_bot_token" value="{{ tg_config.bot_token }}" placeholder="123456:ABC-DEF…" class="input-field w-full px-4 py-2.5 font-mono">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium mb-2">{{ t('settings.chat_id') }}</label>
-                                <input type="text" name="tg_chat_id" value="{{ tg_config.chat_id }}" placeholder="-100123456789" class="input-field w-full px-4 py-2.5 font-mono">
+                                <label for="tg_chat_id" class="block text-sm font-medium mb-2">{{ t('settings.chat_id') }}</label>
+                                <input type="text" id="tg_chat_id" name="tg_chat_id" value="{{ tg_config.chat_id }}" placeholder="-100123456789" class="input-field w-full px-4 py-2.5 font-mono">
                             </div>
                         </div>
 
@@ -376,23 +376,23 @@
                                 </label>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium mb-2">{{ t('settings.proxy_url')|default('Proxy Connection String') }}</label>
-                                <input type="text" name="tg_proxy_url" placeholder="http://user:pass@host:port" class="input-field w-full px-4 py-2.5 font-mono text-xs">
+                                <label for="tg_proxy_url" class="block text-sm font-medium mb-2">{{ t('settings.proxy_url')|default('Proxy Connection String') }}</label>
+                                <input type="text" id="tg_proxy_url" name="tg_proxy_url" placeholder="http://user:pass@host:port" class="input-field w-full px-4 py-2.5 font-mono text-xs">
                                 <p class="mt-1 text-[10px] text-muted">Paste a full URL or fill separate details below (HTTP only).</p>
                             </div>
                             <div class="grid grid-cols-3 gap-3">
                                 <div class="col-span-2">
-                                    <label class="block text-sm font-medium mb-2">{{ t('settings.proxy_host') }}</label>
-                                    <input type="text" name="tg_proxy_host" value="{{ tg_config.proxy_host }}" placeholder="1.2.3.4" class="input-field w-full px-4 py-2.5 font-mono text-xs">
+                                    <label for="tg_proxy_host" class="block text-sm font-medium mb-2">{{ t('settings.proxy_host') }}</label>
+                                    <input type="text" id="tg_proxy_host" name="tg_proxy_host" value="{{ tg_config.proxy_host }}" placeholder="1.2.3.4" class="input-field w-full px-4 py-2.5 font-mono text-xs">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium mb-2">{{ t('settings.proxy_port') }}</label>
-                                    <input type="text" name="tg_proxy_port" value="{{ tg_config.proxy_port }}" placeholder="1080" class="input-field w-full px-4 py-2.5 font-mono text-xs">
+                                    <label for="tg_proxy_port" class="block text-sm font-medium mb-2">{{ t('settings.proxy_port') }}</label>
+                                    <input type="text" id="tg_proxy_port" name="tg_proxy_port" value="{{ tg_config.proxy_port }}" placeholder="1080" class="input-field w-full px-4 py-2.5 font-mono text-xs">
                                 </div>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium mb-2">{{ t('settings.proxy_auth') }}</label>
-                                <input type="text" name="tg_proxy_auth" value="{{ tg_config.proxy_auth }}" placeholder="user:pass" class="input-field w-full px-4 py-2.5 font-mono text-xs">
+                                <label for="tg_proxy_auth" class="block text-sm font-medium mb-2">{{ t('settings.proxy_auth') }}</label>
+                                <input type="text" id="tg_proxy_auth" name="tg_proxy_auth" value="{{ tg_config.proxy_auth }}" placeholder="user:pass" class="input-field w-full px-4 py-2.5 font-mono text-xs">
                             </div>
                         </div>
                     </div>
@@ -419,8 +419,8 @@
                         <div class="space-y-4">
                             <h3 class="text-xs font-bold text-muted uppercase tracking-widest mb-4">{{ t('settings.beszel_hub') }}</h3>
                             <div>
-                                <label class="block text-sm font-medium mb-2">{{ t('settings.beszel_url')|default('Beszel URL') }}</label>
-                                <input type="text" name="beszel_url" value="{{ beszel_config.url }}" placeholder="http://bz.example.com:8090" class="input-field w-full px-4 py-2.5 font-mono">
+                                <label for="beszel_url" class="block text-sm font-medium mb-2">{{ t('settings.beszel_url')|default('Beszel URL') }}</label>
+                                <input type="text" id="beszel_url" name="beszel_url" value="{{ beszel_config.url }}" placeholder="http://bz.example.com:8090" class="input-field w-full px-4 py-2.5 font-mono">
                                 <p class="mt-1 text-xs text-secondary">{{ t('settings.beszel_url_desc') }}</p>
                             </div>
                         </div>
@@ -428,12 +428,12 @@
                         <div class="space-y-4 border-l border-default/50 pl-0 md:pl-8">
                             <h3 class="text-xs font-bold text-muted uppercase tracking-widest mb-4">{{ t('common.credentials') }}</h3>
                             <div>
-                                <label class="block text-sm font-medium mb-2">{{ t('common.email_address') }}</label>
-                                <input type="email" name="beszel_email" value="{{ beszel_config.email }}" placeholder="admin@example.com" class="input-field w-full px-4 py-2.5 font-mono">
+                                <label for="beszel_email" class="block text-sm font-medium mb-2">{{ t('common.email_address') }}</label>
+                                <input type="email" id="beszel_email" name="beszel_email" value="{{ beszel_config.email }}" placeholder="admin@example.com" class="input-field w-full px-4 py-2.5 font-mono">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium mb-2">{{ t('common.password') }}</label>
-                                <input type="password" name="beszel_password" value="{{ beszel_config.password }}" placeholder="••••••••" class="input-field w-full px-4 py-2.5 font-mono">
+                                <label for="beszel_password" class="block text-sm font-medium mb-2">{{ t('common.password') }}</label>
+                                <input type="password" id="beszel_password" name="beszel_password" value="{{ beszel_config.password }}" placeholder="••••••••" class="input-field w-full px-4 py-2.5 font-mono">
                             </div>
                         </div>
                     </div>

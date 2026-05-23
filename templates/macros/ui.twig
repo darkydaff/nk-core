@@ -68,7 +68,7 @@
 {% macro input(name, label = null, placeholder = '', value = '', type = 'text', required = false, class = '', id = '', icon = null) %}
     <div class="flex flex-col gap-1.5 w-full">
         {% if label %}
-            <label class="text-[10px] text-muted uppercase font-bold tracking-widest">{{ label }}{% if required %}<span class="text-red-500 ml-0.5">*</span>{% endif %}</label>
+            <label for="{{ id|default(name) }}" class="text-[10px] text-muted uppercase font-bold tracking-widest">{{ label }}{% if required %}<span class="text-red-500 ml-0.5">*</span>{% endif %}</label>
         {% endif %}
         <div class="relative w-full">
             {% if icon %}
@@ -83,7 +83,7 @@
                 value="{{ value }}" 
                 {% if required %}required{% endif %}
                 class="input-field {{ icon ? 'pl-9' : '' }} {{ class }}"
-                {% if id %}id="{{ id }}"{% endif %}
+            id="{{ id|default(name) }}"
             />
         </div>
     </div>
@@ -93,13 +93,13 @@
 {% macro select(name, options = [], label = null, selected = '', required = false, class = '', id = '') %}
     <div class="flex flex-col gap-1.5 w-full">
         {% if label %}
-            <label class="text-[10px] text-muted uppercase font-bold tracking-widest">{{ label }}</label>
+            <label for="{{ id|default(name) }}" class="text-[10px] text-muted uppercase font-bold tracking-widest">{{ label }}</label>
         {% endif %}
         <select 
             name="{{ name }}"
+            id="{{ id|default(name) }}"
             {% if required %}required{% endif %}
             class="input-field cursor-pointer {{ class }}"
-            {% if id %}id="{{ id }}"{% endif %}
         >
             {% for opt in options %}
                 <option value="{{ opt.value }}" {% if opt.value == selected %}selected{% endif %}>{{ opt.label }}</option>

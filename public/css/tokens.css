@@ -1,4 +1,4 @@
-/* public/css/tokens.css */
+﻿/* public/css/tokens.css */
 
 :root {
     /* ─── SYSTEM CONFIGURATION ─── */
@@ -19,7 +19,7 @@
 
     --color-content-primary:   #0f172a; /* Slate 900 */
     --color-content-secondary: #475569; /* Slate 600 */
-    --color-content-muted:     #94a3b8; /* Slate 400 */
+    --color-content-muted:     #64748b; /* Slate 500 */
     --color-placeholder:       #cbd5e1; /* Slate 300 */
 
     /* Core Action Mappings */
@@ -38,47 +38,10 @@
     --shadow-md:    0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -1px rgba(0, 0, 0, 0.04);
     --shadow-lg:    0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
     --shadow-modal: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
 
-    /* ─── TYPOGRAPHY HIERARCHY ─── */
-    --font-size-xs:   0.75rem;   /* 12px */
-    --font-size-sm:   0.875rem;  /* 14px */
-    --font-size-base: 1rem;      /* 16px */
-    --font-size-lg:   1.125rem;  /* 18px */
-    --font-size-xl:   1.25rem;   /* 20px */
-    --font-size-2xl:  1.5rem;    /* 24px */
-    --font-size-3xl:  1.875rem;  /* 30px */
-
-    /* ─── SPACING SCALE ─── */
-    --space-1:  0.25rem;
-    --space-2:  0.5rem;
-    --space-3:  0.75rem;
-    --space-4:  1.0rem;
-    --space-5:  1.25rem;
-    --space-6:  1.5rem;
-    --space-8:  2.0rem;
-    --space-10: 2.5rem;
-    --space-12: 3.0rem;
-    --space-16: 4.0rem;
-
-    /* ─── BORDER RADII ─── */
-    --radius-sm: 0.375rem;
-    --radius-md: 0.5rem;
-    --radius-lg: 0.75rem;
-    --radius-xl: 1.0rem;
-
-    /* ─── Z-INDEX LAYERING SCALE ─── */
-    --z-index-map:            10;
-    --z-index-dropdown:       100;
-    --z-index-sticky:         200;
-    --z-index-sidebar:        500;
-    --z-index-modal-backdrop: 1000;
-    --z-index-modal:          1010;
-    --z-index-toast:          10000;
-
-    /* ─── TRANSITIONS & ANIMATIONS ─── */
-    --transition-fast:   100ms cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-normal: 200ms cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-slow:   300ms cubic-bezier(0.4, 0, 0.2, 1);
+html {
+    color-scheme: light dark;
 }
 
 html.dark {
@@ -108,4 +71,5 @@ html.dark {
     --shadow-md:    0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
     --shadow-lg:    0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
     --shadow-modal: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    color-scheme: dark;
 }

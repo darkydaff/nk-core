@@ -1,4 +1,4 @@
-body {
+﻿body {
     font-family: 'Inter', sans-serif;
     background-color: var(--color-surface-base);
     color: var(--color-content-primary);
@@ -36,7 +36,7 @@ body {
             border-radius: 0.75rem;
             color: var(--color-sidebar-text);
             opacity: 0.7;
-            transition: all 0.2s ease;
+            transition: background-color, opacity, color 0.2s ease;
             font-size: 0.875rem;
             font-weight: 500;
         }
@@ -70,7 +70,7 @@ body {
             min-height: 100vh;
             display: flex;
             flex-direction: column;
-            transition: all 0.3s ease;
+            transition: width 0.3s ease;
             width: 100%;
         }
 
@@ -108,7 +108,7 @@ body {
             padding: 0.625rem 1.25rem;
             border-radius: 0.75rem;
             font-weight: 600;
-            transition: all 0.2s ease;
+            transition: background-color, border-color, color, box-shadow, transform 0.2s ease;
             display: inline-flex;
             align-items: center;
             justify-content: center;
@@ -118,6 +118,11 @@ body {
             background: var(--color-primary-hover) !important;
             transform: translateY(-1px);
             box-shadow: 0 4px 12px -2px rgba(14, 165, 233, 0.4);
+        }
+
+        .btn-primary:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 4px var(--color-primary-light);
         }
 
         .bg-primary { background-color: var(--color-primary) !important; }
@@ -143,7 +148,12 @@ body {
             padding: 0.625rem 1.25rem;
             border-radius: 0.75rem;
             font-weight: 500;
-            transition: all 0.2s ease;
+            transition: background-color, border-color, color, box-shadow, transform 0.2s ease;
+        }
+
+        .btn-secondary:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 4px var(--color-primary-light);
         }
 
         .badge-active {
@@ -182,7 +192,7 @@ body {
             color: var(--color-content-primary);
             border-radius: 0.75rem;
             padding: 0.75rem 1rem;
-            transition: all 0.2s ease;
+            transition: border-color, background-color, box-shadow, color 0.2s ease;
             appearance: none;
             line-height: 1.5;
             width: 100%;
@@ -199,7 +209,7 @@ body {
             color: var(--color-content-primary);
         }
 
-        .input-field:focus {
+        .input-field:focus-visible {
             border-color: var(--color-primary);
             background: var(--color-surface-panel);
             outline: none;
@@ -305,8 +315,13 @@ body {
             justify-content: center;
             border-radius: 0.5rem;
             color: var(--color-content-muted) !important;
-            transition: all 0.2s ease !important;
+            transition: background-color, border-color, color, box-shadow, transform !important;
             background: transparent;
+        }
+
+        .btn-action:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 4px var(--color-primary-light);
         }
 
         .btn-action:hover {
@@ -334,6 +349,11 @@ body {
             color: #34d399 !important; /* emerald-400 */
         }
 
+        .btn-edit:focus-visible {
+            outline: none;
+            box-shadow: 0 0 0 4px var(--color-primary-light);
+        }
+
         .btn-edit {
             background: var(--color-surface-panel) !important;
             color: var(--color-content-secondary) !important;
@@ -344,7 +364,7 @@ body {
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            transition: all 0.2s ease !important;
+            transition: background-color, border-color, color, box-shadow, transform !important;
             box-shadow: var(--shadow-sm);
         }
 
@@ -354,3 +374,5 @@ body {
             border-color: var(--color-primary) !important;
             transform: translateY(-1px);
         }
+        .proxy-row { content-visibility: auto; }
+        .server-card { content-visibility: auto; }

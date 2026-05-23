@@ -1,4 +1,4 @@
-{% extends "layout.twig" %}
+﻿{% extends "layout.twig" %}
 {% block title %}{{ t('servers.add') }}{% endblock %}
 
 {% block breadcrumbs %}
@@ -24,7 +24,7 @@
     </div>
 
     {% if error %}
-    <div class="mb-6 bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 rounded-lg flex items-center">
+    <div role="alert" class="mb-6 bg-red-500/10 border border-red-500/30 text-red-300 px-4 py-3 rounded-lg flex items-center">
         <i class="fas fa-exclamation-circle mr-3 text-red-400"></i>
         {{ error }}
     </div>
@@ -34,27 +34,27 @@
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="md:col-span-2">
-                <label class="block text-sm font-medium mb-2">{{ t('servers.name') }}</label>
+                <label for="name" class="block text-sm font-medium mb-2">{{ t('servers.name') }}</label>
                 <div class="relative">
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
                         <i class="fas fa-tag"></i>
                     </div>
-                    <input name="name" required class="input-field w-full !pl-11 pr-4 py-2.5" placeholder="{{ t('servers.placeholder_name') }}">
+                     <input name="name" required class="input-field w-full !pl-11 pr-4 py-2.5" placeholder="{{ t('servers.placeholder_name') }}" autocomplete="off">
                 </div>
             </div>
 
             <div>
-                <label class="block text-sm font-medium mb-2">{{ t('servers.host_ip') }}</label>
+                <label for="host" class="block text-sm font-medium mb-2">{{ t('servers.host_ip') }}</label>
                 <div class="relative">
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
                         <i class="fas fa-network-wired text-xs"></i>
                     </div>
-                    <input name="host" required class="input-field w-full !pl-11 pr-4 py-2.5" placeholder="{{ t('servers.placeholder_ip') }}">
+                     <input name="host" required class="input-field w-full !pl-11 pr-4 py-2.5" placeholder="{{ t('servers.placeholder_ip') }}" autocomplete="off">
                 </div>
             </div>
             
             <div>
-                <label class="block text-sm font-medium mb-2">{{ t('servers.ssh_port') }}</label>
+                <label for="port" class="block text-sm font-medium mb-2">{{ t('servers.ssh_port') }}</label>
                 <div class="relative">
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
                         <i class="fas fa-plug text-xs"></i>
@@ -64,7 +64,7 @@
             </div>
 
             <div>
-                <label class="block text-sm font-medium mb-2">{{ t('servers.vpn_port_udp') }}</label>
+                <label for="vpn_port" class="block text-sm font-medium mb-2">{{ t('servers.vpn_port_udp') }}</label>
                 <div class="relative">
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
                         <i class="fas fa-door-open text-xs"></i>
@@ -74,7 +74,7 @@
             </div>
 
             <div>
-                <label class="block text-sm font-medium mb-2">{{ t('servers.ssh_username') }}</label>
+                <label for="username" class="block text-sm font-medium mb-2">{{ t('servers.ssh_username') }}</label>
                 <div class="relative">
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
                         <i class="fas fa-user-shield"></i>
@@ -84,7 +84,7 @@
             </div>
 
             <div class="md:col-span-2">
-                <label class="block text-sm font-medium mb-2">{{ t('servers.ssh_password') }}</label>
+                <label for="password" class="block text-sm font-medium mb-2">{{ t('servers.ssh_password') }}</label>
                 <div class="relative">
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
                         <i class="fas fa-key"></i>

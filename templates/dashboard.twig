@@ -62,7 +62,7 @@
                     <i class="fas fa-arrow-down text-xl"></i>
                 </div>
                 <div>
-                    <span class="text-2xl font-bold" id="summary-total-download">{{ (summary.total_download / 1024 / 1024 / 1024)|number_format(2) }} GB</span>
+                    <span class="text-2xl font-bold" id="summary-total-download">{{ (summary.total_download / 1024 / 1024 / 1024)|number_format(2) }}&nbsp;GB</span>
                     <p class="text-xs font-bold text-muted uppercase tracking-widest mt-1">{{ t('dashboard.total_ingress', [], 'Total Inbound') }}</p>
                 </div>
             </div>
@@ -73,7 +73,7 @@
                     <i class="fas fa-arrow-up text-xl"></i>
                 </div>
                 <div>
-                    <span class="text-2xl font-bold" id="summary-total-upload">{{ (summary.total_upload / 1024 / 1024 / 1024)|number_format(2) }} GB</span>
+                    <span class="text-2xl font-bold" id="summary-total-upload">{{ (summary.total_upload / 1024 / 1024 / 1024)|number_format(2) }}&nbsp;GB</span>
                     <p class="text-xs font-bold text-muted uppercase tracking-widest mt-1">{{ t('dashboard.total_egress', [], 'Total Outbound') }}</p>
                 </div>
             </div>
@@ -163,7 +163,7 @@
 
                 <div class="flex flex-wrap items-center gap-2">
                     <div class="relative w-full md:w-48 lg:w-64">
-                        <input type="text" id="fleetSearch" class="input-field input-with-icon !py-2 text-sm" placeholder="{{ t('dashboard.search_placeholder', [], 'Search servers by name or IP...') }}">
+                        <input type="text" id="fleetSearch" class="input-field input-with-icon !py-2 text-sm" placeholder="{{ t('dashboard.search_placeholder', [], 'Search servers by name or IP…') }}">
                         <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-muted text-xs"></i>
                     </div>
                     <select id="statusFilter" class="input-field !w-auto !py-2 px-3 text-[11px] font-bold">

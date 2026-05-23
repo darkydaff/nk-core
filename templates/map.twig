@@ -1,4 +1,4 @@
-{% extends "layout.twig" %}
+﻿{% extends "layout.twig" %}
 {% block title %}{{ t('map.title')|default('Intelligence Map') }} — {{ app_name }}{% endblock %}
 
 {% block breadcrumbs %}
@@ -234,7 +234,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // ── Helpers ──────────────────────────────────────────────────────────
 
     function formatTraffic(mb) {
-        return mb >= 1024 ? (mb / 1024).toFixed(2) + ' GB' : mb.toFixed(2) + ' MB';
+        return mb >= 1024 ? (mb / 1024).toFixed(2) + ' GB' : mb.toFixed(2) + ' MB';
     }
 
     function statusBadge(status) {

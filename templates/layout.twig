@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <!-- Blocking theme script -->
     <script>
-        if (localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage))) {
+        if (localStorage.getItem('theme') === 'dark' || !('theme' in localStorage)) {
             document.documentElement.classList.add('dark');
         }
     </script>
@@ -16,7 +16,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600;700&family=Geist+Mono:wght@100..900&display=swap" rel="stylesheet">
     
     
-    <meta name="theme-color" content="#0f172a">
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8fafc">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0c0e17">
+    <meta name="color-scheme" content="light dark">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="NK-CORE">
@@ -44,8 +46,9 @@
     
 </head>
 <body class="antialiased text-[14px] {% if user %}has-sidebar{% endif %}">
+    <a href="#main-content" class="sr-only focus:not-sr-only">Skip to content</a>
     {% if user %}
-    <div id="sidebarOverlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <button id="sidebarOverlay" class="sidebar-overlay" onclick="toggleSidebar()" aria-label="Close sidebar" type="button"></button>
     
     <aside id="sidebar" class="sidebar">
         <div class="sidebar-logo">
@@ -147,7 +150,7 @@
         </header>
         {% endif %}
 
-        <main class="flex-grow p-4 md:p-8 max-w-7xl w-full mx-auto animate-in">
+        <main id="main-content" class="flex-grow p-4 md:p-8 max-w-7xl w-full mx-auto animate-in">
             {% block content %}{% endblock %}
         </main>
 
@@ -156,7 +159,7 @@
         </footer>
     </div>
 
-    <div id="toast-container" class="toast-container"></div>
+    <div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
 
     <script>
         function toggleSidebar() {
@@ -209,3 +212,4 @@
     {% block scripts %}{% endblock %}
 </body>
 </html>
+
