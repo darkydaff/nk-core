@@ -28,7 +28,7 @@ class VpnConfigRenderer
 
         // Fetch all active clients for this server
         $pdo = DB::conn();
-        $stmt = $pdo->prepare("SELECT *, client_ip AS ip_address FROM vpn_clients WHERE server_id = ? AND status = 'active' AND deleted_at IS NULL ORDER BY client_ip ASC");
+        $stmt = $pdo->prepare("SELECT *, client_ip AS ip_address FROM vpn_clients WHERE server_id = ? AND status IN ('active', 'verifying', 'provisioning') AND deleted_at IS NULL ORDER BY client_ip ASC");
         $stmt->execute([$this->server->getId()]);
         $clients = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
