@@ -1080,7 +1080,7 @@ class VpnClient {
     /**
      * Format bytes to human-readable string (auto-scale to MB/GB)
      */
-    private function formatBytes(int $bytes): string {
+    public static function formatBytes(float $bytes): string {
         if ($bytes >= 1073741824) {
             return number_format($bytes / 1073741824, 2) . ' GB';
         }
