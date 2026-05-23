@@ -138,8 +138,10 @@ class ProxyServer
                 // Open both TCP and UDP for SOCKS5, TCP for HTTP
                 $protocols = ($type === ProxyType::SOCKS5) ? ['tcp', 'udp'] : ['tcp'];
                 foreach ($protocols as $proto) {
-                    $this->executeCommand("iptables -C INPUT -p {$proto} --dport {$proxy['port']} -j ACCEPT 2>/dev/null || iptables -A INPUT -p {$proto} --dport {$proxy['port']} -j ACCEPT", true);
-                    $this->executeCommand("iptables -C OUTPUT -p {$proto} --sport {$proxy['port']} -j ACCEPT 2>/dev/null || iptables -A OUTPUT -p {$proto} --sport {$proxy['port']} -j ACCEPT", true);
+                    $this->executeCommand("iptables -D INPUT -p {$proto} --dport {$proxy['port']} -j ACCEPT 2>/dev/null || true", true);
+                    $this->executeCommand("iptables -I INPUT 1 -p {$proto} --dport {$proxy['port']} -j ACCEPT", true);
+                    $this->executeCommand("iptables -D OUTPUT -p {$proto} --sport {$proxy['port']} -j ACCEPT 2>/dev/null || true", true);
+                    $this->executeCommand("iptables -I OUTPUT 1 -p {$proto} --sport {$proxy['port']} -j ACCEPT", true);
                     $this->executeCommand("which ufw > /dev/null && ufw allow {$proxy['port']}/{$proto} || true", true);
                 }
             }

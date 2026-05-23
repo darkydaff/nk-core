@@ -15,6 +15,7 @@ require_once __DIR__ . '/../inc/Enums.php';
 require_once __DIR__ . '/../inc/VpnServer.php';
 require_once __DIR__ . '/../inc/VpnClient.php';
 require_once __DIR__ . '/../inc/ServerMonitoring.php';
+require_once __DIR__ . '/../inc/ProxyServer.php';
 require_once __DIR__ . '/../inc/Logger.php';
 
 // Load environment configuration
@@ -77,6 +78,15 @@ while (true) {
                     }
                 } else {
                     echo "  No active traffic (DB Clients: {$dbCount}, Active Peers: {$activeCount})\n";
+                }
+
+                // Collect proxy traffic metrics if proxies exist
+                $pxCount = DB::conn()->prepare('SELECT COUNT(*) FROM http_proxies WHERE server_id = ? AND deleted_at IS NULL');
+                $pxCount->execute([$server['id']]);
+                if ((int)$pxCount->fetchColumn() > 0) {
+                    echo "  Collecting proxy metrics...\n";
+                    $proxy = new ProxyServer((int)$server['id']);
+                    $proxy->updateTrafficStats();
                 }
                 
             } catch (Exception $e) {

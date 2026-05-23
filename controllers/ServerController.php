@@ -412,6 +412,17 @@ class ServerController
             $server->updatePingAndStatus();
             $server->updateGeoIp();
             $synced = VpnClient::syncAllStatsForServer($serverId);
+
+            // Sync proxy traffic as well if proxies are configured on this server
+            $db = DB::conn();
+            $pxCount = $db->prepare('SELECT COUNT(*) FROM http_proxies WHERE server_id = ? AND deleted_at IS NULL');
+            $pxCount->execute([$serverId]);
+            if ((int)$pxCount->fetchColumn() > 0) {
+                require_once __DIR__ . '/../inc/ProxyServer.php';
+                $proxy = new ProxyServer($serverId);
+                $proxy->updateTrafficStats();
+            }
+
             echo json_encode(['success' => true, 'synced' => $synced]);
         } catch (Exception $e) {
             http_response_code(500);
