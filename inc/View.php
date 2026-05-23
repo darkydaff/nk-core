@@ -6,6 +6,10 @@ use Twig\TwigFunction;
 class View {
   private static ?Environment $twig = null;
 
+  public static function isInitialized(): bool {
+    return self::$twig !== null;
+  }
+
   public static function init(string $templatesPath, array $globals = []): void {
     if (!class_exists(Environment::class)) {
       throw new RuntimeException('Twig is not installed. Run composer require twig/twig');

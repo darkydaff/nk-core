@@ -10,6 +10,10 @@ class VpnConfigRenderer
     {
         $this->server = $server;
         $this->ssh = $server->getSshClient();
+        
+        if (!View::isInitialized()) {
+            View::init(dirname(__DIR__) . '/templates');
+        }
     }
 
     /**
