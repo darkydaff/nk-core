@@ -129,8 +129,23 @@ while (true) {
                     $pdo->prepare("UPDATE jobs SET status = 'error', error_summary = ?, attempts = ?, exit_code = ?, duration_ms = ?, worker_hostname = ?, failure_category = ?, is_retryable = ?, severity = ?, completed_at = NOW() WHERE id = ?")
                         ->execute([$errorSummary, $reserves, $exitCode, $durationMs ?? null, $hostname, $classification['category'], (int)$classification['retryable'], $classification['severity'], $jobId]);
                 } else {
-                    $pdo->prepare("INSERT INTO jobs (type, server_id, status, payload, error_summary, attempts, exit_code, duration_ms, worker_hostname, failure_category, is_retryable, severity, started_at, completed_at) VALUES (?, ?, 'error', ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())")
-                        ->execute([$type, $payload['server_id'] ?? null, json_encode($payload), $errorSummary, $reserves, $exitCode, $durationMs ?? null, $hostname, $classification['category'], (int)$classification['retryable'], $classification['severity']]);
+                    $userId = $payload['user_id'] ?? $payload['requested_by'] ?? null;
+                    if (!$userId && !empty($payload['client_id'])) {
+                        $stmtUser = $pdo->prepare("SELECT user_id FROM vpn_clients WHERE id = ?");
+                        $stmtUser->execute([$payload['client_id']]);
+                        $userId = $stmtUser->fetchColumn() ?: null;
+                    }
+                    if (!$userId && !empty($payload['server_id'])) {
+                        $stmtUser = $pdo->prepare("SELECT user_id FROM vpn_servers WHERE id = ?");
+                        $stmtUser->execute([$payload['server_id']]);
+                        $userId = $stmtUser->fetchColumn() ?: null;
+                    }
+                    if (!$userId) {
+                        $userId = 1; // Fallback to system admin user ID
+                    }
+
+                    $pdo->prepare("INSERT INTO jobs (user_id, type, server_id, status, payload, error_summary, attempts, exit_code, duration_ms, worker_hostname, failure_category, is_retryable, severity, started_at, completed_at) VALUES (?, ?, ?, 'error', ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())")
+                        ->execute([$userId, $type, $payload['server_id'] ?? null, json_encode($payload), $errorSummary, $reserves, $exitCode, $durationMs ?? null, $hostname, $classification['category'], (int)$classification['retryable'], $classification['severity']]);
                 }
                 
                 if ($type === 'provision_server' && isset($payload['server_id'])) {
