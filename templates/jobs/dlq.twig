@@ -1,99 +1,99 @@
 {% extends "layout.twig" %}
 
 {% block content %}
-<div class="px-6 py-8">
+<div class="px-4 md:px-6 py-6 md:py-8 space-y-6">
     <div class="flex justify-between items-center mb-8">
         <div>
-            <h1 class="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-                <i class="fas fa-biohazard text-red-500"></i> Dead Letter Queue
+            <h1 class="text-3xl font-bold tracking-tight text-content-primary flex items-center gap-3">
+                <i class="fas fa-biohazard text-error"></i> Dead Letter Queue
             </h1>
-            <p class="text-gray-400 mt-2">Quarantined execution artifacts and failed orchestration jobs.</p>
+            <p class="text-content-secondary mt-2">Quarantined execution artifacts and failed orchestration jobs.</p>
         </div>
     </div>
 
     <!-- Quick Stats -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div class="bg-gray-800 border border-gray-700/50 rounded-xl p-6 shadow-lg">
-            <div class="text-gray-400 text-sm font-medium mb-1">Total Quarantined</div>
-            <div class="text-3xl font-bold text-white">{{ stats.total|default(0) }}</div>
+        <div class="panel p-6 flex flex-col gap-2">
+            <div class="text-content-secondary text-sm font-medium">Total Quarantined</div>
+            <div class="text-3xl font-bold text-content-primary">{{ stats.total|default(0) }}</div>
         </div>
-        <div class="bg-gray-800 border border-yellow-500/20 rounded-xl p-6 shadow-lg">
-            <div class="text-gray-400 text-sm font-medium mb-1">Retryable</div>
-            <div class="text-3xl font-bold text-yellow-500">{{ stats.retryable|default(0) }}</div>
+        <div class="panel p-6 border-warning/30 flex flex-col gap-2">
+            <div class="text-content-secondary text-sm font-medium">Retryable</div>
+            <div class="text-3xl font-bold text-warning">{{ stats.retryable|default(0) }}</div>
         </div>
-        <div class="bg-gray-800 border border-red-500/20 rounded-xl p-6 shadow-lg">
-            <div class="text-gray-400 text-sm font-medium mb-1">Fatal Errors</div>
-            <div class="text-3xl font-bold text-red-500">{{ stats.fatal|default(0) }}</div>
+        <div class="panel p-6 border-error/30 flex flex-col gap-2">
+            <div class="text-content-secondary text-sm font-medium">Fatal Errors</div>
+            <div class="text-3xl font-bold text-error">{{ stats.fatal|default(0) }}</div>
         </div>
     </div>
 
     <!-- DLQ Table -->
-    <div class="bg-gray-800 border border-gray-700/50 rounded-xl overflow-hidden shadow-lg">
+    <div class="panel overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse">
                 <thead>
-                    <tr class="bg-gray-800/80 text-gray-400 text-xs uppercase tracking-wider border-b border-gray-700">
-                        <th class="px-6 py-4 font-medium">Job ID</th>
-                        <th class="px-6 py-4 font-medium">Target</th>
-                        <th class="px-6 py-4 font-medium">Category &amp; Retry</th>
-                        <th class="px-6 py-4 font-medium">Failure Summary</th>
-                        <th class="px-6 py-4 font-medium text-right">Actions</th>
+                    <tr class="bg-surface-base/30 text-content-muted text-[10px] font-bold uppercase tracking-wider border-b border-surface-border">
+                        <th class="px-6 py-4 font-semibold">Job ID</th>
+                        <th class="px-6 py-4 font-semibold">Target</th>
+                        <th class="px-6 py-4 font-semibold">Category &amp; Retry</th>
+                        <th class="px-6 py-4 font-semibold">Failure Summary</th>
+                        <th class="px-6 py-4 font-semibold text-right">Actions</th>
                     </tr>
                 </thead>
-                <tbody class="text-sm divide-y divide-gray-700/50">
+                <tbody class="text-sm divide-y divide-surface-border/50">
                     {% for job in jobs %}
-                        <tr class="hover:bg-gray-750/50 transition-colors">
+                        <tr class="hover:bg-surface-hover/50 transition-colors">
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="font-mono text-gray-300">#{{ job.id }}</div>
-                                <div class="text-xs text-gray-500 mt-1">{{ job.type }}</div>
+                                <div class="font-mono text-content-primary">#{{ job.id }}</div>
+                                <div class="text-xs text-content-muted mt-1">{{ job.type }}</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 {% if job.server_id %}
-                                    <div class="text-white font-medium">{{ job.server_name }}</div>
-                                    <div class="text-xs text-gray-500">{{ job.host }}</div>
+                                    <div class="text-content-primary font-medium">{{ job.server_name }}</div>
+                                    <div class="text-xs text-content-muted">{{ job.host }}</div>
                                 {% else %}
-                                    <span class="text-gray-500 italic">Global</span>
+                                    <span class="text-content-muted italic">Global</span>
                                 {% endif %}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center gap-2 mb-1">
                                     {% if job.severity == 'fatal' %}
-                                        <span class="px-2 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-400 border border-red-500/30">Fatal</span>
+                                        <span class="badge-error text-[10px] px-1.5 py-0.5 rounded-md">Fatal</span>
                                     {% elseif job.severity == 'critical' %}
-                                        <span class="px-2 py-0.5 rounded text-xs font-medium bg-orange-500/20 text-orange-400 border border-orange-500/30">Critical</span>
+                                        <span class="bg-orange-500/10 text-orange-500 border border-orange-500/20 text-[10px] px-1.5 py-0.5 rounded-md">Critical</span>
                                     {% else %}
-                                        <span class="px-2 py-0.5 rounded text-xs font-medium bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">Warning</span>
+                                        <span class="badge-warning text-[10px] px-1.5 py-0.5 rounded-md">Warning</span>
                                     {% endif %}
-                                    <span class="text-gray-300">{{ job.failure_category|default('unknown') }}</span>
+                                    <span class="text-content-secondary font-medium ml-1">{{ job.failure_category|default('unknown') }}</span>
                                 </div>
-                                <div class="text-xs">
+                                <div class="text-xs mt-1.5">
                                     {% if job.is_retryable %}
-                                        <span class="text-green-400"><i class="fas fa-check-circle mr-1"></i>Retryable</span>
+                                        <span class="text-success font-medium"><i class="fas fa-check-circle mr-1 text-[10px]"></i>Retryable</span>
                                     {% else %}
-                                        <span class="text-red-400"><i class="fas fa-times-circle mr-1"></i>Permanent</span>
+                                        <span class="text-error font-medium"><i class="fas fa-times-circle mr-1 text-[10px]"></i>Permanent</span>
                                     {% endif %}
-                                    <span class="text-gray-500 ml-2">Attempts: {{ job.attempts }}/5</span>
+                                    <span class="text-content-muted ml-2">Attempts: {{ job.attempts }}/5</span>
                                 </div>
                             </td>
                             <td class="px-6 py-4">
-                                <div class="font-mono text-xs text-gray-400 bg-gray-900 rounded p-2 overflow-hidden max-h-16 whitespace-pre-wrap truncate border border-gray-700/50">
+                                <div class="font-mono text-xs text-content-secondary bg-surface-base rounded p-2.5 overflow-hidden max-h-16 whitespace-pre-wrap truncate border border-surface-border/50">
                                     {{ job.error_summary|default('No error summary recorded') }}
                                 </div>
-                                <div class="text-xs text-gray-500 mt-2 flex justify-between">
+                                <div class="text-[10px] text-content-muted mt-2 flex justify-between">
                                     <span>Failed at: {{ job.completed_at }}</span>
                                     <span>Worker: {{ job.worker_hostname }}</span>
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right">
                                 <div class="flex items-center justify-end gap-2">
-                                    <button onclick="showLogsModal({{ job.id }})" class="p-2 text-gray-400 hover:text-white transition-colors" title="View Details">
-                                        <i class="fas fa-file-alt"></i>
+                                    <button onclick="showLogsModal({{ job.id }})" class="w-8 h-8 rounded-lg bg-surface-hover text-content-muted hover:text-content-primary hover:bg-surface-border transition-colors flex items-center justify-center border border-surface-border/40" title="View Details">
+                                        <i class="fas fa-file-alt text-xs"></i>
                                     </button>
                                     
                                     <form method="POST" action="/jobs/{{ job.id }}/retry" onsubmit="return confirm('Are you sure you want to requeue this job?');" class="inline">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                                        <button type="submit" class="p-2 {% if job.is_retryable %}text-blue-400 hover:text-blue-300{% else %}text-gray-600 hover:text-red-400{% endif %} transition-colors" title="Force Retry">
-                                            <i class="fas fa-sync-alt"></i>
+                                        <button type="submit" class="w-8 h-8 rounded-lg bg-surface-hover text-content-muted hover:bg-surface-border hover:text-primary transition-colors flex items-center justify-center border border-surface-border/40" title="Force Retry">
+                                            <i class="fas fa-sync-alt text-xs"></i>
                                         </button>
                                     </form>
                                 </div>
@@ -107,9 +107,8 @@
                         </tr>
                     {% else %}
                         <tr>
-                            <td colspan="5" class="px-6 py-12 text-center text-gray-500">
-                                <i class="fas fa-check-circle text-4xl mb-4 text-gray-600"></i>
-                                <p class="text-lg">DLQ is empty. All queues are healthy.</p>
+                            <td colspan="5" class="px-6 py-12 text-center">
+                                {{ ui.empty_state('DLQ is empty', 'All queues are healthy.', 'fa-check-circle') }}
                             </td>
                         </tr>
                     {% endfor %}
@@ -120,18 +119,22 @@
 </div>
 
 <!-- Logs Modal -->
-<div id="logsModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden z-50 flex items-center justify-center">
-    <div class="bg-gray-900 border border-gray-700 w-full max-w-4xl max-h-[90vh] rounded-xl shadow-2xl flex flex-col">
-        <div class="px-6 py-4 border-b border-gray-700 flex justify-between items-center">
-            <h3 class="text-xl font-bold text-white" id="modalTitle">Job Details</h3>
-            <button onclick="closeLogsModal()" class="text-gray-400 hover:text-white" aria-label="{{ t('common.close')|default('Close') }}"><i class="fas fa-times"></i></button>
+<div id="logsModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+    <div class="panel max-w-4xl w-full max-h-[90vh] shadow-2xl flex flex-col overflow-hidden">
+        <div class="px-6 py-4 border-b border-surface-border bg-panel flex justify-between items-center">
+            <h3 class="text-lg font-bold text-content-primary" id="modalTitle">Job Details</h3>
+            <button onclick="closeLogsModal()" class="w-8 h-8 rounded-lg bg-surface-hover text-content-muted hover:text-content-primary flex items-center justify-center border border-surface-border/40" aria-label="{{ t('common.close')|default('Close') }}"><i class="fas fa-times"></i></button>
         </div>
-        <div class="p-6 overflow-y-auto flex-1">
-            <h4 class="text-sm font-medium text-gray-400 mb-2 uppercase tracking-wider">Payload</h4>
-            <pre id="modalPayload" class="bg-black text-gray-300 p-4 rounded border border-gray-700 font-mono text-sm overflow-x-auto mb-6"></pre>
+        <div class="p-6 overflow-y-auto flex-1 space-y-6">
+            <div>
+                <h4 class="text-xs font-bold text-content-muted mb-2 uppercase tracking-widest">Payload</h4>
+                <pre id="modalPayload" class="bg-surface-base text-content-primary p-4 rounded border border-surface-border font-mono text-xs overflow-x-auto"></pre>
+            </div>
             
-            <h4 class="text-sm font-medium text-gray-400 mb-2 uppercase tracking-wider">Error Trace &amp; Output</h4>
-            <pre id="modalError" class="bg-black text-red-400 p-4 rounded border border-red-900/50 font-mono text-sm overflow-x-auto whitespace-pre-wrap"></pre>
+            <div>
+                <h4 class="text-xs font-bold text-content-muted mb-2 uppercase tracking-widest">Error Trace &amp; Output</h4>
+                <pre id="modalError" class="bg-surface-base text-error p-4 rounded border border-error/20 font-mono text-xs overflow-x-auto whitespace-pre-wrap"></pre>
+            </div>
         </div>
     </div>
 </div>

@@ -1,4 +1,4 @@
-﻿body {
+body {
     font-family: 'Inter', sans-serif;
     background-color: var(--color-surface-base);
     color: var(--color-content-primary);
@@ -176,6 +176,83 @@
             background-color: rgba(244, 63, 94, 0.15);
             border-color: rgba(244, 63, 94, 0.25);
             color: #fb7185;
+        }
+
+        .badge-warning {
+            background-color: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            color: #d97706;
+        }
+        .dark .badge-warning {
+            background-color: rgba(245, 158, 11, 0.15);
+            border-color: rgba(245, 158, 11, 0.25);
+            color: #fbbf24;
+        }
+
+        .badge-muted {
+            background-color: rgba(100, 116, 139, 0.1);
+            border: 1px solid rgba(100, 116, 139, 0.2);
+            color: var(--color-content-secondary);
+        }
+        .dark .badge-muted {
+            background-color: rgba(100, 116, 139, 0.15);
+            border-color: rgba(100, 116, 139, 0.25);
+            color: var(--color-content-secondary);
+        }
+
+        .badge-primary {
+            background-color: var(--color-primary-light);
+            border: 1px solid rgba(14, 165, 233, 0.2);
+            color: var(--color-primary);
+        }
+        .dark .badge-primary {
+            background-color: var(--color-primary-light);
+            border-color: rgba(14, 165, 233, 0.25);
+            color: var(--color-primary);
+        }
+
+        /* Telemetry state badges */
+        .badge-state {
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .badge-state.active {
+            background: rgba(16, 185, 129, 0.1);
+            color: #059669;
+            border: 1px solid rgba(16, 185, 129, 0.2);
+        }
+        .dark .badge-state.active {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.25);
+        }
+        .badge-state.idle {
+            background: rgba(99, 102, 241, 0.1);
+            color: #4f46e5;
+            border: 1px solid rgba(99, 102, 241, 0.2);
+        }
+        .dark .badge-state.idle {
+            background: rgba(99, 102, 241, 0.15);
+            color: #818cf8;
+            border: 1px solid rgba(99, 102, 241, 0.25);
+        }
+        .badge-state.backpressure {
+            background: rgba(239, 68, 68, 0.1);
+            color: #dc2626;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            animation: pulse 2s infinite;
+        }
+        .dark .badge-state.backpressure {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.25);
         }
 
         .btn-secondary:hover {

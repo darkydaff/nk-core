@@ -1,4 +1,4 @@
-﻿/* public/css/tokens.css */
+/* public/css/tokens.css */
 
 :root {
     /* ─── SYSTEM CONFIGURATION ─── */
@@ -29,6 +29,11 @@
 
     /* Semantic Status Color Mappings */
     --color-status-active:     #10b981; /* Emerald 500 */
+    --color-status-active-light: rgba(16, 185, 129, 0.1);
+    --color-status-active-border:rgba(16, 185, 129, 0.2);
+    --color-status-offline:      #64748b; /* Slate 500 */
+    --color-status-offline-light:rgba(100, 116, 139, 0.1);
+    --color-status-offline-border:rgba(100, 116, 139, 0.2);
     --color-status-warning:    #f59e0b; /* Amber 500 */
     --color-status-error:      #f43f5e; /* Rose 500 */
     --color-status-info:       #0ea5e9; /* Sky 500 */
@@ -65,6 +70,12 @@ html.dark {
 
     /* Core Action Mappings - Dark Muted Focus */
     --color-primary-light:     rgba(14, 165, 233, 0.15);
+
+    --color-status-active-light: rgba(16, 185, 129, 0.15);
+    --color-status-active-border:rgba(16, 185, 129, 0.25);
+    --color-status-offline:      #475569; /* Slate 600 */
+    --color-status-offline-light:rgba(71, 85, 105, 0.15);
+    --color-status-offline-border:rgba(71, 85, 105, 0.25);
 
     /* Shadows & Elevations - Dark Accentuated Depth */
     --shadow-sm:    0 1px 2px 0 rgba(0, 0, 0, 0.5);

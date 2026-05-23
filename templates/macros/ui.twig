@@ -6,17 +6,17 @@
     {% set label = label ?: status|capitalize %}
     
     {% set colors = {
-        'active': 'bg-sky-500/10 text-sky-500 border-sky-500/20',
-        'online': 'bg-sky-500/10 text-sky-500 border-sky-500/20',
-        'offline': 'bg-red-500/10 text-red-400 border-red-500/20',
-        'error': 'bg-red-500/10 text-red-400 border-red-500/20',
-        'disabled': 'bg-amber-500/10 text-amber-500 border-amber-500/20',
-        'never': 'bg-slate-500/10 text-slate-400 border-slate-500/20',
-        'deploying': 'bg-primary/10 text-primary border-primary/20',
-        'provisioning': 'bg-primary/10 text-primary border-primary/20'
+        'active': 'badge-active',
+        'online': 'badge-active',
+        'offline': 'badge-error',
+        'error': 'badge-error',
+        'disabled': 'badge-warning',
+        'never': 'badge-muted',
+        'deploying': 'badge-primary',
+        'provisioning': 'badge-primary'
     } %}
 
-    {% set class = colors[status] ?: 'bg-slate-500/10 text-slate-400 border-slate-500/20' %}
+    {% set class = colors[status] ?: 'badge-muted' %}
     
     <span {% if id %}id="{{ id }}"{% endif %} class="inline-flex items-center justify-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border {{ class }} leading-none h-fit">
         {% if status in ['online', 'deploying', 'provisioning'] %}

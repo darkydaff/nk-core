@@ -19,41 +19,41 @@
 <div class="max-w-6xl mx-auto px-4 py-12 w-full">
     <!-- Header -->
     <div class="mb-12 text-center">
-        <div class="w-20 h-20 rounded-3xl bg-surface-hover text-primary flex items-center justify-center mx-auto mb-6 shadow-md border border-default animate-float">
+        <div class="w-20 h-20 rounded-3xl bg-surface-hover text-primary flex items-center justify-center mx-auto mb-6 shadow-md border border-surface-border animate-float">
             <i class="fas fa-rocket text-4xl"></i>
         </div>
         <h1 class="text-4xl font-extrabold text-primary mb-3 tracking-tight">{{ t('servers.deploying') }}: {{ server.name }}</h1>
         <div class="flex items-center justify-center gap-3">
             <span class="flex h-2 w-2 relative">
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-success"></span>
             </span>
-            <p class="text-secondary font-mono text-sm tracking-wider">{{ server.host }}</p>
+            <p class="text-content-secondary font-mono text-sm tracking-wider">{{ server.host }}</p>
         </div>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         <!-- Left: Stepper UI (4 columns) -->
         <div class="lg:col-span-4 h-full">
-            <div class="panel h-full flex flex-col p-8 border-default bg-surface shadow-sm">
+            <div class="panel h-full flex flex-col p-8 border-surface-border bg-surface-panel shadow-sm">
                 <div class="flex items-center justify-between mb-10">
-                    <h3 class="text-xs font-black uppercase tracking-[0.2em] text-muted">{{ t('deployment.progress') }}</h3>
+                    <h3 class="text-xs font-black uppercase tracking-[0.2em] text-content-muted">{{ t('deployment.progress') }}</h3>
                     <div id="deploymentSummary" class="hidden">
-                         <div id="totalDuration" class="text-sm font-mono font-bold text-primary bg-panel px-3 py-1 rounded-md border border-default">00:00</div>
+                         <div id="totalDuration" class="text-sm font-mono font-bold text-primary bg-surface-panel px-3 py-1 rounded-md border border-surface-border">00:00</div>
                     </div>
                 </div>
                 
                 <div id="stepper" class="space-y-0 flex-1 overflow-y-auto pr-2 scrollbar-thin">
                     <!-- Steps will be injected here -->
-                    <div class="flex flex-col items-center justify-center py-24 text-muted/20 italic text-sm">
+                    <div class="flex flex-col items-center justify-center py-24 text-content-muted/20 italic text-sm">
                         <i class="fas fa-hourglass-start text-3xl mb-5 opacity-10"></i>
                         {{ t('deployment.waiting_to_start') }}
                     </div>
                 </div>
 
                 <!-- Cancel Button -->
-                <div id="cancelContainer" class="mt-8 hidden pt-8 border-t border-default">
-                    <button onclick="requestCancel()" class="w-full py-4 text-xs font-black uppercase tracking-widest text-red-400 hover:text-white hover:bg-red-500 border border-red-500/20 rounded-xl transition-all duration-200">
+                <div id="cancelContainer" class="mt-8 hidden pt-8 border-t border-surface-border">
+                    <button onclick="requestCancel()" class="w-full py-4 text-xs font-black uppercase tracking-widest text-error hover:text-white hover:bg-error border border-error/20 rounded-xl transition-all duration-200">
                         <i class="fas fa-stop-circle mr-2"></i>{{ t('deployment.cancel') }}
                     </button>
                 </div>
@@ -62,7 +62,7 @@
 
         <!-- Right: Terminal UI (8 columns) -->
         <div class="lg:col-span-8">
-            <div class="panel p-0 overflow-hidden border border-default shadow-2xl bg-[#0c0c0d] rounded-2xl">
+            <div class="panel p-0 overflow-hidden border border-surface-border shadow-2xl bg-[#0c0c0d] rounded-2xl">
                 <!-- Terminal Header -->
                 <div class="flex items-center justify-between px-6 py-4 bg-[#1a1b1e] border-b border-white/5">
                     <div class="flex items-center gap-4">
@@ -74,8 +74,8 @@
                         <div class="h-4 w-px bg-white/10 mx-2"></div>
                         <span class="text-[10px] uppercase tracking-[0.3em] font-black text-white/20 font-mono">deployment_console.sh</span>
                     </div>
-                    <div id="connectionStatus" class="flex items-center gap-3 text-[10px] font-mono font-bold text-muted uppercase tracking-tighter bg-black px-4 py-2 rounded-lg border border-white/5">
-                        <span id="connDot" class="w-2 h-2 rounded-full bg-muted"></span>
+                    <div id="connectionStatus" class="flex items-center gap-3 text-[10px] font-mono font-bold text-content-muted uppercase tracking-tighter bg-black px-4 py-2 rounded-lg border border-white/5">
+                        <span id="connDot" class="w-2 h-2 rounded-full bg-content-muted"></span>
                         <span id="connText">Initializing</span>
                     </div>
                 </div>
@@ -87,12 +87,12 @@
                     <!-- Reconnection Overlay -->
                     <div id="reconnectOverlay" class="absolute inset-0 bg-black/80 z-20 flex items-center justify-center opacity-0 pointer-events-none transition-all duration-300">
                         <div class="bg-[#1a1b1e] border border-white/10 p-8 rounded-2xl shadow-3xl flex items-center gap-6">
-                            <div class="w-14 h-14 rounded-full bg-yellow-500/10 flex items-center justify-center">
-                                <i class="fas fa-wifi text-yellow-500 text-2xl animate-pulse"></i>
+                            <div class="w-14 h-14 rounded-full bg-warning/10 flex items-center justify-center">
+                                <i class="fas fa-wifi text-warning text-2xl animate-pulse"></i>
                             </div>
                             <div>
                                 <div class="font-bold text-white text-lg mb-1">Connection Lost</div>
-                                <div class="text-xs text-muted/50">Re-establishing secure bridge to orchestrator...</div>
+                                <div class="text-xs text-content-muted/50">Re-establishing secure bridge to orchestrator...</div>
                             </div>
                         </div>
                     </div>
@@ -150,7 +150,8 @@
     background: linear-gradient(to bottom, var(--color-primary), transparent);
     opacity: 0.3;
 }
-.step-item.completed:not(:last-child)::after { background: var(--color-primary); opacity: 0.4; }
+.step-item.completed:not(:last-child)::after { background: var(--color-status-active); opacity: 0.4; }
+.step-item.failed:not(:last-child)::after { background: var(--color-status-error); opacity: 0.4; }
 
 .step-icon {
     width: 2rem; height: 2rem; border-radius: 0.6rem; 
@@ -164,15 +165,21 @@
 .step-item.active .step-icon { 
     border-color: var(--color-primary); 
     color: var(--color-primary); 
-    background: var(--bg-surface-hover);
-    box-shadow: 0 4px 12px rgba(var(--color-primary-rgb), 0.1);
+    background: var(--color-surface-hover);
+    box-shadow: 0 4px 12px var(--color-primary-light);
     transform: scale(1.1);
 }
 .step-item.completed .step-icon { 
-    background: var(--color-primary); 
-    border-color: var(--color-primary); 
+    background: var(--color-status-active); 
+    border-color: var(--color-status-active); 
     color: white;
     transform: scale(1);
+}
+.step-item.failed .step-icon { 
+    background: var(--color-surface-hover); 
+    border-color: var(--color-status-error); 
+    color: var(--color-status-error);
+    transform: scale(1.1);
 }
 
 .scrollbar-thin::-webkit-scrollbar { width: 6px; }
@@ -278,11 +285,11 @@ function initCentrifuge(jobId, subToken = null) {
     });
 
     centrifuge.on('connected', () => {
-        updateConnStatus('Connected', 'bg-green-500');
+        updateConnStatus('Connected', 'bg-success');
     });
 
     centrifuge.on('disconnected', () => {
-        updateConnStatus('Disconnected', 'bg-muted');
+        updateConnStatus('Disconnected', 'bg-content-muted');
     });
 
     // Use provided token or fall back to template-injected one (for resumption)
@@ -310,26 +317,26 @@ function processEvent(event, logTarget = null, stepperTarget = null) {
     switch (event.type) {
         case 'step.start':
             addStep(event.payload.step, event.message, stepperTarget);
-            appendLog(`[STEP] ${event.message}`, 'text-blue-400 font-bold', '➜', logTarget);
+            appendLog(`[STEP] ${event.message}`, 'text-primary font-bold', '➜', logTarget);
             break;
         case 'step.end':
             completeStep(event.payload.step, event.payload.duration_ms);
-            appendLog(`[OK] ${event.message} (${formatDuration(event.payload.duration_ms)})`, 'text-green-400 font-bold', '✓', logTarget);
+            appendLog(`[OK] ${event.message} (${formatDuration(event.payload.duration_ms)})`, 'text-success font-bold', '✓', logTarget);
             break;
         case 'step.error':
             failStep(event.payload.step, event.payload.error);
-            appendLog(`[ERROR] ${event.payload.error}`, 'text-red-400 font-bold', '✕', logTarget);
+            appendLog(`[ERROR] ${event.payload.error}`, 'text-error font-bold', '✕', logTarget);
             break;
         case 'log':
-            appendLog(event.message, event.level === 'error' ? 'text-red-400' : 'text-primary/60', null, logTarget);
+            appendLog(event.message, event.level === 'error' ? 'text-error' : 'text-primary/60', null, logTarget);
             break;
         case 'job.success':
             finishJob(true);
-            appendLog("DEPLOYMENT COMPLETED SUCCESSFULLY", "text-green-400 font-bold bg-green-500/10 p-2 rounded block mt-4 text-center", "★", logTarget);
+            appendLog("DEPLOYMENT COMPLETED SUCCESSFULLY", "text-success font-bold bg-success/10 p-2 rounded block mt-4 text-center", "★", logTarget);
             break;
         case 'job.error':
             finishJob(false, event.payload.error);
-            appendLog(`FATAL ERROR: ${event.payload.error}`, "text-red-400 font-bold bg-red-500/10 p-2 rounded block mt-4 text-center", "⚠", logTarget);
+            appendLog(`FATAL ERROR: ${event.payload.error}`, "text-error font-bold bg-error/10 p-2 rounded block mt-4 text-center", "⚠", logTarget);
             break;
     }
 }
@@ -348,7 +355,7 @@ function addStep(id, title, target = null) {
         <div class="step-icon"><i class="fas fa-circle"></i></div>
         <div class="flex-1">
             <div class="text-sm font-bold text-primary">${title}</div>
-            <div class="text-[10px] text-muted uppercase tracking-tighter step-meta">In progress...</div>
+            <div class="text-[10px] text-content-muted uppercase tracking-tighter step-meta">In progress...</div>
         </div>
     `;
     (target || UI.stepper).appendChild(div);
@@ -367,9 +374,9 @@ function failStep(id, error) {
     const step = document.getElementById(`step-${id}`);
     if (!step) return;
     step.classList.remove('active');
-    step.querySelector('.step-icon').classList.replace('border-primary', 'border-red-500');
-    step.querySelector('.step-icon').innerHTML = '<i class="fas fa-times text-red-500"></i>';
-    step.querySelector('.step-meta').className = 'text-[10px] text-red-400 uppercase tracking-tighter';
+    step.classList.add('failed');
+    step.querySelector('.step-icon').innerHTML = '<i class="fas fa-times"></i>';
+    step.querySelector('.step-meta').className = 'text-[10px] text-error uppercase tracking-tighter';
     step.querySelector('.step-meta').textContent = error;
 }
 
@@ -442,9 +449,9 @@ function updateConnStatus(text, colorClass) {
     dot.className = `w-1.5 h-1.5 rounded-full ${colorClass}`;
     label.textContent = text;
     
-    if (colorClass === 'bg-green-500') {
+    if (colorClass === 'bg-success') {
         overlay.classList.add('opacity-0', 'pointer-events-none');
-    } else if (colorClass === 'bg-red-500' || colorClass === 'bg-yellow-500') {
+    } else if (colorClass === 'bg-error' || colorClass === 'bg-warning') {
         overlay.classList.remove('opacity-0', 'pointer-events-none');
     }
 }
