@@ -108,7 +108,7 @@ class VpnConfigRenderer
             
             // 4. Hot Swap & Sync
             // Atomic swap
-            $swapCmd = "docker exec $containerName bash -c 'mv /opt/amnezia/awg/wg0.conf.next /opt/amnezia/awg/wg0.conf && /usr/local/bin/awg syncconf wg0 /opt/amnezia/awg/wg0.conf'";
+            $swapCmd = "docker exec $containerName bash -c 'mv /opt/amnezia/awg/wg0.conf.next /opt/amnezia/awg/wg0.conf && /usr/local/bin/awg syncconf wg0 <(/usr/local/bin/awg-quick strip /opt/amnezia/awg/wg0.conf)'";
             $this->ssh->executeCommand($swapCmd, true, true);
             
             Logger::channel('control-plane')->info('Declarative Sync Successful', ['server_id' => $this->server->getId()]);
