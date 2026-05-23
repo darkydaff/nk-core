@@ -98,6 +98,16 @@ class Translator
             'common.status_online' => ['en' => 'Online', 'uk' => 'В мережі', 'ru' => 'В сети'],
             'common.status_offline' => ['en' => 'Offline', 'uk' => 'Офлайн', 'ru' => 'Оффлайн'],
             'common.status_revoked' => ['en' => 'Revoked', 'uk' => 'Відкликано', 'ru' => 'Отозван'],
+            // New Map & Deployment keys
+            'map.fleet_distribution' => ['en' => 'Fleet Distribution', 'uk' => 'Розподіл флоту', 'ru' => 'Распределение флота'],
+            'deployment.progress' => ['en' => 'Deployment Progress', 'uk' => 'Прогрес розгортання', 'ru' => 'Прогресс развертывания'],
+            'deployment.waiting_to_start' => ['en' => 'Waiting to start...', 'uk' => 'Очікування запуску...', 'ru' => 'Ожидание запуска...'],
+            'deployment.cancel' => ['en' => 'Cancel Deployment', 'uk' => 'Скасувати розгортання', 'ru' => 'Отменить развертывание'],
+            'servers.initiating' => ['en' => 'Initiating', 'uk' => 'Ініціалізація', 'ru' => 'Инициализация'],
+            'servers.deploying' => ['en' => 'Deploying', 'uk' => 'Розгортання', 'ru' => 'Развертывание'],
+            'servers.deploy_step_hint' => ['en' => 'Tailoring kernel parameters for high-performance VPN throughput...', 'uk' => 'Налаштування параметрів ядра для високої пропускної здатності VPN...', 'ru' => 'Настройка параметров ядра для высокой пропускной способности VPN...'],
+            'servers.deployment_in_progress' => ['en' => 'Deployment In Progress', 'uk' => 'Розгортання триває', 'ru' => 'Выполняется развертывание'],
+            'servers.deploying_to' => ['en' => 'Provisioning node:', 'uk' => 'Налаштування вузла:', 'ru' => 'Настройка узла:'],
         ];
 
         $stmt = $pdo->prepare("INSERT INTO translations (locale, category, key_name, translation) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE translation = VALUES(translation)");
