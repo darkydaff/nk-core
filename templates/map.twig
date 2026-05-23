@@ -1,4 +1,4 @@
-﻿{% extends "layout.twig" %}
+{% extends "layout.twig" %}
 {% block title %}{{ t('map.title')|default('Intelligence Map') }} — {{ app_name }}{% endblock %}
 
 {% block breadcrumbs %}
@@ -51,13 +51,13 @@
     /* Cluster badge (number of clients) */
     .cluster-badge {
         position: absolute; top: -6px; right: -6px;
-        background: #f87171; color: #fff;
+        background: var(--color-status-error); color: #fff;
         font-size: 10px; font-weight: 700;
         min-width: 18px; height: 18px;
         border-radius: 999px;
         display: flex; align-items: center; justify-content: center;
         padding: 0 4px;
-        border: 2px solid #0f172a;
+        border: 2px solid var(--color-surface-panel);
         pointer-events: none;
     }
 
@@ -67,7 +67,7 @@
         border: 1px solid var(--color-surface-border);
         border-radius: 12px; 
         color: var(--color-content-primary);
-        box-shadow: var(--shadow);
+        box-shadow: var(--shadow-md);
     }
     .leaflet-popup-tip { background: var(--color-surface-panel); }
     .leaflet-popup-content { margin: 0; min-width: 240px; max-width: 300px; }
@@ -97,7 +97,7 @@
         margin-top: 12px; font-size: 11px; color: var(--color-primary);
         text-decoration: none; font-weight: 700; text-transform: uppercase; tracking-wider;
     }
-    .popup-link:hover { color: var(--color-primary-dark); }
+    .popup-link:hover { color: var(--color-primary-hover); }
 
     /* Multi-client popup (list) */
     .popup-header {
@@ -137,21 +137,6 @@
     }
     .map-btn:hover { border-color: var(--color-primary); color: var(--color-content-primary); background: var(--color-surface-base); }
     .map-btn.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
-
-    /* Stats bar */
-    #mapStats {
-        display: flex; align-items: center; gap: 24px;
-        padding: 12px 20px;
-        background: var(--color-surface-panel); 
-        border: 1px solid var(--color-surface-border);
-        border-radius: 12px; margin-bottom: 16px; flex-wrap: wrap;
-    }
-    .stat-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-    .stat-dot { width: 10px; height: 10px; border-radius: 50%; }
-    .stat-dot-online  { background: var(--color-status-active); box-shadow: 0 0 10px var(--color-status-active-light); }
-    .stat-dot-offline { background: var(--color-status-offline); }
-    .stat-label { color: var(--color-content-secondary); font-weight: 500; }
-    .stat-value { color: var(--color-content-primary); font-weight: 800; font-family: 'Geist Mono', monospace; }
 </style>
 {% endblock %}
 
@@ -167,21 +152,26 @@
     </div>
 
     <!-- Stats Bar -->
-    <div id="mapStats">
-        <div class="stat-item">
-            <span class="stat-dot stat-dot-online"></span>
-            <span class="stat-label">{{ t('status.online')|default('Online') }}:</span>
-            <span class="stat-value" id="countOnline">—</span>
+    <div id="mapStats" class="panel px-5 py-4 flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div class="flex items-center gap-3 flex-wrap">
+            <span class="text-xs font-bold uppercase tracking-widest text-content-muted">{{ t('map.fleet_distribution')|default('Fleet Distribution') }}</span>
+            <div class="hidden sm:block h-4 w-px bg-surface-border"></div>
+            <div class="flex items-center gap-2">
+                <span class="badge-active text-[11px] px-2.5 py-1 rounded-lg flex items-center font-bold">
+                    <span class="w-1.5 h-1.5 rounded-full bg-success mr-1.5 animate-pulse"></span>
+                    {{ t('status.online')|default('Online') }}: <span class="ml-1 font-mono text-xs" id="countOnline">—</span>
+                </span>
+                <span class="badge-error text-[11px] px-2.5 py-1 rounded-lg flex items-center font-bold">
+                    <span class="w-1.5 h-1.5 rounded-full bg-error mr-1.5"></span>
+                    {{ t('status.offline')|default('Offline') }}: <span class="ml-1 font-mono text-xs" id="countOffline">—</span>
+                </span>
+            </div>
         </div>
-        <div class="stat-item">
-            <span class="stat-dot stat-dot-offline"></span>
-            <span class="stat-label">{{ t('status.offline')|default('Offline') }}:</span>
-            <span class="stat-value" id="countOffline">—</span>
-        </div>
-        <div class="stat-item" style="margin-left:auto;">
-            <i class="fas fa-map-marker-alt text-muted text-xs"></i>
-            <span class="stat-label">{{ t('map.clients_plotted')|default('clients plotted') }}:</span>
-            <span class="stat-value" id="countTotal">—</span>
+        <div class="flex items-center gap-2">
+            <span class="badge-muted text-[11px] px-2.5 py-1 rounded-lg flex items-center font-bold">
+                <i class="fas fa-map-marker-alt text-content-secondary mr-1.5 text-[10px]"></i>
+                {{ t('map.clients_plotted')|default('clients plotted') }}: <span class="ml-1 font-mono text-xs text-content-primary" id="countTotal">—</span>
+            </span>
         </div>
     </div>
 
@@ -299,9 +289,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     ${statusBadge(c.status)}
                 </div>
                 <div class="popup-item-meta">
-                    <span><i class="fas fa-server" style="margin-right:3px;color:#475569;"></i>${c.server_name || '—'}</span>
-                    <span><i class="fas fa-exchange-alt" style="margin-right:3px;color:#475569;"></i>${formatTraffic(c.traffic_mb)}</span>
-                    <span><i class="fas fa-clock" style="margin-right:3px;color:#475569;"></i>${c.last_seen}</span>
+                    <span><i class="fas fa-server mr-1 text-content-muted"></i>${c.server_name || '—'}</span>
+                    <span><i class="fas fa-exchange-alt mr-1 text-content-muted"></i>${formatTraffic(c.traffic_mb)}</span>
+                    <span><i class="fas fa-clock mr-1 text-content-muted"></i>${c.last_seen}</span>
                 </div>
             </div>`).join('');
 

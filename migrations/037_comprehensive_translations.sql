@@ -201,7 +201,7 @@ INSERT INTO translations (locale, category, key_name, translation) VALUES
 ('uk', 'map', 'title', 'Мапа клієнтів'),
 ('ru', 'map', 'title', 'Карта клиентов'),
 ('en', 'map', 'clients_plotted', 'Clients Plotted'),
-('uk', 'map', 'clients_plotted', 'Клієнтів на карті'),
+('uk', 'map', 'clients_plotted', 'Клієнтів на мапі'),
 ('ru', 'map', 'clients_plotted', 'Клиентов на карте'),
 
 -- Settings
