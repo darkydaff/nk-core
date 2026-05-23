@@ -9,7 +9,7 @@ class VpnConfigRenderer
     public function __construct(VpnServer $server)
     {
         $this->server = $server;
-        $this->ssh = new SshClient($server->getSshConfig());
+        $this->ssh = $server->getSshClient();
     }
 
     /**

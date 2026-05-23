@@ -744,7 +744,11 @@ class ServerView {
     unsubscribeTelemetry() {
         if (this.telemetrySubscription) {
             console.log(`[Telemetry] Unsubscribing from telemetry channel: server:telemetry:${this.serverId}`);
-            this.telemetrySubscription.unsubscribe();
+            if (this.centrifuge) {
+                this.centrifuge.removeSubscription(this.telemetrySubscription);
+            } else {
+                this.telemetrySubscription.unsubscribe();
+            }
             this.telemetrySubscription = null;
             this.telemetryRows = null; // Clear cached row selectors to defend against leaks
         }

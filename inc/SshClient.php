@@ -380,4 +380,21 @@ class SshClient
 
         return $output;
     }
+
+    /**
+     * Upload a local file to a remote path.
+     */
+    public function uploadFile(string $localPath, string $remotePath): void
+    {
+        if (!file_exists($localPath)) {
+            throw new \InvalidArgumentException("Local file does not exist: {$localPath}");
+        }
+        $content = file_get_contents($localPath);
+        if ($content === false) {
+            throw new \RuntimeException("Failed to read local file: {$localPath}");
+        }
+        $base64 = base64_encode($content);
+        $cmd = sprintf("echo %s | base64 -d > %s", escapeshellarg($base64), escapeshellarg($remotePath));
+        $this->executeCommand($cmd, false, true);
+    }
 }
