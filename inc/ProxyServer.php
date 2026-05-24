@@ -79,8 +79,12 @@ class ProxyServer
         $stmt->execute([$this->serverId]);
         $proxies = $stmt->fetchAll();
 
-        // Detect if we should try to import existing config (only if DB is empty for this server)
-        if (empty($proxies)) {
+        // Detect if we should try to import existing config (only if DB is completely empty of any proxy records for this server)
+        $countStmt = $pdo->prepare('SELECT COUNT(*) FROM http_proxies WHERE server_id = ?');
+        $countStmt->execute([$this->serverId]);
+        $hasAnyRecords = (int)$countStmt->fetchColumn() > 0;
+
+        if (empty($proxies) && !$hasAnyRecords) {
             $imported = $this->detectAndImportExistingConfig();
             if ($imported > 0) {
                 // Refresh proxies list after import

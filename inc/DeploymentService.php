@@ -14,7 +14,7 @@ class DeploymentService {
     public static function deployDockerContainer($server, string $containerName, string $image, string $runOptions): bool {
         // 1. Stop and remove existing container if it exists
         $server->executeCommand("docker stop {$containerName} 2>/dev/null || true", true);
-        $server->executeCommand("docker rm {$containerName} 2>/dev/null || true", true);
+        $server->executeCommand("docker rm -f {$containerName} 2>/dev/null || true", true);
         
         // 2. Run new container
         $cmd = "docker run -d --restart always --name {$containerName} {$runOptions} {$image} 2>&1";

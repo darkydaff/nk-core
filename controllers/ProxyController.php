@@ -17,7 +17,8 @@ class ProxyController
                 'success' => $success,
                 'message' => $message,
                 'error' => $error,
-                'redirect' => $redirect
+                'redirect' => $redirect,
+                'reload' => $success && !$redirect
             ]);
             exit;
         }
@@ -286,8 +287,8 @@ class ProxyController
             return $this->respond(true, "Proxy is working. External IP: " . $ip);
         } else {
             $errMsg = $error ?: "HTTP $httpCode";
+            if ($httpCode === 407 || $errorNo === CURLE_LOGIN_DENIED)  $errMsg = "Proxy authentication failed";
             if ($errorNo === CURLE_COULDNT_CONNECT)    $errMsg = "Could not connect to proxy server";
-            if ($errorNo === CURLE_PROXY_AUTH_FAILED)  $errMsg = "Proxy authentication failed";
             if ($errorNo === CURLE_OPERATION_TIMEDOUT) $errMsg = "Connection timed out";
             return $this->respond(false, "Connectivity check failed: $errMsg");
         }
