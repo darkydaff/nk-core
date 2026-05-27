@@ -198,19 +198,11 @@ class AwgConfigGenerator
     public function getDockerfile(): string
     {
         return <<<DOCKERFILE
-# Stage 1: Build amneziawg-go and amneziawg-tools
-FROM golang:alpine AS builder
+# Stage 1: Build amneziawg-tools
+FROM alpine:latest AS builder
 RUN apk add --no-cache git make build-base bash libmnl-dev pkgconfig
-ENV GOPROXY=https://goproxy.cn,https://goproxy.io,direct
 
-ARG AMNEZIAWG_GO_REF=master
 ARG AMNEZIAWG_TOOLS_REF=v1.0.20260223
-
-# Build amneziawg-go
-RUN git clone --branch \${AMNEZIAWG_GO_REF} https://github.com/amnezia-vpn/amneziawg-go.git /build/amneziawg-go && \\
-    cd /build/amneziawg-go && \\
-    make && \\
-    cp amneziawg-go /usr/local/bin/
 
 # Build amneziawg-tools
 RUN git clone --branch \${AMNEZIAWG_TOOLS_REF} https://github.com/amnezia-vpn/amneziawg-tools.git /build/amneziawg-tools && \\
@@ -223,7 +215,6 @@ FROM alpine:latest
 RUN apk add --no-cache bash iptables iproute2 coreutils dumb-init libmnl
 
 # Copy binaries from builder
-COPY --from=builder /usr/local/bin/amneziawg-go /usr/local/bin/
 COPY --from=builder /usr/bin/awg /usr/local/bin/
 COPY --from=builder /usr/bin/awg-quick /usr/local/bin/
 
@@ -302,8 +293,8 @@ if [ -f /opt/amnezia/awg/wg0.conf ]; then
         echo "AmneziaWG kernel module detected. Using kernel mode."
         unset WG_QUICK_USERSPACE_IMPLEMENTATION
     else
-        echo "AmneziaWG kernel module not found. Using userspace amneziawg-go fallback."
-        export WG_QUICK_USERSPACE_IMPLEMENTATION=/usr/local/bin/amneziawg-go
+        echo "ERROR: AmneziaWG kernel module not found. Userspace fallback is disabled."
+        exit 1
     fi
     
     export WG_SUDO=1

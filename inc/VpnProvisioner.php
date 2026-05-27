@@ -74,11 +74,7 @@ class VpnProvisioner
             
             $this->runProvisioningStep("Installing AmneziaWG Kernel Module...", 'install_kernel_module', function() {
                 if (!$this->linux->installKernelModule()) {
-                    $msg = 'Warning: AmneziaWG kernel module failed to install/load. Using slower userspace fallback (amneziawg-go).';
-                    $this->warnings[] = $msg;
-                    $pdo = DB::conn();
-                    $pdo->prepare('UPDATE vpn_servers SET error_message = ? WHERE id = ?')
-                        ->execute([$msg, $this->server->getId()]);
+                    throw new Exception('AmneziaWG kernel module failed to install/load on host, and userspace fallback is disabled.');
                 }
             });
 
