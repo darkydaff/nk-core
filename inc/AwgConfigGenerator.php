@@ -201,6 +201,7 @@ class AwgConfigGenerator
 # Stage 1: Build amneziawg-go and amneziawg-tools
 FROM golang:alpine AS builder
 RUN apk add --no-cache git make build-base bash libmnl-dev pkgconfig
+ENV GOPROXY=https://goproxy.io,direct
 
 ARG AMNEZIAWG_GO_REF=master
 ARG AMNEZIAWG_TOOLS_REF=v1.0.20260223
