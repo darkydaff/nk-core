@@ -206,13 +206,13 @@ ARG AMNEZIAWG_GO_REF=master
 ARG AMNEZIAWG_TOOLS_REF=v1.0.20260223
 
 # Build amneziawg-go
-RUN git clone --depth 1 --branch \${AMNEZIAWG_GO_REF} https://github.com/amnezia-vpn/amneziawg-go.git /build/amneziawg-go && \\
+RUN git clone --branch \${AMNEZIAWG_GO_REF} https://github.com/amnezia-vpn/amneziawg-go.git /build/amneziawg-go && \\
     cd /build/amneziawg-go && \\
     make && \\
     cp amneziawg-go /usr/local/bin/
 
 # Build amneziawg-tools
-RUN git clone --depth 1 --branch \${AMNEZIAWG_TOOLS_REF} https://github.com/amnezia-vpn/amneziawg-tools.git /build/amneziawg-tools && \\
+RUN git clone --branch \${AMNEZIAWG_TOOLS_REF} https://github.com/amnezia-vpn/amneziawg-tools.git /build/amneziawg-tools && \\
     cd /build/amneziawg-tools/src && \\
     make && \\
     make install PREFIX=/usr

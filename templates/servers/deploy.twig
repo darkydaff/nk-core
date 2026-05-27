@@ -376,8 +376,11 @@ function failStep(id, error) {
     step.classList.remove('active');
     step.classList.add('failed');
     step.querySelector('.step-icon').innerHTML = '<i class="fas fa-times"></i>';
-    step.querySelector('.step-meta').className = 'text-[10px] text-error uppercase tracking-tighter';
-    step.querySelector('.step-meta').textContent = error;
+    const meta = step.querySelector('.step-meta');
+    if (meta) {
+        meta.className = 'text-[10px] text-error uppercase tracking-tighter step-meta';
+        meta.textContent = error;
+    }
 }
 
 function appendLog(msg, color = 'text-primary/60', icon = null, target = null) {
