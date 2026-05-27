@@ -432,9 +432,9 @@ WantedBy=multi-user.target' > /etc/systemd/system/nk-telemetry.service",
             $containerName, $containerName, $containerName
         ), true);
 
-        // Build new image — Go compilation can take 5-10 minutes
+                // Build new image — Go compilation can take 5-10 minutes
         $buildCmd = sprintf(
-            'docker build --no-cache --pull -t %s /opt/amnezia/nk-awg-v2 2>&1',
+            'docker build --no-cache --progress=plain --pull -t %s /opt/amnezia/nk-awg-v2 2>&1',
             $containerName
         );
         $buildOutput = $this->server->executeCommand($buildCmd, true, true, false, 900);
