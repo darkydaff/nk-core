@@ -367,7 +367,7 @@ class SshClient
         }
 
         if ($checkExit && $exitCode !== 0) {
-            throw new RemoteCommandException("Remote command failed (exit {$exitCode}): " . trim(substr($output, -500)));
+            throw new RemoteCommandException("Remote command failed (exit {$exitCode}): " . trim(substr($output, -8000)));
         }
 
         // Stream output to Job if active
@@ -375,7 +375,7 @@ class SshClient
             $this->currentJob->log($output, [
                 'command' => $loggedCommand,
                 'exit_code' => $exitCode
-            ]);
+            ], true);
         }
 
         return $output;

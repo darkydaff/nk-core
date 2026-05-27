@@ -140,8 +140,8 @@ class VpnProvisioner
             $errorMsg = mb_convert_encoding($e->getMessage(), 'UTF-8', 'UTF-8');
             $errorMsg = preg_replace('/[^\x20-\x7E\n]/', '', $errorMsg);
             
-            if (strlen($errorMsg) > 2000) {
-                $errorMsg = substr($errorMsg, 0, 1000) . "..." . substr($errorMsg, -500);
+                        if (strlen($errorMsg) > 10000) {
+                $errorMsg = substr($errorMsg, 0, 2000) . "..." . substr($errorMsg, -8000);
             }
 
             Logger::channel('deployments')->error("Deployment failed during phase {$this->currentPhase}: {$errorMsg}", [
