@@ -59,9 +59,9 @@ while (true) {
         
         $process = new Process(['php', $processScript, $job->getData()]);
         
-        // Hard execution timeout: 600 seconds (10 minutes).
+                // Hard execution timeout: 600 seconds (10 minutes).
         $process->setTimeout(600);
-        $process->setIdleTimeout(120);
+        $process->setIdleTimeout(null);
         
         $startTime = microtime(true);
         $exitCode = null;
