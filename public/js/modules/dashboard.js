@@ -163,7 +163,7 @@ const Dashboard = {
                 if (upEl) upEl.innerText = (s.traffic.sent / 1073741824).toFixed(2) + ' GB';
             }
 
-            if (data.summary?.traffic) this.updateChart(data.summary.traffic);
+            this.updateChart();
         } catch (e) {
             console.error('Search failed:', e);
         } finally {
@@ -175,34 +175,20 @@ const Dashboard = {
         }
     },
 
-    updateChart: function(traffic) {
-        if (!this.chart || !this.lastTraffic) {
-            this.lastTraffic = traffic;
-            return;
+    updateChart: async function() {
+        if (!this.chart) return;
+        try {
+            const r = await fetch('/api/monitoring/traffic-history');
+            const data = await r.json();
+            if (data.history) {
+                this.chart.data.labels = data.history.map(h => h.label);
+                this.chart.data.datasets[0].data = data.history.map(h => h.speed_down_mb < 0.01 ? 0 : h.speed_down_mb);
+                this.chart.data.datasets[1].data = data.history.map(h => h.speed_up_mb < 0.01 ? 0 : h.speed_up_mb);
+                this.chart.update('none');
+            }
+        } catch (e) {
+            console.error('Failed to update chart history:', e);
         }
-
-        // Calculate bits per second from byte diff
-        // 15 seconds is the polling interval
-        const diffDown = Math.max(0, (traffic.received - this.lastTraffic.received));
-        const diffUp = Math.max(0, (traffic.sent - this.lastTraffic.sent));
-        this.lastTraffic = traffic;
-
-        let mbpsDown = (diffDown * 8) / 15 / 1024 / 1024;
-        let mbpsUp = (diffUp * 8) / 15 / 1024 / 1024;
-
-        if (mbpsDown < 0.01) mbpsDown = 0;
-        if (mbpsUp < 0.01) mbpsUp = 0;
-
-        if (this.chart.data.labels.length >= 60) {
-            this.chart.data.labels.shift();
-            this.chart.data.datasets[0].data.shift();
-            this.chart.data.datasets[1].data.shift();
-        }
-
-        this.chart.data.labels.push(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
-        this.chart.data.datasets[0].data.push(mbpsDown);
-        this.chart.data.datasets[1].data.push(mbpsUp);
-        this.chart.update('none');
     },
 
     renderResults: function(results, isAutoRefresh = false) {
