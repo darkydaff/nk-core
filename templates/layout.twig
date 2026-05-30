@@ -129,7 +129,7 @@
                             {% endfor %}
                             <i class="fas fa-chevron-down ml-2 text-[10px] opacity-50"></i>
                         </button>
-                        <div id="languageDropdown" class="hidden absolute right-0 top-full mt-2 w-48 bg-card border border-border rounded-lg shadow-xl p-1 z-50" role="listbox" aria-labelledby="lang-trigger">
+                        <div id="languageDropdown" class="hidden absolute right-0 top-full mt-2 w-48 bg-surface-panel border border-border rounded-lg shadow-xl p-1 z-50" role="listbox" aria-labelledby="lang-trigger">
                             {% for lang in languages %}
                             <form method="POST" action="/language/change" class="block">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
