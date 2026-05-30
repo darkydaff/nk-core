@@ -132,10 +132,19 @@ const Dashboard = {
         const traffic = document.getElementById('trafficFilter').value;
         const sort = document.getElementById('sortFilter').value;
 
+        // Capture current selected client IDs
+        const selectedIds = Array.from(document.querySelectorAll('.client-checkbox:checked')).map(cb => cb.value);
+
         try {
             const response = await fetch(`/api/search-clients?q=${encodeURIComponent(q)}&status=${status}&traffic=${traffic}&sort=${sort}`);
             const data = await response.json();
             this.renderResults(data.results, isAutoRefresh);
+
+            // Restore selected client checkboxes
+            document.querySelectorAll('.client-checkbox').forEach(cb => {
+                if (selectedIds.includes(cb.value)) cb.checked = true;
+            });
+            this.updateBatchUI();
             
             // Update Summary Cards if present
             if (data.summary) {
@@ -556,6 +565,13 @@ const Dashboard = {
 
     updateBatchUI: function() {
         const selected = document.querySelectorAll('.client-checkbox:checked');
+        const allCheckbox = document.querySelectorAll('.client-checkbox');
+        const master = document.getElementById('selectAllClients');
+        if (master) {
+            master.checked = allCheckbox.length > 0 && selected.length === allCheckbox.length;
+            master.indeterminate = selected.length > 0 && selected.length < allCheckbox.length;
+        }
+
         const bar = document.getElementById('batchActionBar');
         const text = document.getElementById('selectedCountText');
         

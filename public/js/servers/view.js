@@ -472,6 +472,13 @@ class ServerView {
 
     updateBatchBar() {
         const selected = document.querySelectorAll('.client-checkbox:checked');
+        const allCheckbox = document.querySelectorAll('.client-checkbox');
+        const master = document.getElementById('selectAll');
+        if (master) {
+            master.checked = allCheckbox.length > 0 && selected.length === allCheckbox.length;
+            master.indeterminate = selected.length > 0 && selected.length < allCheckbox.length;
+        }
+
         if (this.batchActionBar) {
             if (selected.length > 0) {
                 this.batchActionBar.classList.remove('hidden');

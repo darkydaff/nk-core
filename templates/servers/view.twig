@@ -368,44 +368,57 @@
 			<!-- Global Search Localized for this Server -->
 			<div class="lg:col-span-3">
 				<div class="panel overflow-hidden flex flex-col min-h-[500px]">
-					<div class="px-5 py-4 border-b border-default bg-panel/30 flex items-center justify-between gap-4">
-						<div class="flex items-center gap-4">
-                            <h2 class="text-sm font-semibold uppercase tracking-widest opacity-70">{{ t('dashboard.fleet_search', [], 'Server Clients') }}</h2>
-                            <!-- Batch Action Bar (Integrated) -->
-                            <div id="batchActionBar" class="hidden items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-full animate-in fade-in slide-in-from-left-2">
-                                <span id="selectedCountText" class="text-[10px] font-bold text-primary uppercase tracking-widest mr-2">0 SELECTED</span>
-                                <div class="flex items-center gap-1 border-l border-primary/20 pl-2">
-                                    <button onclick="window.serverView.handleBatchAction('revoke')" class="text-[10px] font-bold text-amber-500 hover:text-amber-400 uppercase tracking-tight px-2 py-1 transition-colors">{{ t('common.revoke', [], 'Revoke') }}</button>
-                                    <button onclick="window.serverView.handleBatchAction('restore')" class="text-[10px] font-bold text-green-500 hover:text-green-400 uppercase tracking-tight px-2 py-1 transition-colors">{{ t('common.restore', [], 'Restore') }}</button>
-                                    <button onclick="window.serverView.handleBatchAction('delete')" class="text-[10px] font-bold text-red-500 hover:text-red-400 uppercase tracking-tight px-2 py-1 transition-colors">{{ t('common.delete', [], 'Delete') }}</button>
+					<div class="relative">
+						<div class="px-5 py-3 border-b border-default bg-panel/30 flex flex-col md:flex-row md:items-center justify-between gap-4">
+							<div class="flex items-center gap-4">
+                                <h2 class="text-sm font-semibold uppercase tracking-widest opacity-70">{{ t('dashboard.fleet_search', [], 'Server Clients') }}</h2>
+                            </div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <div class="relative w-full md:w-48 lg:w-64">
+                                    <input type="text" id="clientSearch" class="input-field input-with-icon !py-1.5 text-xs font-medium" placeholder="{{ t('dashboard.search_placeholder', [], 'Search clients…') }}">
+                                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[10px]"></i>
                                 </div>
+                                <select id="statusFilter" class="input-field !w-auto !py-1.5 pl-3 pr-8 text-xs font-medium cursor-pointer">
+                                    <option value="all">{{ t('common.status_all', [], 'All Status') }}</option>
+                                    <option value="online">{{ t('common.status_online', [], 'Online') }}</option>
+                                    <option value="offline">{{ t('common.status_offline', [], 'Offline') }}</option>
+                                    <option value="revoked">{{ t('status.revoked', [], 'Revoked') }}</option>
+                                </select>
+                                <select id="trafficFilter" class="input-field !w-auto !py-1.5 pl-3 pr-8 text-xs font-medium cursor-pointer">
+                                    <option value="all">{{ t('common.traffic_all', [], 'All Traffic') }}</option>
+                                    <option value="medium">{{ t('common.traffic_medium', [], '> 100MB') }}</option>
+                                    <option value="high">{{ t('common.traffic_high', [], '> 1GB') }}</option>
+                                </select>
+                                <select id="sortFilter" class="input-field !w-auto !py-1.5 pl-3 pr-8 text-xs font-medium cursor-pointer">
+                                    <option value="recent">{{ t('common.sort_newest', [], 'Newest') }}</option>
+                                    <option value="handshake">{{ t('common.sort_handshake', [], 'Last Activity') }}</option>
+                                    <option value="traffic">{{ t('common.sort_traffic', [], 'Most Traffic') }}</option>
+                                    <option value="oldest">{{ t('common.sort_oldest', [], 'Oldest') }}</option>
+                                </select>
                             </div>
                         </div>
-                        <div class="flex flex-wrap items-center gap-2">
-							<div class="relative w-48 lg:w-64">
-								<input type="text" id="clientSearch" class="input-field input-with-icon !py-2 text-sm" placeholder="{{ t('dashboard.search_placeholder', [], 'Search clients…') }}">
-								<i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-muted text-xs"></i>
-							</div>
-							<select id="statusFilter" class="input-field !w-auto !py-2 px-3 text-[11px] font-bold">
-								<option value="all">{{ t('common.status_all', [], 'All Status') }}</option>
-								<option value="online">{{ t('common.status_online', [], 'Online') }}</option>
-								<option value="offline">{{ t('common.status_offline', [], 'Offline') }}</option>
-								<option value="revoked">{{ t('status.revoked', [], 'Revoked') }}</option>
-							</select>
-							<select id="trafficFilter" class="input-field !w-auto !py-2 px-3 text-[11px] font-bold">
-								<option value="all">{{ t('common.traffic_all', [], 'All Traffic') }}</option>
-								<option value="medium">{{ t('common.traffic_medium', [], '> 100MB') }}</option>
-								<option value="high">{{ t('common.traffic_high', [], '> 1GB') }}</option>
-							</select>
-							<select id="sortFilter" class="input-field !w-auto !py-2 px-3 text-[11px] font-bold">
-								<option value="recent">{{ t('common.sort_newest', [], 'Newest') }}</option>
-								<option value="handshake">{{ t('common.sort_handshake', [], 'Last Activity') }}</option>
-								<option value="traffic">{{ t('common.sort_traffic', [], 'Most Traffic') }}</option>
-								<option value="oldest">{{ t('common.sort_oldest', [], 'Oldest') }}</option>
-							</select>
-						</div>
 
-					</div>
+                        <!-- Batch Action Bar Overlay -->
+                        <div id="batchActionBar" class="absolute inset-0 bg-card z-20 hidden items-center justify-between px-5 py-3 border-b border-default animate-in fade-in duration-200">
+                            <div class="flex items-center gap-3">
+                                <span id="selectedCountText" class="text-xs font-semibold text-primary uppercase tracking-widest">0 SELECTED</span>
+                                <button onclick="document.querySelectorAll('.client-checkbox').forEach(cb => cb.checked = false); window.serverView.updateBatchBar();" class="text-[10px] font-bold text-muted hover:text-primary uppercase tracking-wider ml-2 px-2 py-1 rounded border border-default hover:bg-surface-hover transition-colors">
+                                    {{ t('common.clear_selection', [], 'Clear selection') }}
+                                </button>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <button onclick="window.serverView.handleBatchAction('revoke')" class="btn-secondary !py-1 !px-2.5 text-xs font-medium text-amber-500 hover:text-amber-400">
+                                    {{ t('common.revoke', [], 'Revoke') }}
+                                </button>
+                                <button onclick="window.serverView.handleBatchAction('restore')" class="btn-secondary !py-1 !px-2.5 text-xs font-medium text-green-500 hover:text-green-400">
+                                    {{ t('common.restore', [], 'Restore') }}
+                                </button>
+                                <button onclick="window.serverView.handleBatchAction('delete')" class="btn-primary !py-1 !px-2.5 text-xs font-medium bg-destructive hover:bg-destructive/90 text-destructive-foreground">
+                                    {{ t('common.delete', [], 'Delete') }}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
 
 					<div
 						id="searchResults" class="flex-grow"><!-- Search results injected here -->
