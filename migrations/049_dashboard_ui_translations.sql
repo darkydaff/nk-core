@@ -3,7 +3,7 @@ INSERT INTO translations (locale, category, key_name, translation) VALUES
 -- English
 ('en', 'dashboard', 'overview_subtitle', 'Global fleet and client overview'),
 ('en', 'dashboard', 'active_nodes', 'Nodes across regions'),
-('en', 'dashboard', 'provisioned_access', 'Total access keys'),
+('en', 'dashboard', 'provisioned_access', 'Total configs'),
 ('en', 'dashboard', 'total_ingress', 'Cumulative inbound traffic'),
 ('en', 'dashboard', 'total_egress', 'Cumulative outbound traffic'),
 ('en', 'dashboard', 'traffic_analytics', 'Traffic Analytics'),
@@ -16,7 +16,7 @@ INSERT INTO translations (locale, category, key_name, translation) VALUES
 -- Ukrainian
 ('uk', 'dashboard', 'overview_subtitle', 'Загальний огляд флоту та клієнтів'),
 ('uk', 'dashboard', 'active_nodes', 'Вузли в різних регіонах'),
-('uk', 'dashboard', 'provisioned_access', 'Всього ключів доступу'),
+('uk', 'dashboard', 'provisioned_access', 'Всього конфігурацій'),
 ('uk', 'dashboard', 'total_ingress', 'Сумарний вхідний трафік'),
 ('uk', 'dashboard', 'total_egress', 'Сумарний вихідний трафік'),
 ('uk', 'dashboard', 'traffic_analytics', 'Аналітика трафіку'),
@@ -29,7 +29,7 @@ INSERT INTO translations (locale, category, key_name, translation) VALUES
 -- Russian
 ('ru', 'dashboard', 'overview_subtitle', 'Общий обзор флота и клиентов'),
 ('ru', 'dashboard', 'active_nodes', 'Узлы в разных регионах'),
-('ru', 'dashboard', 'provisioned_access', 'Всего ключей доступа'),
+('ru', 'dashboard', 'provisioned_access', 'Всего конфигураций'),
 ('ru', 'dashboard', 'total_ingress', 'Суммарный входящий трафик'),
 ('ru', 'dashboard', 'total_egress', 'Суммарный исходящий трафик'),
 ('ru', 'dashboard', 'traffic_analytics', 'Аналитика трафика'),

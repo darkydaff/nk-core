@@ -76,6 +76,7 @@ const Dashboard = {
                 },
                 scales: {
                     y: { 
+                        min: 0,
                         grid: { color: colors.grid }, 
                         ticks: { 
                             color: colors.text,
