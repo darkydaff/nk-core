@@ -346,6 +346,51 @@ h1, h2, h3, h4, .font-brand {
     box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring));
 }
 
+/* ── Custom Checkboxes (Shadcn UI style) ── */
+input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 1px solid hsl(var(--input)) !important;
+    border-radius: calc(var(--radius) - 3px) !important;
+    background-color: hsl(var(--background)) !important;
+    display: inline-grid;
+    place-content: center;
+    cursor: pointer;
+    vertical-align: middle;
+    position: relative;
+    transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+    margin: 0;
+}
+
+input[type="checkbox"]::before {
+    content: "";
+    width: 9px;
+    height: 9px;
+    transform: scale(0);
+    transition: 100ms transform ease-in-out;
+    background-color: hsl(var(--primary-foreground));
+    transform-origin: center;
+    clip-path: polygon(14% 44%, 0 58%, 30% 88%, 100% 18%, 86% 4%, 30% 60%);
+}
+
+input[type="checkbox"]:checked {
+    background-color: hsl(var(--primary)) !important;
+    border-color: hsl(var(--primary)) !important;
+}
+
+input[type="checkbox"]:checked::before {
+    transform: scale(1);
+}
+
+input[type="checkbox"]:focus-visible {
+    outline: none;
+    border-color: hsl(var(--ring)) !important;
+    box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring)) !important;
+}
+
+
 /* ── Data Tables ── */
 table {
     width: 100%;

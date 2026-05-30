@@ -64,10 +64,27 @@
     --color-sidebar-text: hsl(var(--foreground));
     --color-sidebar-border: hsl(var(--border));
     --color-sidebar-hover: hsl(var(--accent));
+
+    /* Status Colors Compatibility Layer */
+    --color-status-active: hsl(var(--success));
+    --color-status-active-light: hsl(var(--success) / 0.1);
+    --color-status-active-border: hsl(var(--success) / 0.2);
+    
+    --color-status-offline: hsl(var(--offline));
+    --color-status-offline-light: hsl(var(--offline) / 0.1);
+    --color-status-offline-border: hsl(var(--offline) / 0.2);
+    
+    --color-status-warning: hsl(var(--warning));
+    --color-status-warning-light: hsl(var(--warning) / 0.1);
+    --color-status-warning-border: hsl(var(--warning) / 0.2);
+    
+    --color-status-error: hsl(var(--destructive-status));
+    --color-status-error-light: hsl(var(--destructive-status) / 0.1);
+    --color-status-error-border: hsl(var(--destructive-status) / 0.2);
 }
 
 html {
-    color-scheme: light dark;
+    color-scheme: light;
 }
 
 html.dark {
