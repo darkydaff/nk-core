@@ -91,7 +91,7 @@ h1, h2, h3, h4, .font-brand {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 1.5rem;
+    padding: 0;
     position: sticky;
     top: 0;
     z-index: 90;
@@ -104,6 +104,100 @@ h1, h2, h3, h4, .font-brand {
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius);
     box-shadow: none;
+    position: relative;
+}
+
+/* Global Border Radius overrides to enforce system radius */
+.rounded-3xl,
+.rounded-2xl,
+.rounded-xl,
+.rounded-lg {
+    border-radius: var(--radius) !important;
+}
+
+.rounded-md {
+    border-radius: calc(var(--radius) - 2px) !important;
+}
+
+/* Clean up card/panel headers to match Shadcn */
+.panel > div:first-child[class*="border-b"] {
+    background: transparent !important;
+    border-bottom: 1px solid hsl(var(--border)) !important;
+    padding: 1rem 1.5rem !important;
+}
+
+.panel > div:first-child[class*="border-b"] h2 {
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+    color: hsl(var(--foreground)) !important;
+    opacity: 1 !important;
+}
+
+/* Shadcn-style Dashboard Stat Cards */
+.panel.p-6.flex.items-center.gap-5 {
+    display: flex !important;
+    flex-direction: column-reverse !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    gap: 0.25rem !important;
+    position: relative !important;
+    padding: 1.5rem !important;
+}
+
+/* Position the icon at the top-right */
+.panel.p-6.flex.items-center.gap-5 > div:first-child {
+    position: absolute !important;
+    top: 1.25rem !important;
+    right: 1.25rem !important;
+    width: auto !important;
+    height: auto !important;
+    background: transparent !important;
+    border: none !important;
+    color: hsl(var(--muted-foreground)) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.panel.p-6.flex.items-center.gap-5 > div:first-child i {
+    font-size: 1rem !important;
+}
+
+/* Flip the title and value */
+.panel.p-6.flex.items-center.gap-5 > div:last-child {
+    display: flex !important;
+    flex-direction: column-reverse !important;
+    width: 100% !important;
+    margin-top: 0 !important;
+}
+
+.panel.p-6.flex.items-center.gap-5 > div:last-child p.text-muted {
+    font-size: 0.75rem !important;
+    font-weight: 500 !important;
+    color: hsl(var(--muted-foreground)) !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+    margin-bottom: 0.25rem !important;
+    margin-top: 0 !important;
+}
+
+.panel.p-6.flex.items-center.gap-5 > div:last-child > div {
+    font-size: 1.5rem !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.05em !important;
+    display: flex !important;
+    align-items: baseline !important;
+    gap: 0.5rem !important;
+}
+
+/* Value span inside the flex container */
+.panel.p-6.flex.items-center.gap-5 > div:last-child > div > span:not(.badge) {
+    font-size: 1.5rem !important;
+    font-weight: 700 !important;
 }
 
 .btn-primary {
