@@ -375,8 +375,10 @@
                             </div>
                             <div class="flex flex-wrap items-center gap-2">
                                 <div class="relative w-full md:w-48 lg:w-64">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted-foreground">
+                                        <i class="fas fa-search text-[10px]"></i>
+                                    </div>
                                     <input type="text" id="clientSearch" class="input-field input-with-icon !py-1.5 text-xs font-medium" placeholder="{{ t('dashboard.search_placeholder', [], 'Search clients…') }}">
-                                    <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[10px]"></i>
                                 </div>
                                 <select id="statusFilter" class="input-field !w-auto !py-1.5 pl-3 pr-8 text-xs font-medium cursor-pointer">
                                     <option value="all">{{ t('common.status_all', [], 'All Status') }}</option>
@@ -399,7 +401,7 @@
                         </div>
 
                         <!-- Batch Action Bar Overlay -->
-                        <div id="batchActionBar" class="absolute inset-0 bg-card z-20 hidden items-center justify-between px-5 py-3 border-b border-default animate-in fade-in duration-200">
+                        <div id="batchActionBar" class="absolute inset-0 bg-surface-panel z-20 hidden items-center justify-between px-5 py-3 border-b border-default animate-in fade-in duration-200">
                             <div class="flex items-center gap-3">
                                 <span id="selectedCountText" class="text-xs font-semibold text-primary uppercase tracking-widest">0 SELECTED</span>
                                 <button onclick="document.querySelectorAll('.client-checkbox').forEach(cb => cb.checked = false); window.serverView.updateBatchBar();" class="text-[10px] font-bold text-muted hover:text-primary uppercase tracking-wider ml-2 px-2 py-1 rounded border border-default hover:bg-surface-hover transition-colors">
