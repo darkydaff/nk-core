@@ -423,6 +423,13 @@ td {
     }
 }
 
+/* Fallback utility for environments where tailwindcss is not yet recompiled */
+@media (min-width: 1280px) {
+    .xl\:hidden {
+        display: none !important;
+    }
+}
+
 /* Toast Styling managed in JS */
 .toast {
     background: hsl(var(--card));
