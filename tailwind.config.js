@@ -10,33 +10,55 @@ module.exports = {
     extend: {
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
-        header: ['Space Grotesk', 'sans-serif'],
         mono: ['Geist Mono', 'monospace'],
-        brand: ['Geist Mono', 'monospace'],
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)"
       },
       colors: {
-        surface: {
-          base: 'var(--color-surface-base)',
-          panel: 'var(--color-surface-panel)',
-          hover: 'var(--color-surface-hover)',
-          border: 'var(--color-surface-border)',
-        },
-        content: {
-          primary: 'var(--color-content-primary)',
-          secondary: 'var(--color-content-secondary)',
-          muted: 'var(--color-content-muted)',
-        },
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
         primary: {
-          DEFAULT: 'var(--color-primary)',
-          hover: 'var(--color-primary-hover)',
-          light: 'var(--color-primary-light)',
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
         },
-        success: 'var(--color-status-active)',
-        warning: 'var(--color-status-warning)',
-        error: 'var(--color-status-error)',
-      },
-      boxShadow: {
-        'tactical': '0 1px 2px 0 rgba(0, 0, 0, 0.5)',
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
       }
     }
   },
