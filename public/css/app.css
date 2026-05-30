@@ -78,6 +78,9 @@ h1, h2, h3, h4, .font-brand {
 }
 
 @media (min-width: 1280px) {
+    .sidebar {
+        transform: translateX(0) !important;
+    }
     body.has-sidebar .main-wrapper {
         margin-left: var(--sidebar-width);
         width: calc(100% - var(--sidebar-width));
