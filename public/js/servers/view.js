@@ -475,9 +475,11 @@ class ServerView {
         if (this.batchActionBar) {
             if (selected.length > 0) {
                 this.batchActionBar.classList.remove('hidden');
-                this.selectedCountText.innerText = this.labels.selected.replace('%s', selected.length);
+                this.batchActionBar.classList.add('flex');
+                this.selectedCountText.innerText = `${selected.length} SELECTED`;
             } else {
                 this.batchActionBar.classList.add('hidden');
+                this.batchActionBar.classList.remove('flex');
             }
         }
     }

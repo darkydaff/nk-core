@@ -371,33 +371,17 @@
 					<div class="px-5 py-4 border-b border-default bg-panel/30 flex items-center justify-between gap-4">
 						<div class="flex items-center gap-4">
                             <h2 class="text-sm font-semibold uppercase tracking-widest opacity-70">{{ t('dashboard.fleet_search', [], 'Server Clients') }}</h2>
-                            <!-- Batch Actions Bar (Responsive) -->
-                            <div id="batchActionBar" class="hidden flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-full animate-fade-in 
-                                 fixed bottom-6 left-4 right-4 md:relative md:bottom-auto md:left-auto md:right-auto md:bg-primary/10 
-                                 bg-surface-panel shadow-2xl md:shadow-none p-3 md:p-1 border-primary/40 md:border-primary/20 z-[100]">
-                                
-                                <div class="flex flex-col md:flex-row items-center w-full gap-3 md:gap-2">
-                                    <div class="flex items-center w-full md:w-auto border-b md:border-b-0 border-default/50 pb-2 md:pb-0">
-                                        <span class="text-[11px] md:text-[10px] font-bold text-primary uppercase tracking-widest mr-auto md:mr-2" id="selectedCountText">0 SELECTED</span>
-                                        <button onclick="document.querySelectorAll('.client-checkbox').forEach(cb => cb.checked = false); window.serverView.updateBatchBar();" class="md:hidden text-[10px] text-muted hover:text-primary uppercase font-bold px-2 py-1">
-                                            <i class="fas fa-times mr-1"></i>{{ t('common.clear')|default('Clear') }}
-                                        </button>
-                                    </div>
-                                    
-                                    <div class="flex items-center justify-around w-full md:w-auto gap-2">
-                                        <button onclick="window.serverView.handleBatchAction('revoke')" class="flex-1 md:flex-none text-[11px] md:text-[10px] font-bold text-orange-400 hover:text-orange-300 uppercase tracking-tight px-3 py-2.5 md:px-2 md:py-1 transition-colors bg-orange-500/10 md:bg-transparent rounded-lg border border-orange-500/20 md:border-0 text-center">
-                                            <i class="fas fa-user-slash mr-1.5 md:hidden"></i>{{ t('common.revoke')|default('Revoke') }}
-                                        </button>
-                                        <button onclick="window.serverView.handleBatchAction('restore')" class="flex-1 md:flex-none text-[11px] md:text-[10px] font-bold dark:text-green-400 text-green-600 hover:dark:text-green-300 hover:text-green-700 uppercase tracking-tight px-3 py-2.5 md:px-2 md:py-1 transition-colors bg-green-500/10 md:bg-transparent rounded-lg border border-green-500/20 md:border-0 text-center">
-                                            <i class="fas fa-user-check mr-1.5 md:hidden"></i>{{ t('common.restore')|default('Restore') }}
-                                        </button>
-                                        <button onclick="window.serverView.handleBatchAction('delete')" class="flex-1 md:flex-none text-[11px] md:text-[10px] font-bold dark:text-red-400 text-red-600 hover:dark:text-red-300 hover:text-red-700 uppercase tracking-tight px-3 py-2.5 md:px-2 md:py-1 transition-colors bg-red-500/10 md:bg-transparent rounded-lg border border-red-500/20 md:border-0 text-center">
-                                            <i class="fas fa-trash-alt mr-1.5 md:hidden"></i>{{ t('common.delete')|default('Delete') }}
-                                        </button>
-                                    </div>
+                            <!-- Batch Action Bar (Integrated) -->
+                            <div id="batchActionBar" class="hidden items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-full animate-in fade-in slide-in-from-left-2">
+                                <span id="selectedCountText" class="text-[10px] font-bold text-primary uppercase tracking-widest mr-2">0 SELECTED</span>
+                                <div class="flex items-center gap-1 border-l border-primary/20 pl-2">
+                                    <button onclick="window.serverView.handleBatchAction('revoke')" class="text-[10px] font-bold text-amber-500 hover:text-amber-400 uppercase tracking-tight px-2 py-1 transition-colors">{{ t('common.revoke', [], 'Revoke') }}</button>
+                                    <button onclick="window.serverView.handleBatchAction('restore')" class="text-[10px] font-bold text-green-500 hover:text-green-400 uppercase tracking-tight px-2 py-1 transition-colors">{{ t('common.restore', [], 'Restore') }}</button>
+                                    <button onclick="window.serverView.handleBatchAction('delete')" class="text-[10px] font-bold text-red-500 hover:text-red-400 uppercase tracking-tight px-2 py-1 transition-colors">{{ t('common.delete', [], 'Delete') }}</button>
                                 </div>
                             </div>
-                        </div>						<div class="flex flex-wrap items-center gap-2">
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
 							<div class="relative w-48 lg:w-64">
 								<input type="text" id="clientSearch" class="input-field input-with-icon !py-2 text-sm" placeholder="{{ t('dashboard.search_placeholder', [], 'Search clients…') }}">
 								<i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-muted text-xs"></i>
@@ -467,7 +451,7 @@
 		</div>
 	</div>
 	<script src="https://cdn.jsdelivr.net/npm/centrifuge@3.1.0/dist/centrifuge.min.js"></script>
-	<script src="/js/servers/view.js?v=5"></script>
+	<script src="/js/servers/view.js?v=10"></script>
 
 	<script>
 		document.addEventListener('DOMContentLoaded', () => {
