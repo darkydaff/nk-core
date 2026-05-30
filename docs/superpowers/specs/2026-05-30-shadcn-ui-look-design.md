@@ -16,18 +16,24 @@ Redesign the aesthetic of the NK-Core VPN Web Management Panel to match the clea
 ### 2. Design Tokens (`public/css/tokens.css`)
 
 #### Color System HSL Variables
-We will replace existing slate/cyber colors with the default Shadcn Zinc HSL values.
+We will replace existing slate/cyber colors with the Shadcn Zinc HSL neutral values. However, to keep the UI professional yet distinct, we will retain a **branded primary color (Sky Blue)** for primary actions, rather than switching to pure grayscale zinc.
+
+We will also define dedicated chart HSL color variables to prevent charts from using random colors.
 
 ```css
 :root {
+    /* ─── Neutral Zinc Theme ─── */
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
     --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
+    
+    /* ─── Branded Primary Color (Sky Blue) ─── */
+    --primary: 199 89% 48%; /* Sky 500 */
+    --primary-foreground: 0 0% 100%; /* Pure White */
+    
     --secondary: 240 4.8% 95.9%;
     --secondary-foreground: 240 5.9% 10%;
     --muted: 240 4.8% 95.9%;
@@ -38,7 +44,7 @@ We will replace existing slate/cyber colors with the default Shadcn Zinc HSL val
     --destructive-foreground: 0 0% 98%;
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
+    --ring: 199 89% 48%; /* Matches primary brand */
     
     /* Radius Token */
     --radius: 0.5rem;
@@ -53,6 +59,13 @@ We will replace existing slate/cyber colors with the default Shadcn Zinc HSL val
     --offline: 240 3.8% 46.1%; /* Zinc 500 */
     --offline-foreground: 240 4.8% 95.9%;
 
+    /* Chart HSL Tokens */
+    --chart-1: 199 89% 48%; /* Branded Sky */
+    --chart-2: 262.1 83.3% 57.8%; /* Violet */
+    --chart-3: 346.8 77.2% 49.8%; /* Rose */
+    --chart-4: 47.9 95.8% 51.2%; /* Amber */
+    --chart-5: 142.1 76.2% 36.3%; /* Emerald */
+
     /* Legacy Compatibility Layer mappings */
     --color-surface-base: hsl(var(--background));
     --color-surface-panel: hsl(var(--card));
@@ -63,7 +76,7 @@ We will replace existing slate/cyber colors with the default Shadcn Zinc HSL val
     --color-content-muted: hsl(var(--muted-foreground));
     --color-primary: hsl(var(--primary));
     --color-primary-hover: hsl(var(--primary));
-    --color-primary-light: hsl(var(--accent));
+    --color-primary-light: hsl(var(--primary) / 0.1);
     
     --color-sidebar: hsl(var(--background));
     --color-sidebar-text: hsl(var(--foreground));
@@ -78,8 +91,11 @@ We will replace existing slate/cyber colors with the default Shadcn Zinc HSL val
     --card-foreground: 0 0% 98%;
     --popover: 240 10% 3.9%;
     --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
+    
+    /* Branded Primary - slightly lightened for dark mode legibility */
+    --primary: 199 89% 54%; 
+    --primary-foreground: 240 10% 3.9%;
+    
     --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
     --muted: 240 3.7% 15.9%;
@@ -90,7 +106,7 @@ We will replace existing slate/cyber colors with the default Shadcn Zinc HSL val
     --destructive-foreground: 0 0% 98%;
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --ring: 199 89% 54%;
 
     /* Semantic Status Color HSL Tokens - Dark */
     --success: 142.1 70.6% 45.3%; /* Vibrant Emerald */
@@ -101,11 +117,18 @@ We will replace existing slate/cyber colors with the default Shadcn Zinc HSL val
     --destructive-status-foreground: 355.6 100% 97.3%;
     --offline: 240 5% 64.9%;
     --offline-foreground: 240 3.7% 15.9%;
+
+    /* Chart HSL Tokens - Dark */
+    --chart-1: 199 89% 54%;
+    --chart-2: 270.7 91% 65.1%;
+    --chart-3: 343.4 79.7% 54.7%;
+    --chart-4: 47.9 95.8% 51.2%;
+    --chart-5: 142.1 70.6% 45.3%;
 }
 ```
 
 ### 3. Tailwind Configuration (`tailwind.config.js`)
-Update key sections in `tailwind.config.js` to register new tokens:
+Update key sections in `tailwind.config.js` to register new HSL variables and radii offsets:
 
 ```javascript
 module.exports = {
@@ -167,9 +190,25 @@ module.exports = {
 
 ### 4. Components & Layout Overrides (`public/css/app.css`)
 
+#### Focus Ring & Outline Standard
+Add a global directive to normalize focus styling across browsers:
+```css
+:focus-visible {
+    outline: none;
+}
+```
+All buttons, inputs, and custom interactive items will rely on:
+```css
+/* Focus Utility Class standard */
+.focus-ring {
+    outline: none;
+    box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring));
+}
+```
+
 #### Layout & General
-*   **Fonts**: Force `h1`, `h2`, `h3`, `h4`, and `.font-brand` to fall back to `'Inter', sans-serif`. Only IPs, keys, code-like blocks, and logs retain `Geist Mono`.
-*   **Card Panels (`.panel`)**: Remove card shadow transitions and use a flat, border-focused design:
+*   **Fonts**: Force `h1`, `h2`, `h3`, `h4`, and `.font-brand` to fallback to `'Inter', sans-serif`. Only IPs, WireGuard public/private keys, code blocks, config templates, and logs retain `Geist Mono`.
+*   **Card Panels (`.panel`)**: Remove panel shadow transitions and use a flat, border-focused design:
     ```css
     .panel {
         background: hsl(var(--card));
@@ -181,23 +220,31 @@ module.exports = {
     ```
 
 #### Sidebar Navigation
-*   **Subtle Active State**: Active sidebar items will be subtly highlighted with an accent color rather than a heavy left-border stripe.
+*   **No Layout Shifting**: The menu items will keep identical padding and margin sizes across inactive/active states to prevent visual layout shifts:
     ```css
+    .sidebar-item {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        margin: 0.25rem 0.75rem;
+        border-radius: var(--radius);
+        color: var(--color-sidebar-text);
+        opacity: 0.7;
+        transition: background-color, opacity, color 0.2s ease;
+    }
     .sidebar-item.active {
         background: hsl(var(--accent));
         color: hsl(var(--accent-foreground));
-        border-left: none; /* Remove legacy red/blue border */
-        margin-left: 0.75rem;
-        padding-left: 1.25rem;
+        opacity: 1;
     }
     ```
 
 #### Buttons & Inputs
-*   **Buttons**: Remove translates and heavy hover shadows. Ensure border-radius uses `rounded-md` standard.
+*   **Buttons**: Remove scale-ups, translates, and hover shadows. Ensure border-radius uses `rounded-md` standard.
 *   **Inputs**: Apply `border border-input` and default focus ring styling `focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2`.
 
 #### Data Tables
-*   Remove all background zebra striping (`even:bg-slate-50/50` or custom classes).
+*   Remove background zebra striping (`even:bg-slate-50/50` or custom classes).
 *   Add a subtle hover background to rows.
 *   Separate rows using thin borders.
 *   Maintain compact padding density for data tables.
@@ -219,21 +266,35 @@ module.exports = {
     ```
 
 #### Semantic Status Badges
-*   Unify state badges (e.g. active, idle, error, warning) to use semantic status colors defined by our CSS variables (`--success`, `--warning`, `--destructive-status`, `--offline`) in HSL.
-*   Badges will be rendered using solid subtle tones:
+*   Unify state badges (e.g. active, idle, error, warning) to use semantic status colors defined by our CSS variables (`--success`, `--warning`, `--destructive-status`, `--offline`).
+*   Badges will be rendered using modern HSL slash-opacity syntax:
     ```css
     .badge-active {
-        background-color: hsla(var(--success), 0.1);
-        border: 1px solid hsla(var(--success), 0.2);
+        background-color: hsl(var(--success) / 0.1);
+        border: 1px solid hsl(var(--success) / 0.2);
         color: hsl(var(--success));
     }
-    /* Rest follows same pattern for warning, error, idle, offline statuses */
+    .badge-error {
+        background-color: hsl(var(--destructive-status) / 0.1);
+        border: 1px solid hsl(var(--destructive-status) / 0.2);
+        color: hsl(var(--destructive-status));
+    }
+    .badge-warning {
+        background-color: hsl(var(--warning) / 0.1);
+        border: 1px solid hsl(var(--warning) / 0.2);
+        color: hsl(var(--warning));
+    }
+    .badge-muted {
+        background-color: hsl(var(--offline) / 0.1);
+        border: 1px solid hsl(var(--offline) / 0.2);
+        color: hsl(var(--offline));
+    }
     ```
 
 ## Dark-Mode-First Validation
 Because dark mode is the primary theme target for system administrators:
 *   Ensure table borders use high-contrast dark lines (`hsl(var(--border))`).
-*   Verify telemetry charts (Chart.js charts) synchronize with dark background values.
+*   Verify telemetry charts (Chart.js charts) synchronize with dark background values and use standard chart colors (`--chart-1` to `--chart-5`).
 *   Check form inputs and select field popups have legible contrast against `hsl(var(--card))` in dark mode.
 
 ## Verification Plan
