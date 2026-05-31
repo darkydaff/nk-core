@@ -7,7 +7,8 @@ Implement a network visualization on the Intelligence Map page by plotting VPN s
 > [!NOTE]
 > * **Interactive Hover Logic**: Clustered dots (multiple clients at the same location) do not show connection lines on hover to prevent map clutter. Hovering over a row inside the cluster's popup list highlights that individual client's connection line.
 > * **Single Client Hover**: Standalone client dots will draw their connection line directly when hovered.
-> * **Server Click**: Clicking on a server marker opens its information card popup and displays all connections to its clients (online and offline) at once. The connection lines are automatically cleared when the popup card is closed.
+> * **Server Hover**: Hovering over a server marker highlights connection lines to all of its clients (online and offline) at once. The connection lines are styled subtly (low-opacity overlay) and no text tooltips are displayed on hover.
+> * **Server Click**: Clicking on a server marker opens its information card popup and draws the connection lines permanently until closed. Smart-pans the map to center the server.
 > * **Visual Distinction**: Servers are plotted as purple glowing server icon markers to stand out from client dots (pulsing green for online, static gray for offline).
 
 ## Proposed Changes
@@ -65,12 +66,13 @@ Update the Map API to return both client and server data. We'll load all active 
 Update Leaflet map setup to fetch both clients and servers and render them with interactive connections.
 * **Server Markers**:
   * Rendered using custom Leaflet `L.divIcon` with a purple theme containing `<i class="fas fa-server"></i>` and a subtle glow.
-  * Server hover (`mouseover` / `mouseout`) triggers are omitted to prevent blocking the map layout during accidental mouse movements.
-  * Add `click` listener: Opens an information card popup showing the server name, IP/host, city/country location, total & online client count, ping latency, and a link to view server details (`/servers/${server.id}`). Smart-pans the map to center the server.
-  * Add `popupopen` listener: Draws dashed connection lines to all of its clients (online and offline).
-  * Add `popupclose` listener: Clears connection lines.
+  * Hover text labels (Leaflet tooltips) are omitted entirely to keep the view clean and avoid map occlusion.
+  * Add `mouseover` listener: draws dashed connection lines to all of its clients (online and offline) in a highly subtle/low-opacity style.
+  * Add `mouseout` listener: clears connection lines.
+  * Add `click` listener: opens an information card popup showing the server name, IP/host, city/country location, total & online client count, ping latency, and a link to view server details (`/servers/${server.id}`). Smart-pans the map to center the server.
+  * Add `popupopen`/`popupclose` listeners to manage connection line visibility on click.
 * **Client Markers**:
-  * Render standalone dots (1 client) and clustered dots (>1 clients).
+  * Render standalone dots (1 client) and clustered dots (>1 clients). No hover text tooltips are used.
   * Add `mouseover` listener to standalone client dots to immediately highlight their connection line.
   * Update cluster popups to list clients. Add `onmouseover` and `onmouseout` to the row elements so hovering a list row draws the corresponding client's line.
   * Add `click` listener to center the map on the client marker.
