@@ -102,7 +102,12 @@ class MapController
             $serverSql = "
                 SELECT 
                     s.id, s.name, s.host, s.status, s.country, s.country_code, s.city, s.isp, s.org, s.lat, s.lon,
-                    (SELECT COUNT(*) FROM vpn_clients c WHERE c.server_id = s.id AND c.deleted_at IS NULL) as client_count
+                    (SELECT COUNT(*) FROM vpn_clients c WHERE c.server_id = s.id AND c.deleted_at IS NULL) as client_count,
+                    (SELECT COUNT(*) FROM vpn_clients c 
+                     WHERE c.server_id = s.id 
+                       AND c.deleted_at IS NULL 
+                       AND c.status = '" . ClientStatus::ACTIVE->value . "'
+                       AND c.last_handshake > DATE_SUB(NOW(), INTERVAL 10 MINUTE)) as online_client_count
                 FROM vpn_servers s
                 WHERE s.deleted_at IS NULL
                   AND s.lat IS NOT NULL
@@ -124,6 +129,7 @@ class MapController
                     'country'      => $row['country'],
                     'country_code' => $row['country_code'],
                     'client_count' => (int) $row['client_count'],
+                    'online_count' => (int) $row['online_client_count'],
                 ];
             }, $serverRows);
         } catch (Throwable $e) {

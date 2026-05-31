@@ -450,7 +450,7 @@ document.addEventListener('DOMContentLoaded', function () {
             <div class="server-card-title"><i class="fas fa-server"></i> ${srv.name}</div>
             <div class="server-card-row"><i class="fas fa-network-wired"></i>IP: ${srv.host}</div>
             <div class="server-card-row"><i class="fas fa-map-marker-alt"></i>Location: ${srv.city || '—'}, ${srv.country || '—'}</div>
-            <div class="server-card-row"><i class="fas fa-users"></i>Clients: ${srv.client_count}</div>
+            <div class="server-card-row"><i class="fas fa-users"></i>Clients: ${srv.client_count} (${srv.online_count} online)</div>
             <a href="/servers/${srv.id}" class="server-card-link" onclick="event.stopPropagation();"><i class="fas fa-external-link-alt"></i> ${labelText}</a>
         </div>`;
     }
@@ -467,7 +467,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 </div>
                 <div class="popup-item-meta">
                     <span><i class="fas fa-network-wired mr-1 text-content-muted"></i>IP: ${srv.host}</span>
-                    <span><i class="fas fa-users mr-1 text-content-muted"></i>Clients: ${srv.client_count}</span>
+                    <span><i class="fas fa-users mr-1 text-content-muted"></i>Clients: ${srv.client_count} (${srv.online_count} online)</span>
                 </div>
             </div>`).join('');
 
