@@ -315,6 +315,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let cachedClients = [];
     let cachedServers = [];
     let currentOpenServerId = null;
+    let currentOpenClientId = null;
 
     // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -502,7 +503,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Hover: draw connections (no text tooltip)
             marker.on('mouseover', () => {
-                if (currentOpenServerId) return;
+                if (currentOpenServerId || currentOpenClientId) return;
                 clearLines();
                 if (count === 1) {
                     drawServerConnections(group[0].id);
@@ -512,13 +513,14 @@ document.addEventListener('DOMContentLoaded', function () {
             });
 
             marker.on('mouseout', () => {
-                if (currentOpenServerId) return;
+                if (currentOpenServerId || currentOpenClientId) return;
                 clearLines();
             });
 
             // Click: smart panning and draw connections on popupopen
             marker.on('popupopen', () => {
                 clearLines();
+                currentOpenClientId = null; // Leaflet closes other popups automatically
                 if (count === 1) {
                     currentOpenServerId = group[0].id;
                     drawServerConnections(group[0].id);
@@ -549,6 +551,8 @@ document.addEventListener('DOMContentLoaded', function () {
         allClientMarkers = [];
         clearLines();
 
+        const visible = clients.filter(c => currentFilter === 'all' || c.status === currentFilter);
+
         if (currentOpenServerId) {
             if (currentOpenServerId.toString().startsWith('group_')) {
                 const key = currentOpenServerId.substring(6);
@@ -557,9 +561,17 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 drawServerConnections(currentOpenServerId);
             }
+        } else if (currentOpenClientId) {
+            const key = currentOpenClientId.substring(13); // remove 'client_group_'
+            const [gLat, gLon] = key.split(',').map(Number);
+            const matchingClients = visible.filter(c => c.lat.toFixed(4) === gLat.toFixed(4) && c.lon.toFixed(4) === gLon.toFixed(4));
+            matchingClients.forEach(c => {
+                const srv = cachedServers.find(s => s.id === c.server_id);
+                if (srv) {
+                    drawConnection([c.lat, c.lon], [srv.lat, srv.lon], c.status, false);
+                }
+            });
         }
-
-        const visible = clients.filter(c => currentFilter === 'all' || c.status === currentFilter);
 
         // Group by rounded coordinate key
         const groups = {};
@@ -585,7 +597,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
             // Hover: draw connections for all clients in the group
             marker.on('mouseover', () => {
-                if (currentOpenServerId) return;
+                if (currentOpenServerId || currentOpenClientId) return;
                 clearLines();
                 group.forEach(c => {
                     const srv = cachedServers.find(s => s.id === c.server_id);
@@ -595,14 +607,33 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             });
             marker.on('mouseout', () => {
-                if (currentOpenServerId) return;
+                if (currentOpenServerId || currentOpenClientId) return;
                 clearLines();
             });
 
-            // Click: smart panning on client click
+            // Click: smart panning on client click and draw connections on popupopen
             marker.on('click', () => {
                 clearLines();
                 map.panTo([lat, lon]);
+            });
+
+            marker.on('popupopen', () => {
+                clearLines();
+                currentOpenServerId = null; // Leaflet closes other popups automatically
+                currentOpenClientId = `client_group_${lat.toFixed(4)},${lon.toFixed(4)}`;
+                group.forEach(c => {
+                    const srv = cachedServers.find(s => s.id === c.server_id);
+                    if (srv) {
+                        drawConnection([lat, lon], [srv.lat, srv.lon], c.status, false);
+                    }
+                });
+            });
+
+            marker.on('popupclose', () => {
+                if (currentOpenClientId === `client_group_${lat.toFixed(4)},${lon.toFixed(4)}`) {
+                    clearLines();
+                    currentOpenClientId = null;
+                }
             });
 
             marker.addTo(map);
@@ -628,6 +659,18 @@ document.addEventListener('DOMContentLoaded', function () {
     window.clearClientConnection = function() {
         if (currentOpenServerId) return;
         clearLines();
+        if (currentOpenClientId) {
+            const key = currentOpenClientId.substring(13); // remove 'client_group_'
+            const [gLat, gLon] = key.split(',').map(Number);
+            const visible = cachedClients.filter(c => currentFilter === 'all' || c.status === currentFilter);
+            const matchingClients = visible.filter(c => c.lat.toFixed(4) === gLat.toFixed(4) && c.lon.toFixed(4) === gLon.toFixed(4));
+            matchingClients.forEach(c => {
+                const srv = cachedServers.find(s => s.id === c.server_id);
+                if (srv) {
+                    drawConnection([c.lat, c.lon], [srv.lat, srv.lon], c.status, false);
+                }
+            });
+        }
     };
 
     window.highlightServerConnection = function(serverId) {
