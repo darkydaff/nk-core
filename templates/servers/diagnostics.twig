@@ -137,7 +137,7 @@
                             <th class="pb-3">Node Name</th>
                             <th class="pb-3">Current State</th>
                             <th class="pb-3 text-center">Health Grade</th>
-                            <th class="pb-3 text-right">Metrics & Drift</th>
+                            <th class="pb-3 text-right hidden sm:table-cell">Metrics & Drift</th>
                             <th class="pb-3 text-right">Diagnostics</th>
                         </tr>
                     </thead>
@@ -319,7 +319,7 @@
                         </span>
                     </td>
                     <td class="py-4 text-center font-bold ${healthColor}">${node.server_health_score}/100</td>
-                    <td class="py-4 text-right font-mono text-xs text-content-primary">
+                    <td class="py-4 text-right font-mono text-xs text-content-primary hidden sm:table-cell">
                         <div class="text-content-primary">${node.last_db_time_ms ? parseFloat(node.last_db_time_ms).toFixed(1) + 'ms' : '0.0ms'}</div>
                         <div class="text-[10px] text-content-muted">Drift: ${node.baseline_drift_index ? parseFloat(node.baseline_drift_index).toFixed(1) + '%' : '0%'}</div>
                     </td>

@@ -151,20 +151,20 @@
                             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted-foreground">
                                 <i class="fas fa-search text-[10px]"></i>
                             </div>
-                            <input type="text" id="fleetSearch" class="input-field input-with-icon !py-1.5 text-xs font-medium" placeholder="{{ t('dashboard.search_placeholder', [], 'Search servers by name or IP…') }}">
+                            <input type="text" id="fleetSearch" class="input-field input-with-icon !py-1.5 text-xs font-medium" placeholder="{{ t('dashboard.search_placeholder', [], 'Search servers by name or IP…') }}" aria-label="{{ t('dashboard.search_placeholder', [], 'Search servers by name or IP…') }}">
                         </div>
-                        <select id="statusFilter" class="input-field !w-auto !py-1.5 pl-3 pr-8 text-xs font-medium cursor-pointer">
+                        <select id="statusFilter" class="input-field !w-auto !py-1.5 pl-3 pr-8 text-xs font-medium cursor-pointer" aria-label="{{ t('common.status_all', [], 'Filter by Status') }}">
                             <option value="all">{{ t('common.status_all', [], 'All Status') }}</option>
                             <option value="online">{{ t('common.status_online', [], 'Online') }}</option>
                             <option value="offline">{{ t('common.status_offline', [], 'Offline') }}</option>
                             <option value="revoked">{{ t('status.revoked', [], 'Revoked') }}</option>
                         </select>
-                        <select id="trafficFilter" class="input-field !w-auto !py-1.5 pl-3 pr-8 text-xs font-medium cursor-pointer">
+                        <select id="trafficFilter" class="input-field !w-auto !py-1.5 pl-3 pr-8 text-xs font-medium cursor-pointer" aria-label="{{ t('common.traffic_all', [], 'Filter by Traffic') }}">
                             <option value="all">{{ t('common.traffic_all', [], 'All Traffic') }}</option>
                             <option value="medium">{{ t('common.traffic_medium', [], '> 100MB') }}</option>
                             <option value="high">{{ t('common.traffic_high', [], '> 1GB') }}</option>
                         </select>
-                        <select id="sortFilter" class="input-field !w-auto !py-1.5 pl-3 pr-8 text-xs font-medium cursor-pointer">
+                        <select id="sortFilter" class="input-field !w-auto !py-1.5 pl-3 pr-8 text-xs font-medium cursor-pointer" aria-label="{{ t('common.sort_newest', [], 'Sort by') }}">
                             <option value="recent">{{ t('common.sort_newest', [], 'Newest First') }}</option>
                             <option value="traffic">{{ t('common.sort_traffic', [], 'Most Traffic') }}</option>
                             <option value="handshake">{{ t('common.sort_handshake', [], 'Last Activity') }}</option>

@@ -149,7 +149,7 @@ window.NK = {
 
         if (submitBtn) {
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i> Processing...';
+            submitBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i> Processing…';
         }
 
         try {

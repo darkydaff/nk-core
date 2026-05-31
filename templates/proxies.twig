@@ -33,14 +33,15 @@
 					<div class="relative w-full md:w-80 group">
 						<i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-content-muted group-focus-within:text-primary transition-colors text-xs"></i>
 						<input type="text" id="proxySearch" onkeyup="filterProxies()" placeholder="{{ t('common.search')|default('Search by username, server or IP…') }}" 
-							   class="input-field input-with-icon !py-2.5 text-sm bg-surface-base border-surface-border focus:ring-4 focus:ring-primary/10 transition-all">
+							   class="input-field input-with-icon !py-2.5 text-sm bg-surface-base border-surface-border focus:ring-4 focus:ring-primary/10 transition-all"
+							   aria-label="{{ t('common.search')|default('Search by username, server or IP…') }}">
 					</div>
-					<select id="typeFilter" onchange="filterProxies()" class="input-field !w-auto !py-2.5 px-4 text-[11px] font-bold uppercase tracking-wider bg-surface-base border-surface-border">
+					<select id="typeFilter" onchange="filterProxies()" class="input-field !w-auto !py-2.5 px-4 text-[11px] font-bold uppercase tracking-wider bg-surface-base border-surface-border" aria-label="Filter by Proxy Type">
 						<option value="all">All Types</option>
 						<option value="http">HTTP</option>
 						<option value="socks5">SOCKS5</option>
 					</select>
-					<select id="statusFilter" onchange="filterProxies()" class="input-field !w-auto !py-2.5 px-4 text-[11px] font-bold uppercase tracking-wider bg-surface-base border-surface-border">
+					<select id="statusFilter" onchange="filterProxies()" class="input-field !w-auto !py-2.5 px-4 text-[11px] font-bold uppercase tracking-wider bg-surface-base border-surface-border" aria-label="Filter by Proxy Status">
 						<option value="all">All Status</option>
 						<option value="active">Active</option>
 						<option value="paused">Paused</option>
@@ -83,19 +84,19 @@
 							</div>
 						</div>
 						<div class="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
-							<button onclick="checkProxy({{ proxy.id }}, this)" class="w-9 h-9 min-w-[2.25rem] rounded-xl bg-sky-500/5 text-sky-600 dark:text-sky-400 hover:bg-sky-500 hover:text-white transition-all flex items-center justify-center border border-sky-500/10" title="{{ t('proxies.test_connection')|default('Test Connection') }}">
+							<button onclick="checkProxy({{ proxy.id }}, this)" class="w-9 h-9 min-w-[2.25rem] rounded-xl bg-sky-500/5 text-sky-600 dark:text-sky-400 hover:bg-sky-500 hover:text-white transition-all flex items-center justify-center border border-sky-500/10" title="{{ t('proxies.test_connection')|default('Test Connection') }}" aria-label="{{ t('proxies.test_connection')|default('Test Connection') }}">
 								<i class="fas fa-plug-circle-check text-sm"></i>
 							</button>
 							{% if proxy.status == 'active' %}
-								<button onclick="handleAjaxAction('/proxies/{{ proxy.id }}/pause')" class="w-9 h-9 min-w-[2.25rem] rounded-xl bg-amber-500/5 text-amber-600 dark:text-amber-400 hover:bg-amber-500 hover:text-white transition-all flex items-center justify-center border border-amber-500/10" title="{{ t('common.revoke')|default('Revoke') }}">
+								<button onclick="handleAjaxAction('/proxies/{{ proxy.id }}/pause')" class="w-9 h-9 min-w-[2.25rem] rounded-xl bg-amber-500/5 text-amber-600 dark:text-amber-400 hover:bg-amber-500 hover:text-white transition-all flex items-center justify-center border border-amber-500/10" title="{{ t('common.revoke')|default('Revoke') }}" aria-label="{{ t('common.revoke')|default('Revoke') }}">
 									<i class="fas fa-user-slash text-sm"></i>
 								</button>
 							{% else %}
-								<button onclick="handleAjaxAction('/proxies/{{ proxy.id }}/resume')" class="w-9 h-9 min-w-[2.25rem] rounded-xl bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all flex items-center justify-center border border-emerald-500/10" title="{{ t('common.restore')|default('Restore') }}">
+								<button onclick="handleAjaxAction('/proxies/{{ proxy.id }}/resume')" class="w-9 h-9 min-w-[2.25rem] rounded-xl bg-emerald-500/5 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white transition-all flex items-center justify-center border border-emerald-500/10" title="{{ t('common.restore')|default('Restore') }}" aria-label="{{ t('common.restore')|default('Restore') }}">
 									<i class="fas fa-user-check text-sm"></i>
 								</button>
 							{% endif %}
-							<button onclick="handleAjaxAction('/proxies/{{ proxy.id }}/delete', {}, '{{ t('proxies.delete_confirm') }}')" class="w-9 h-9 min-w-[2.25rem] rounded-xl bg-rose-500/5 text-rose-600 dark:text-rose-400 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center border border-rose-500/10" title="{{ t('common.delete')|default('Delete') }}">
+							<button onclick="handleAjaxAction('/proxies/{{ proxy.id }}/delete', {}, '{{ t('proxies.delete_confirm') }}')" class="w-9 h-9 min-w-[2.25rem] rounded-xl bg-rose-500/5 text-rose-600 dark:text-rose-400 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center border border-rose-500/10" title="{{ t('common.delete')|default('Delete') }}" aria-label="{{ t('common.delete')|default('Delete') }}">
 								<i class="fas fa-trash-alt text-sm"></i>
 							</button>
 						</div>
@@ -132,7 +133,7 @@
 									<label class="text-[10px] text-content-secondary uppercase font-bold tracking-wider ml-1 mb-1 block">{{ t('proxies.host')|default('Server IP') }}</label>
 									<div class="flex items-center bg-surface-base rounded-xl border border-surface-border p-0.5 group-hover/field:border-primary/20 transition-colors min-w-0">
 										<span class="px-3 py-1.5 text-xs font-mono truncate flex-grow leading-none min-w-0 text-content-secondary">{{ proxy.server_host }}</span>
-										<button onclick="copyToClipboard('{{ proxy.server_host }}', this)" class="p-1.5 text-content-muted hover:text-primary transition-colors flex-shrink-0">
+										<button onclick="copyToClipboard('{{ proxy.server_host }}', this)" class="p-1.5 text-content-muted hover:text-primary transition-colors flex-shrink-0" aria-label="{{ t('common.copy')|default('Copy') }}">
 											<i class="fas fa-copy text-[10px]"></i>
 										</button>
 									</div>
@@ -141,7 +142,7 @@
 									<label class="text-[10px] text-content-secondary uppercase font-bold tracking-wider ml-1 mb-1 block">{{ t('proxies.port')|default('Port') }}</label>
 									<div class="flex items-center bg-surface-base rounded-xl border border-surface-border p-0.5 group-hover/field:border-primary/20 transition-colors min-w-0">
 										<span class="px-3 py-1.5 text-xs font-mono truncate flex-grow leading-none min-w-0 text-content-secondary">{{ proxy.port }}</span>
-										<button onclick="copyToClipboard('{{ proxy.port }}', this)" class="p-1.5 text-content-muted hover:text-primary transition-colors flex-shrink-0">
+										<button onclick="copyToClipboard('{{ proxy.port }}', this)" class="p-1.5 text-content-muted hover:text-primary transition-colors flex-shrink-0" aria-label="{{ t('common.copy')|default('Copy') }}">
 											<i class="fas fa-copy text-[10px]"></i>
 										</button>
 									</div>
@@ -156,7 +157,8 @@
 									</div>
 									<button onclick="copyToClipboard('{{ full_url }}', this)" 
 											class="w-10 h-10 min-w-[2.5rem] bg-surface-hover hover:bg-primary hover:text-white text-content-muted transition-all rounded-xl flex items-center justify-center flex-shrink-0"
-											title="{{ t('common.copy') }}">
+											title="{{ t('common.copy') }}"
+											aria-label="{{ t('common.copy')|default('Copy') }}">
 										<i class="fas fa-copy"></i>
 									</button>
 								</div>
@@ -314,10 +316,14 @@
 
 	<script>
 		function openCreateModal() {
-			document.getElementById('createModal').classList.remove('hidden');
+			const modal = document.getElementById('createModal');
+			modal.classList.remove('hidden');
+			NK.initFocusTrap(modal);
 		}
 		function closeCreateModal() {
-			document.getElementById('createModal').classList.add('hidden');
+			const modal = document.getElementById('createModal');
+			modal.classList.add('hidden');
+			NK.destroyFocusTrap(modal);
 		}
 
 		function filterProxies() {

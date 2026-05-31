@@ -257,9 +257,9 @@ const Dashboard = {
                         <div class="flex items-center justify-between pt-2 border-t border-default/50">
                             <code class="text-[10px] text-secondary font-mono">${highlightedIp}</code>
                             <div class="flex items-center gap-1">
-                                <button onclick="NK_Dashboard.clientAction(${c.id}, 'sync-stats')" class="p-1.5 btn-action btn-action-sync" title="${this.labels.sync || 'Sync'}"><i class="fas fa-sync-alt text-xs"></i></button>
-                                <button onclick="NK_Dashboard.clientAction(${c.id}, '${isRevoked ? 'restore' : 'revoke'}')" class="p-1.5 btn-action ${isRevoked ? 'btn-action-restore' : 'btn-action-revoke'}" title="${isRevoked ? this.labels.restore || 'Restore' : this.labels.revoke || 'Revoke'}"><i class="fas ${isRevoked ? 'fa-user-check' : 'fa-user-slash'} text-xs"></i></button>
-                                <button onclick="NK_Dashboard.clientAction(${c.id}, 'delete', 'Delete client ${c.name}?')" class="p-1.5 btn-action btn-action-delete" title="${this.labels.delete || 'Delete'}"><i class="fas fa-trash-alt text-xs"></i></button>
+                                <button onclick="NK_Dashboard.clientAction(${c.id}, 'sync-stats')" class="p-1.5 btn-action btn-action-sync" title="${this.labels.sync || 'Sync'}" aria-label="${this.labels.sync || 'Sync'}"><i class="fas fa-sync-alt text-xs"></i></button>
+                                <button onclick="NK_Dashboard.clientAction(${c.id}, '${isRevoked ? 'restore' : 'revoke'}')" class="p-1.5 btn-action ${isRevoked ? 'btn-action-restore' : 'btn-action-revoke'}" title="${isRevoked ? this.labels.restore || 'Restore' : this.labels.revoke || 'Revoke'}" aria-label="${isRevoked ? this.labels.restore || 'Restore' : this.labels.revoke || 'Revoke'}"><i class="fas ${isRevoked ? 'fa-user-check' : 'fa-user-slash'} text-xs"></i></button>
+                                <button onclick="NK_Dashboard.clientAction(${c.id}, 'delete', 'Delete client ${c.name}?')" class="p-1.5 btn-action btn-action-delete" title="${this.labels.delete || 'Delete'}" aria-label="${this.labels.delete || 'Delete'}"><i class="fas fa-trash-alt text-xs"></i></button>
                                 <a href="/clients/${c.id}" class="ml-2 btn-edit">${this.labels.edit || 'Edit'}</a>
                             </div>
                         </div>
@@ -341,13 +341,13 @@ const Dashboard = {
                         if (actionsCell) {
                             const actionsHtml = `
                                 <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button onclick="NK_Dashboard.clientAction(${c.id}, 'sync-stats', 'Sync stats for ${c.name}?')" class="p-1.5 btn-action btn-action-sync" title="${this.labels.sync}">
+                                    <button onclick="NK_Dashboard.clientAction(${c.id}, 'sync-stats', 'Sync stats for ${c.name}?')" class="p-1.5 btn-action btn-action-sync" title="${this.labels.sync}" aria-label="${this.labels.sync}">
                                         <i class="fa-solid fa-rotate text-[11px]"></i>
                                     </button>
-                                    <button onclick="NK_Dashboard.clientAction(${c.id}, '${isRevoked ? 'restore' : 'revoke'}', '${isRevoked ? 'Restore' : 'Revoke'} client ${c.name}?')" class="p-1.5 btn-action ${isRevoked ? 'btn-action-restore' : 'btn-action-revoke'}" title="${isRevoked ? this.labels.restore : this.labels.revoke}">
+                                    <button onclick="NK_Dashboard.clientAction(${c.id}, '${isRevoked ? 'restore' : 'revoke'}', '${isRevoked ? 'Restore' : 'Revoke'} client ${c.name}?')" class="p-1.5 btn-action ${isRevoked ? 'btn-action-restore' : 'btn-action-revoke'}" title="${isRevoked ? this.labels.restore : this.labels.revoke}" aria-label="${isRevoked ? this.labels.restore : this.labels.revoke}">
                                         <i class="fas ${isRevoked ? 'fa-user-check' : 'fa-user-slash'} text-xs"></i>
                                     </button>
-                                    <button onclick="NK_Dashboard.clientAction(${c.id}, 'delete', 'Delete client ${c.name}?')" class="p-1.5 btn-action btn-action-delete" title="${this.labels.delete}">
+                                    <button onclick="NK_Dashboard.clientAction(${c.id}, 'delete', 'Delete client ${c.name}?')" class="p-1.5 btn-action btn-action-delete" title="${this.labels.delete}" aria-label="${this.labels.delete}">
                                         <i class="fas fa-trash-alt text-xs"></i>
                                     </button>
                                     <a href="/clients/${c.id}" class="ml-2 btn-edit">
@@ -516,13 +516,13 @@ const Dashboard = {
                     </td>
                     <td class="px-5 py-4 text-right whitespace-nowrap cell-actions">
                         <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onclick="NK_Dashboard.clientAction(${c.id}, 'sync-stats', 'Sync stats for ${c.name}?')" class="p-1.5 btn-action btn-action-sync" title="${this.labels.sync}">
+                            <button onclick="NK_Dashboard.clientAction(${c.id}, 'sync-stats', 'Sync stats for ${c.name}?')" class="p-1.5 btn-action btn-action-sync" title="${this.labels.sync}" aria-label="${this.labels.sync}">
                                 <i class="fa-solid fa-rotate text-[11px]"></i>
                             </button>
-                            <button onclick="NK_Dashboard.clientAction(${c.id}, '${isRevoked ? 'restore' : 'revoke'}', '${isRevoked ? 'Restore' : 'Revoke'} client ${c.name}?')" class="p-1.5 btn-action ${isRevoked ? 'btn-action-restore' : 'btn-action-revoke'}" title="${isRevoked ? this.labels.restore : this.labels.revoke}">
+                            <button onclick="NK_Dashboard.clientAction(${c.id}, '${isRevoked ? 'restore' : 'revoke'}', '${isRevoked ? 'Restore' : 'Revoke'} client ${c.name}?')" class="p-1.5 btn-action ${isRevoked ? 'btn-action-restore' : 'btn-action-revoke'}" title="${isRevoked ? this.labels.restore : this.labels.revoke}" aria-label="${isRevoked ? this.labels.restore : this.labels.revoke}">
                                 <i class="fas ${isRevoked ? 'fa-user-check' : 'fa-user-slash'} text-xs"></i>
                             </button>
-                            <button onclick="NK_Dashboard.clientAction(${c.id}, 'delete', 'Delete client ${c.name}?')" class="p-1.5 btn-action btn-action-delete" title="${this.labels.delete}">
+                            <button onclick="NK_Dashboard.clientAction(${c.id}, 'delete', 'Delete client ${c.name}?')" class="p-1.5 btn-action btn-action-delete" title="${this.labels.delete}" aria-label="${this.labels.delete}">
                                 <i class="fas fa-trash-alt text-xs"></i>
                             </button>
                             <a href="/clients/${c.id}" class="ml-2 btn-edit">

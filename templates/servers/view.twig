@@ -64,7 +64,7 @@
 									</div>
 								</div>
 							{% endif %}
-							<button onclick="window.serverView.syncStats({{ server.id }})" class="w-6 h-6 rounded-full bg-surface-hover flex items-center justify-center text-muted hover:text-primary transition-all border border-surface-border/50" aria-label="{{ t('common.recheck')|default('Recheck Connectivity') }}">								<i class="fas fa-redo-alt text-[10px]"></i>
+							<button onclick="window.serverView.syncStats({{ server.id }})" class="w-6 h-6 rounded-full bg-surface-hover flex items-center justify-center text-muted hover:text-primary transition-all border border-surface-border/50" aria-label="{{ t('common.recheck')|default('Recheck Connectivity') }}" title="{{ t('common.recheck')|default('Recheck Connectivity') }}">								<i class="fas fa-redo-alt text-[10px]"></i>
 							</button>
 						</div>
 					{% endif %}
@@ -77,15 +77,15 @@
 				</div>
 			</div>
 			<div class="flex gap-2 items-center flex-wrap">
-				<button onclick="window.serverView.syncStats({{ server.id }})" id="syncBtn" class="btn-secondary px-4 py-2 text-sm flex items-center">
+				<button onclick="window.serverView.syncStats({{ server.id }})" id="syncBtn" class="btn-secondary px-4 py-2 text-sm flex items-center" aria-label="{{ t('servers.sync_stats') }}">
 					<i class="fas fa-sync-alt mr-2" id="syncIcon"></i>
 					{{ t('servers.sync_stats') }}
 				</button>
-				<button onclick="window.serverView.openLogsModal({{ server.id }})" id="viewLogsBtn" class="px-4 py-2 rounded-lg bg-surface-hover hover:bg-surface-border text-content-secondary border border-surface-border/50 transition-colors text-sm flex items-center">
+				<button onclick="window.serverView.openLogsModal({{ server.id }})" id="viewLogsBtn" class="px-4 py-2 rounded-lg bg-surface-hover hover:bg-surface-border text-content-secondary border border-surface-border/50 transition-colors text-sm flex items-center" aria-label="{{ t('servers.view_logs')|default('View Logs') }}">
 					<i class="fas fa-terminal mr-2"></i>
 					{{ t('servers.view_logs')|default('View Logs') }}
 				</button>
-				<button onclick="window.serverView.handleDeleteServer({{ server.id }}, '{{ server.name|e('js') }}')" class="px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-colors text-sm">
+				<button onclick="window.serverView.handleDeleteServer({{ server.id }}, '{{ server.name|e('js') }}')" class="px-4 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 transition-colors text-sm" aria-label="{{ t('servers.delete') }}">
 					<i class="fas fa-trash-alt mr-2"></i>
 					{{ t('servers.delete') }}
 				</button>
@@ -268,7 +268,7 @@
 					</div>
 				</div>
 				<p class="text-[10px] text-muted font-mono leading-relaxed mt-2">
-					<i class="fas fa-chevron-right mr-2 text-sky-500/50"></i>{{ t('servers.deploy_step_hint')|default('Tailoring kernel parameters for high-performance VPN throughput...') }}
+					<i class="fas fa-chevron-right mr-2 text-sky-500/50"></i>{{ t('servers.deploy_step_hint')|default('Tailoring kernel parameters for high-performance VPN throughput…') }}
 				</p>
 			</div>
 		{% endif %}
@@ -340,7 +340,7 @@
 								<span id="telemetryModeBadge" class="text-xs font-mono font-bold uppercase {{ server.telemetry_mode == 'push' ? 'text-primary' : 'text-slate-400' }}">
 									{{ server.telemetry_mode == 'push' ? 'Push (Active)' : 'SSH (Legacy)' }}
 								</span>
-								<button onclick="window.serverView.toggleTelemetry({{ server.id }})" id="telemetryToggleBtn" class="px-2.5 py-1 rounded bg-surface-hover hover:bg-primary/20 hover:text-primary transition-all text-[10px] font-bold border border-default/60 flex items-center gap-1">
+								<button onclick="window.serverView.toggleTelemetry({{ server.id }})" id="telemetryToggleBtn" class="px-2.5 py-1 rounded bg-surface-hover hover:bg-primary/20 hover:text-primary transition-all text-[10px] font-bold border border-default/60 flex items-center gap-1" aria-label="{{ server.telemetry_mode == 'push' ? 'Reinstall Agent' : 'Enable Push' }}">
 									<i class="fas fa-magic" id="telemetryToggleIcon"></i>
 									<span id="telemetryToggleText">{{ server.telemetry_mode == 'push' ? 'Reinstall Agent' : 'Enable Push' }}</span>
 								</button>
@@ -354,7 +354,8 @@
 					<form onsubmit="handleAjaxForm(event, '/servers/{{ server.id }}/clients/create')" id="createClientForm">
 						<input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 						<div class="mb-3">
-							<input name="name" required class="input-field" placeholder="{{ t('clients.client_name') }}" id="clientName">
+							<label for="clientName" class="sr-only">{{ t('clients.client_name') }}</label>
+							<input name="name" required class="input-field" placeholder="{{ t('clients.client_name') }}" id="clientName" aria-label="{{ t('clients.client_name') }}">
 						</div>
 						<button type="submit" class="btn-primary w-full py-2.5 text-sm" id="createClientBtn">
 							<i class="fas fa-plus mr-2"></i>
@@ -378,20 +379,20 @@
                                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted-foreground">
                                         <i class="fas fa-search text-[10px]"></i>
                                     </div>
-                                    <input type="text" id="clientSearch" class="input-field input-with-icon !py-1.5 text-xs font-medium" placeholder="{{ t('dashboard.search_placeholder', [], 'Search clients…') }}">
+                                    <input type="text" id="clientSearch" class="input-field input-with-icon !py-1.5 text-xs font-medium" placeholder="{{ t('dashboard.search_placeholder', [], 'Search clients…') }}" aria-label="{{ t('dashboard.search_placeholder', [], 'Search clients…') }}">
                                 </div>
-                                <select id="statusFilter" class="input-field !w-auto !py-1.5 pl-3 pr-8 text-xs font-medium cursor-pointer">
+                                <select id="statusFilter" class="input-field !w-auto !py-1.5 pl-3 pr-8 text-xs font-medium cursor-pointer" aria-label="{{ t('common.status_all', [], 'Filter by Status') }}">
                                     <option value="all">{{ t('common.status_all', [], 'All Status') }}</option>
                                     <option value="online">{{ t('common.status_online', [], 'Online') }}</option>
                                     <option value="offline">{{ t('common.status_offline', [], 'Offline') }}</option>
                                     <option value="revoked">{{ t('status.revoked', [], 'Revoked') }}</option>
                                 </select>
-                                <select id="trafficFilter" class="input-field !w-auto !py-1.5 pl-3 pr-8 text-xs font-medium cursor-pointer">
+                                <select id="trafficFilter" class="input-field !w-auto !py-1.5 pl-3 pr-8 text-xs font-medium cursor-pointer" aria-label="{{ t('common.traffic_all', [], 'Filter by Traffic') }}">
                                     <option value="all">{{ t('common.traffic_all', [], 'All Traffic') }}</option>
                                     <option value="medium">{{ t('common.traffic_medium', [], '> 100MB') }}</option>
                                     <option value="high">{{ t('common.traffic_high', [], '> 1GB') }}</option>
                                 </select>
-                                <select id="sortFilter" class="input-field !w-auto !py-1.5 pl-3 pr-8 text-xs font-medium cursor-pointer">
+                                <select id="sortFilter" class="input-field !w-auto !py-1.5 pl-3 pr-8 text-xs font-medium cursor-pointer" aria-label="{{ t('common.sort_newest', [], 'Sort by') }}">
                                     <option value="recent">{{ t('common.sort_newest', [], 'Newest') }}</option>
                                     <option value="handshake">{{ t('common.sort_handshake', [], 'Last Activity') }}</option>
                                     <option value="traffic">{{ t('common.sort_traffic', [], 'Most Traffic') }}</option>

@@ -5,6 +5,22 @@
     outline: none;
 }
 
+/* Accessible focus ring indicators for keyboard navigation */
+.sidebar-item:focus-visible,
+.server-card:focus-within,
+a:focus-visible,
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+    outline: none !important;
+    box-shadow: 0 0 0 2px hsl(var(--background)), 0 0 0 4px hsl(var(--ring)) !important;
+}
+
+/* Ensure border-radius matching for focused links */
+a:focus-visible {
+    border-radius: var(--radius);
+}
+
 body {
     font-family: 'Inter', sans-serif;
     background-color: var(--color-surface-base);

@@ -1,4 +1,4 @@
-﻿{% extends "layout.twig" %}
+{% extends "layout.twig" %}
 {% block title %}{{ t('clients.title') }}: {{ client.name }}{% endblock %}
 
 {% block breadcrumbs %}
@@ -147,9 +147,9 @@
             
             <form onsubmit="handleAjaxForm(event, '/clients/{{ client.id }}/update')" class="mb-6">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <label class="block text-xs font-medium text-muted uppercase tracking-wide mb-2">{{ t('clients.name') }}</label>
+                <label for="editClientName" class="block text-xs font-medium text-muted uppercase tracking-wide mb-2">{{ t('clients.name') }}</label>
                 <div class="flex gap-2">
-                    <input name="name" value="{{ client.name }}" class="input-field flex-grow px-4 py-2.5 text-sm" required>
+                    <input id="editClientName" name="name" value="{{ client.name }}" class="input-field flex-grow px-4 py-2.5 text-sm" required autocomplete="off" spellcheck="false">
                     <button type="submit" class="btn-primary px-4 py-2.5 text-sm">
                         <i class="fas fa-save mr-2"></i>{{ t('form.save') }}
                     </button>

@@ -1,4 +1,4 @@
-﻿{% extends "layout.twig" %}
+{% extends "layout.twig" %}
 {% block title %}{{ t('servers.add') }}{% endblock %}
 
 {% block breadcrumbs %}
@@ -39,7 +39,7 @@
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
                         <i class="fas fa-tag"></i>
                     </div>
-                     <input name="name" required class="input-field w-full !pl-11 pr-4 py-2.5" placeholder="{{ t('servers.placeholder_name') }}" autocomplete="off">
+                     <input id="name" name="name" required class="input-field w-full !pl-11 pr-4 py-2.5" placeholder="{{ t('servers.placeholder_name') }}" autocomplete="off" spellcheck="false">
                 </div>
             </div>
 
@@ -49,7 +49,7 @@
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
                         <i class="fas fa-network-wired text-xs"></i>
                     </div>
-                     <input name="host" required class="input-field w-full !pl-11 pr-4 py-2.5" placeholder="{{ t('servers.placeholder_ip') }}" autocomplete="off">
+                     <input id="host" name="host" required class="input-field w-full !pl-11 pr-4 py-2.5" placeholder="{{ t('servers.placeholder_ip') }}" autocomplete="off" spellcheck="false">
                 </div>
             </div>
             
@@ -59,7 +59,7 @@
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
                         <i class="fas fa-plug text-xs"></i>
                     </div>
-                    <input name="port" type="number" required class="input-field w-full !pl-11 pr-4 py-2.5" value="22">
+                    <input id="port" name="port" type="number" required class="input-field w-full !pl-11 pr-4 py-2.5" value="22">
                 </div>
             </div>
 
@@ -69,7 +69,7 @@
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
                         <i class="fas fa-door-open text-xs"></i>
                     </div>
-                    <input name="vpn_port" type="number" required class="input-field w-full !pl-11 pr-4 py-2.5" value="{{ random_port }}">
+                    <input id="vpn_port" name="vpn_port" type="number" required class="input-field w-full !pl-11 pr-4 py-2.5" value="{{ random_port }}">
                 </div>
             </div>
 
@@ -79,7 +79,7 @@
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
                         <i class="fas fa-user-shield"></i>
                     </div>
-                    <input name="username" value="root" class="input-field w-full !pl-11 pr-4 py-2.5 font-mono">
+                    <input id="username" name="username" value="root" class="input-field w-full !pl-11 pr-4 py-2.5 font-mono" autocomplete="username" spellcheck="false">
                 </div>
             </div>
 
@@ -89,7 +89,7 @@
                     <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
                         <i class="fas fa-key"></i>
                     </div>
-                    <input name="password" type="password" required class="input-field w-full !pl-11 pr-4 py-2.5 font-mono">
+                    <input id="password" name="password" type="password" required class="input-field w-full !pl-11 pr-4 py-2.5 font-mono" autocomplete="new-password">
                 </div>
             </div>
         </div>

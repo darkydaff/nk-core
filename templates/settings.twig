@@ -1,4 +1,4 @@
-﻿{% extends "layout.twig" %}
+{% extends "layout.twig" %}
 
 {% block title %}{{ t('menu.settings') }} - {{ app_name }}{% endblock %}
 
@@ -60,16 +60,16 @@
                     <div class="space-y-4">
                         <div>
                             <label for="current_password" class="block text-sm font-medium mb-2">{{ t('settings.current_password') }}</label>
-                            <input type="password" id="current_password" name="current_password" required class="input-field w-full px-4 py-2.5 font-mono">
+                            <input type="password" id="current_password" name="current_password" required class="input-field w-full px-4 py-2.5 font-mono" autocomplete="current-password">
                         </div>
                         <div>
                             <label for="new_password" class="block text-sm font-medium mb-2">{{ t('settings.new_password') }}</label>
-                            <input type="password" id="new_password" name="new_password" required minlength="6" class="input-field w-full px-4 py-2.5 font-mono">
+                            <input type="password" id="new_password" name="new_password" required minlength="6" class="input-field w-full px-4 py-2.5 font-mono" autocomplete="new-password">
                             <p class="mt-1 text-xs text-muted">{{ t('settings.min_6_chars') }}</p>
                         </div>
                         <div>
                             <label for="confirm_password" class="block text-sm font-medium mb-2">{{ t('settings.confirm_password') }}</label>
-                            <input type="password" id="confirm_password" name="confirm_password" required minlength="6" class="input-field w-full px-4 py-2.5 font-mono">
+                            <input type="password" id="confirm_password" name="confirm_password" required minlength="6" class="input-field w-full px-4 py-2.5 font-mono" autocomplete="new-password">
                         </div>
                         <div class="pt-2">
                             <button type="submit" class="btn-primary px-5 py-2.5 text-sm">
@@ -119,12 +119,12 @@
                             <form onsubmit="handleAjaxForm(event, '/settings/create-user')" class="space-y-4">
                                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                 <div>
-                                    <label class="block text-[11px] font-medium text-secondary mb-1.5">{{ t('common.username') }}</label>
-                                    <input type="text" id="new_username" name="new_username" required class="input-field w-full px-3 py-2 text-sm">
+                                    <label for="new_username" class="block text-[11px] font-medium text-secondary mb-1.5">{{ t('common.username') }}</label>
+                                    <input type="text" id="new_username" name="new_username" required class="input-field w-full px-3 py-2 text-sm" autocomplete="username" spellcheck="false">
                                 </div>
                                 <div>
                                     <label for="add_user_password" class="block text-[11px] font-medium text-secondary mb-1.5">{{ t('common.new_password') }}</label>
-                                    <input type="password" id="add_user_password" name="new_password" required class="input-field w-full px-3 py-2 text-sm">
+                                    <input type="password" id="add_user_password" name="new_password" required class="input-field w-full px-3 py-2 text-sm" autocomplete="new-password">
                                 </div>
                                 <div class="pt-2">
                                     <button type="submit" class="w-full btn-primary py-2 text-xs font-bold">
@@ -180,16 +180,16 @@
                     <form onsubmit="handleAjaxForm(event, '/settings/save-backup-schedule')" class="grid grid-cols-1 md:grid-cols-3 gap-6 bg-surface/20 p-4 rounded-xl border border-default/50">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <div class="flex items-center space-x-3">
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" name="backup_auto_enabled" value="true" {% if backup_auto_enabled == 'true' %}checked{% endif %} class="sr-only peer">
-                                <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent"></div>
+                            <label class="relative inline-flex items-center cursor-pointer gap-3">
+                                <input type="checkbox" name="backup_auto_enabled" value="true" {% if backup_auto_enabled == 'true' %}checked{% endif %} class="sr-only peer" aria-label="{{ t('settings.enable_auto_backup') }}">
+                                <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent flex-shrink-0"></div>
+                                <span class="text-xs font-medium">{{ t('settings.enable_auto_backup') }}</span>
                             </label>
-                            <span class="text-xs font-medium">{{ t('settings.enable_auto_backup') }}</span>
                         </div>
                         
                         <div>
                             <label class="block text-[10px] font-bold text-muted uppercase tracking-widest mb-1.5">{{ t('settings.backup_time') }}</label>
-                            <input type="time" name="backup_schedule_time" value="{{ backup_schedule_time }}" required class="input-field w-full px-3 py-2 text-sm font-mono">
+                            <input type="time" name="backup_schedule_time" value="{{ backup_schedule_time }}" required class="input-field w-full px-3 py-2 text-sm font-mono" autocomplete="off">
                         </div>
 
                         <div class="flex items-end">
@@ -238,7 +238,7 @@
                                 <span class="text-xs" id="file-name-label">{{ t('common.select_file') }}</span>
                             </div>
                         </div>
-                        <input type="password" name="confirm_password" required placeholder="{{ t('settings.admin_password') }}" class="input-field px-4 py-2 text-xs font-mono w-full md:w-48">
+                        <input type="password" name="confirm_password" required placeholder="{{ t('settings.admin_password') }}" class="input-field px-4 py-2 text-xs font-mono w-full md:w-48" autocomplete="current-password">
                         <button type="submit" class="btn-primary px-5 py-2.5 text-xs font-bold shadow-lg shadow-accent/10 whitespace-nowrap">
                             <i class="fas fa-upload mr-2"></i>{{ t('settings.upload_and_start') }}
                         </button>
@@ -359,11 +359,11 @@
                             <h3 class="text-xs font-bold text-muted uppercase tracking-widest mb-4">{{ t('settings.bot_settings') }}</h3>
                             <div>
                                 <label for="tg_bot_token" class="block text-sm font-medium mb-2">{{ t('settings.bot_token') }}</label>
-                                <input type="password" id="tg_bot_token" name="tg_bot_token" value="{{ tg_config.bot_token }}" placeholder="123456:ABC-DEF…" class="input-field w-full px-4 py-2.5 font-mono">
+                                <input type="password" id="tg_bot_token" name="tg_bot_token" value="{{ tg_config.bot_token }}" placeholder="123456:ABC-DEF…" class="input-field w-full px-4 py-2.5 font-mono" autocomplete="off" spellcheck="false">
                             </div>
                             <div>
                                 <label for="tg_chat_id" class="block text-sm font-medium mb-2">{{ t('settings.chat_id') }}</label>
-                                <input type="text" id="tg_chat_id" name="tg_chat_id" value="{{ tg_config.chat_id }}" placeholder="-100123456789" class="input-field w-full px-4 py-2.5 font-mono">
+                                <input type="text" id="tg_chat_id" name="tg_chat_id" value="{{ tg_config.chat_id }}" placeholder="-100123456789" class="input-field w-full px-4 py-2.5 font-mono" autocomplete="off" spellcheck="false">
                             </div>
                         </div>
 
@@ -371,28 +371,28 @@
                             <div class="flex items-center justify-between mb-4">
                                 <h3 class="text-xs font-bold text-muted uppercase tracking-widest">{{ t('settings.proxy_settings') }}</h3>
                                 <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" name="tg_proxy_enabled" value="true" {% if tg_config.proxy_enabled == 'true' %}checked{% endif %} class="sr-only peer">
+                                    <input type="checkbox" name="tg_proxy_enabled" value="true" {% if tg_config.proxy_enabled == 'true' %}checked{% endif %} class="sr-only peer" aria-label="Enable Telegram Proxy">
                                     <div class="w-9 h-5 toggle-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
                                 </label>
                             </div>
                             <div>
                                 <label for="tg_proxy_url" class="block text-sm font-medium mb-2">{{ t('settings.proxy_url')|default('Proxy Connection String') }}</label>
-                                <input type="text" id="tg_proxy_url" name="tg_proxy_url" placeholder="http://user:pass@host:port" class="input-field w-full px-4 py-2.5 font-mono text-xs">
+                                <input type="text" id="tg_proxy_url" name="tg_proxy_url" placeholder="http://user:pass@host:port" class="input-field w-full px-4 py-2.5 font-mono text-xs" autocomplete="off" spellcheck="false">
                                 <p class="mt-1 text-[10px] text-muted">Paste a full URL or fill separate details below (HTTP only).</p>
                             </div>
                             <div class="grid grid-cols-3 gap-3">
                                 <div class="col-span-2">
                                     <label for="tg_proxy_host" class="block text-sm font-medium mb-2">{{ t('settings.proxy_host') }}</label>
-                                    <input type="text" id="tg_proxy_host" name="tg_proxy_host" value="{{ tg_config.proxy_host }}" placeholder="1.2.3.4" class="input-field w-full px-4 py-2.5 font-mono text-xs">
+                                    <input type="text" id="tg_proxy_host" name="tg_proxy_host" value="{{ tg_config.proxy_host }}" placeholder="1.2.3.4" class="input-field w-full px-4 py-2.5 font-mono text-xs" autocomplete="off" spellcheck="false">
                                 </div>
                                 <div>
                                     <label for="tg_proxy_port" class="block text-sm font-medium mb-2">{{ t('settings.proxy_port') }}</label>
-                                    <input type="text" id="tg_proxy_port" name="tg_proxy_port" value="{{ tg_config.proxy_port }}" placeholder="1080" class="input-field w-full px-4 py-2.5 font-mono text-xs">
+                                    <input type="text" id="tg_proxy_port" name="tg_proxy_port" value="{{ tg_config.proxy_port }}" placeholder="1080" class="input-field w-full px-4 py-2.5 font-mono text-xs" autocomplete="off" spellcheck="false">
                                 </div>
                             </div>
                             <div>
                                 <label for="tg_proxy_auth" class="block text-sm font-medium mb-2">{{ t('settings.proxy_auth') }}</label>
-                                <input type="text" id="tg_proxy_auth" name="tg_proxy_auth" value="{{ tg_config.proxy_auth }}" placeholder="user:pass" class="input-field w-full px-4 py-2.5 font-mono text-xs">
+                                <input type="text" id="tg_proxy_auth" name="tg_proxy_auth" value="{{ tg_config.proxy_auth }}" placeholder="user:pass" class="input-field w-full px-4 py-2.5 font-mono text-xs" autocomplete="off" spellcheck="false">
                             </div>
                         </div>
                     </div>
@@ -420,7 +420,7 @@
                             <h3 class="text-xs font-bold text-muted uppercase tracking-widest mb-4">{{ t('settings.beszel_hub') }}</h3>
                             <div>
                                 <label for="beszel_url" class="block text-sm font-medium mb-2">{{ t('settings.beszel_url')|default('Beszel URL') }}</label>
-                                <input type="text" id="beszel_url" name="beszel_url" value="{{ beszel_config.url }}" placeholder="http://bz.example.com:8090" class="input-field w-full px-4 py-2.5 font-mono">
+                                <input type="text" id="beszel_url" name="beszel_url" value="{{ beszel_config.url }}" placeholder="http://bz.example.com:8090" class="input-field w-full px-4 py-2.5 font-mono" autocomplete="url" spellcheck="false">
                                 <p class="mt-1 text-xs text-secondary">{{ t('settings.beszel_url_desc') }}</p>
                             </div>
                         </div>
@@ -429,11 +429,11 @@
                             <h3 class="text-xs font-bold text-muted uppercase tracking-widest mb-4">{{ t('common.credentials') }}</h3>
                             <div>
                                 <label for="beszel_email" class="block text-sm font-medium mb-2">{{ t('common.email_address') }}</label>
-                                <input type="email" id="beszel_email" name="beszel_email" value="{{ beszel_config.email }}" placeholder="admin@example.com" class="input-field w-full px-4 py-2.5 font-mono">
+                                <input type="email" id="beszel_email" name="beszel_email" value="{{ beszel_config.email }}" placeholder="admin@example.com" class="input-field w-full px-4 py-2.5 font-mono" autocomplete="email" spellcheck="false">
                             </div>
                             <div>
                                 <label for="beszel_password" class="block text-sm font-medium mb-2">{{ t('common.password') }}</label>
-                                <input type="password" id="beszel_password" name="beszel_password" value="{{ beszel_config.password }}" placeholder="••••••••" class="input-field w-full px-4 py-2.5 font-mono">
+                                <input type="password" id="beszel_password" name="beszel_password" value="{{ beszel_config.password }}" placeholder="••••••••" class="input-field w-full px-4 py-2.5 font-mono" autocomplete="current-password">
                             </div>
                         </div>
                     </div>
@@ -473,7 +473,7 @@
             
             <div class="mb-6">
                 <input type="password" name="confirm_password" required placeholder="{{ t('settings.enter_admin_password') }}" 
-                    class="input-field w-full px-4 py-3 text-primary placeholder-slate-600 focus:border-amber-500 transition-all">
+                    class="input-field w-full px-4 py-3 text-primary placeholder-slate-600 focus:border-amber-500 transition-all" autocomplete="current-password">
             </div>
              <div class="flex gap-3">
                 <button type="button" onclick="NK_Settings.closeRestoreModal()" class="flex-1 px-4 py-3 rounded-lg bg-panel text-primary hover:bg-surface-hover transition-colors text-sm font-medium">
