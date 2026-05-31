@@ -44,6 +44,7 @@ class MapController
                 c.bytes_sent,
                 c.bytes_received,
                 c.last_handshake,
+                c.server_id,
                 s.name AS server_name,
                 CASE
                     WHEN c.status = '" . ClientStatus::DISABLED->value . "' THEN 'revoked'
@@ -88,12 +89,46 @@ class MapController
                 'country'      => $row['ip_country'],
                 'country_code' => $row['ip_country_code'],
                 'isp'          => $row['ip_isp'],
+                'server_id'    => (int) $row['server_id'],
                 'server_name'  => $row['server_name'],
                 'traffic_mb'   => $trafficMb,
                 'last_seen'    => $lastSeen,
             ];
         }, $rows);
 
-        echo json_encode(['success' => true, 'clients' => $clients]);
+        // Fetch all active servers with resolved coordinates
+        $serverSql = "
+            SELECT 
+                s.id, s.name, s.host, s.status, s.country, s.country_code, s.city, s.isp, s.org, s.lat, s.lon,
+                (SELECT COUNT(*) FROM vpn_clients c WHERE c.server_id = s.id AND c.deleted_at IS NULL) as client_count
+            FROM vpn_servers s
+            WHERE s.deleted_at IS NULL
+              AND s.lat IS NOT NULL
+              AND s.lon IS NOT NULL
+        ";
+        $serverStmt = $pdo->prepare($serverSql);
+        $serverStmt->execute();
+        $serverRows = $serverStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $servers = array_map(function ($row) {
+            return [
+                'id'           => (int) $row['id'],
+                'name'         => $row['name'],
+                'host'         => $row['host'],
+                'status'       => $row['status'],
+                'lat'          => (float) $row['lat'],
+                'lon'          => (float) $row['lon'],
+                'city'         => $row['city'],
+                'country'      => $row['country'],
+                'country_code' => $row['country_code'],
+                'client_count' => (int) $row['client_count'],
+            ];
+        }, $serverRows);
+
+        echo json_encode([
+            'success' => true,
+            'clients' => $clients,
+            'servers' => $servers
+        ]);
     }
 }
