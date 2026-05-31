@@ -583,22 +583,21 @@ document.addEventListener('DOMContentLoaded', function () {
             const popup  = count === 1 ? buildSinglePopup(group[0]) : buildMultiPopup(group);
             marker.bindPopup(popup, { maxWidth: 300 });
 
-            // Hover: single client dot directly highlights connection
-            if (count === 1) {
-                const c = group[0];
-                marker.on('mouseover', () => {
-                    if (currentOpenServerId) return;
-                    clearLines();
+            // Hover: draw connections for all clients in the group
+            marker.on('mouseover', () => {
+                if (currentOpenServerId) return;
+                clearLines();
+                group.forEach(c => {
                     const srv = cachedServers.find(s => s.id === c.server_id);
                     if (srv) {
-                        drawConnection([c.lat, c.lon], [srv.lat, srv.lon], c.status, false);
+                        drawConnection([lat, lon], [srv.lat, srv.lon], c.status, false);
                     }
                 });
-                marker.on('mouseout', () => {
-                    if (currentOpenServerId) return;
-                    clearLines();
-                });
-            }
+            });
+            marker.on('mouseout', () => {
+                if (currentOpenServerId) return;
+                clearLines();
+            });
 
             // Click: smart panning on client click
             marker.on('click', () => {
