@@ -137,6 +137,97 @@
     }
     .map-btn:hover { border-color: var(--color-primary); color: var(--color-content-primary); background: var(--color-surface-base); }
     .map-btn.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+
+    /* Server Icon Marker */
+    .server-icon-wrapper {
+        position: relative;
+        width: 32px;
+        height: 32px;
+        background: rgba(147, 51, 234, 0.2);
+        border: 2px solid #a855f7;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #c084fc;
+        box-shadow: 0 0 15px rgba(168, 85, 247, 0.5);
+        animation: server-glow 3s ease-in-out infinite alternate;
+        cursor: pointer;
+    }
+    @keyframes server-glow {
+        0% { box-shadow: 0 0 5px rgba(168, 85, 247, 0.3); border-color: #a855f7; }
+        100% { box-shadow: 0 0 20px rgba(168, 85, 247, 0.8); border-color: #c084fc; }
+    }
+
+    /* Offline client dot */
+    .offline-dot {
+        width: 10px; height: 10px; border-radius: 50%;
+        background: #64748b;
+        border: 2px solid #475569;
+        box-shadow: 0 0 4px rgba(100, 116, 139, 0.4);
+        position: absolute; top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+    }
+
+    /* Animated flowing active line */
+    .animated-flow-line {
+        stroke-dasharray: 8, 8;
+        animation: flow-anim 1.5s linear infinite;
+        stroke-linecap: round;
+    }
+    @keyframes flow-anim {
+        to {
+            stroke-dashoffset: -32;
+        }
+    }
+
+    /* Static inactive line */
+    .static-inactive-line {
+        stroke-dasharray: 6, 6;
+        stroke-linecap: round;
+    }
+
+    /* Server Info Card inside popup */
+    .server-info-card {
+        padding: 12px 14px;
+    }
+    .server-card-title {
+        font-size: 13px;
+        font-weight: 700;
+        color: #c084fc;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 8px;
+    }
+    .server-card-row {
+        font-size: 11px;
+        color: var(--color-content-secondary);
+        display: flex;
+        gap: 8px;
+        margin-bottom: 4px;
+        align-items: center;
+    }
+    .server-card-row i {
+        width: 14px;
+        text-align: center;
+        color: var(--color-content-muted);
+    }
+    .server-card-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 10px;
+        font-size: 10px;
+        color: #a855f7;
+        text-decoration: none;
+        font-weight: 700;
+        text-transform: uppercase;
+        tracking-wider;
+    }
+    .server-card-link:hover {
+        color: #c084fc;
+    }
 </style>
 {% endblock %}
 
@@ -217,9 +308,13 @@ document.addEventListener('DOMContentLoaded', function () {
     updateMapTheme();
     window.addEventListener('themeChanged', updateMapTheme);
 
-    let allMarkers = [];
+    let allClientMarkers = [];
+    let allServerMarkers = [];
+    let activeLines = [];
     let currentFilter = 'all';
     let cachedClients = [];
+    let cachedServers = [];
+    let currentOpenServerId = null;
 
     // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -235,7 +330,53 @@ document.addEventListener('DOMContentLoaded', function () {
         return `<span class="popup-status-badge ${cls}">${label}</span>`;
     }
 
+    function clearLines() {
+        activeLines.forEach(line => map.removeLayer(line));
+        activeLines = [];
+        // Map overlay text is no longer used, keeping clean
+    }
+
+    function drawConnection(clientCoords, serverCoords, status, isServerHover = false) {
+        const isOnline = status === 'online';
+        
+        let weight = isOnline ? 3 : 1.5;
+        let opacity = isOnline ? 0.8 : 0.4;
+        
+        if (isServerHover) {
+            weight = isOnline ? 2.0 : 1.0;
+            opacity = isOnline ? 0.35 : 0.15;
+        }
+        
+        const line = L.polyline([clientCoords, serverCoords], {
+            color: isOnline ? '#a855f7' : '#64748b',
+            weight: weight,
+            opacity: opacity,
+            className: isOnline ? 'animated-flow-line' : 'static-inactive-line'
+        }).addTo(map);
+        
+        activeLines.push(line);
+    }
+
+    function drawServerConnections(serverId) {
+        const srv = cachedServers.find(s => s.id === serverId);
+        if (!srv) return;
+        const connectedClients = cachedClients.filter(c => c.server_id === serverId && (currentFilter === 'all' || c.status === currentFilter));
+        connectedClients.forEach(c => {
+            drawConnection([c.lat, c.lon], [srv.lat, srv.lon], c.status, true);
+        });
+    }
+
     // ── Marker factories ─────────────────────────────────────────────────
+
+    function makeServerIcon() {
+        return L.divIcon({
+            className: '',
+            html: `<div class="server-icon-wrapper">
+                       <i class="fas fa-server"></i>
+                   </div>`,
+            iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -20]
+        });
+    }
 
     function makeIcon(hasOnline, count) {
         const badge = count > 1 ? `<div class="cluster-badge">${count}</div>` : '';
@@ -250,16 +391,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -18]
             });
         } else {
-            // offline — use a circle SVG so we can badge it
             return L.divIcon({
                 className: '',
-                html: `<div style="position:relative;width:16px;height:16px;">
-                           <svg width="16" height="16" viewBox="0 0 16 16">
-                               <circle cx="8" cy="8" r="6" fill="#475569" fill-opacity="0.8" stroke="#64748b" stroke-width="1.5"/>
-                           </svg>
+                html: `<div style="position:relative;width:28px;height:28px;">
+                           <div class="offline-dot"></div>
                            ${badge}
                        </div>`,
-                iconSize: [16, 16], iconAnchor: [8, 8], popupAnchor: [0, -12]
+                iconSize: [28, 28], iconAnchor: [14, 14], popupAnchor: [0, -18]
             });
         }
     }
@@ -283,7 +421,9 @@ document.addEventListener('DOMContentLoaded', function () {
         const onlineCount = group.filter(c => c.status === 'online').length;
 
         const items = group.map(c => `
-            <div class="popup-list-item" onclick="window.location='/clients/${c.id}'">
+            <div class="popup-client-row popup-list-item" onclick="window.location='/clients/${c.id}'"
+                 onmouseover="highlightClientConnection(${c.lat}, ${c.lon}, ${c.server_id}, '${c.name}', '${c.status}')"
+                 onmouseout="clearClientConnection()">
                 <div class="popup-item-name">
                     ${c.name}
                     ${statusBadge(c.status)}
@@ -302,16 +442,71 @@ document.addEventListener('DOMContentLoaded', function () {
                 <div class="popup-list">${items}</div>`;
     }
 
+    function buildServerPopup(srv) {
+        const labelText = '{{ t("server.view", [], "View Server") }}';
+        return `<div class="server-info-card">
+            <div class="server-card-title"><i class="fas fa-server"></i> ${srv.name}</div>
+            <div class="server-card-row"><i class="fas fa-network-wired"></i>IP: ${srv.host}</div>
+            <div class="server-card-row"><i class="fas fa-map-marker-alt"></i>Location: ${srv.city || '—'}, ${srv.country || '—'}</div>
+            <div class="server-card-row"><i class="fas fa-users"></i>Clients: ${srv.client_count}</div>
+            <a href="/servers/${srv.id}" class="server-card-link" onclick="event.stopPropagation();"><i class="fas fa-external-link-alt"></i> ${labelText}</a>
+        </div>`;
+    }
+
     // ── Render ───────────────────────────────────────────────────────────
 
-    function renderMarkers(clients) {
-        allMarkers.forEach(m => map.removeLayer(m));
-        allMarkers = [];
+    function renderServerMarkers() {
+        allServerMarkers.forEach(m => map.removeLayer(m));
+        allServerMarkers = [];
 
-        // Filter first
+        cachedServers.forEach(srv => {
+            const marker = L.marker([srv.lat, srv.lon], { icon: makeServerIcon() });
+            marker.bindPopup(buildServerPopup(srv), { maxWidth: 300 });
+
+            // Hover: draw connections (no text tooltip)
+            marker.on('mouseover', () => {
+                if (currentOpenServerId) return;
+                clearLines();
+                drawServerConnections(srv.id);
+            });
+
+            marker.on('mouseout', () => {
+                if (currentOpenServerId) return;
+                clearLines();
+            });
+
+            // Click: smart panning and draw connections on popupopen
+            marker.on('popupopen', () => {
+                clearLines();
+                currentOpenServerId = srv.id;
+                drawServerConnections(srv.id);
+                map.panTo([srv.lat, srv.lon]);
+            });
+
+            marker.on('popupclose', () => {
+                if (currentOpenServerId === srv.id) {
+                    clearLines();
+                    currentOpenServerId = null;
+                }
+            });
+
+            marker.addTo(map);
+            allServerMarkers.push(marker);
+        });
+    }
+
+    function renderClientMarkers(clients) {
+        allClientMarkers.forEach(m => map.removeLayer(m));
+        allClientMarkers = [];
+        clearLines();
+
+        if (currentOpenServerId) {
+            drawServerConnections(currentOpenServerId);
+        }
+
         const visible = clients.filter(c => currentFilter === 'all' || c.status === currentFilter);
 
-        // Group by rounded coordinate key (same IP → same coords)
+        // Group by rounded coordinate key
         const groups = {};
         visible.forEach(c => {
             const key = `${c.lat.toFixed(4)},${c.lon.toFixed(4)}`;
@@ -327,11 +522,37 @@ document.addEventListener('DOMContentLoaded', function () {
 
             group.forEach(c => { c.status === 'online' ? online++ : offline++; });
 
-            const marker = L.marker([lat, lon], { icon: makeIcon(hasOnline, group.length) });
-            const popup  = group.length === 1 ? buildSinglePopup(group[0]) : buildMultiPopup(group);
+            const count = group.length;
+
+            const marker = L.marker([lat, lon], { icon: makeIcon(hasOnline, count) });
+            const popup  = count === 1 ? buildSinglePopup(group[0]) : buildMultiPopup(group);
             marker.bindPopup(popup, { maxWidth: 300 });
+
+            // Hover: single client dot directly highlights connection
+            if (count === 1) {
+                const c = group[0];
+                marker.on('mouseover', () => {
+                    if (currentOpenServerId) return;
+                    clearLines();
+                    const srv = cachedServers.find(s => s.id === c.server_id);
+                    if (srv) {
+                        drawConnection([c.lat, c.lon], [srv.lat, srv.lon], c.status, false);
+                    }
+                });
+                marker.on('mouseout', () => {
+                    if (currentOpenServerId) return;
+                    clearLines();
+                });
+            }
+
+            // Click: smart panning on client click
+            marker.on('click', () => {
+                clearLines();
+                map.panTo([lat, lon]);
+            });
+
             marker.addTo(map);
-            allMarkers.push(marker);
+            allClientMarkers.push(marker);
         });
 
         document.getElementById('countOnline').textContent  = online;
@@ -339,13 +560,29 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('countTotal').textContent   = online + offline;
     }
 
+    // ── Global handles ───────────────────────────────────────────────────
+
+    window.highlightClientConnection = function(lat, lon, serverId, name, status) {
+        if (currentOpenServerId) return;
+        clearLines();
+        const srv = cachedServers.find(s => s.id === serverId);
+        if (srv) {
+            drawConnection([lat, lon], [srv.lat, srv.lon], status, false);
+        }
+    };
+
+    window.clearClientConnection = function() {
+        if (currentOpenServerId) return;
+        clearLines();
+    };
+
     // ── Filter toggle ────────────────────────────────────────────────────
 
     window.setFilter = function (filter) {
         currentFilter = filter;
         ['btnAll','btnOnline','btnOffline'].forEach(id => document.getElementById(id).classList.remove('active'));
         document.getElementById({ all:'btnAll', online:'btnOnline', offline:'btnOffline' }[filter]).classList.add('active');
-        renderMarkers(cachedClients);
+        renderClientMarkers(cachedClients);
     };
 
     // ── Load data ────────────────────────────────────────────────────────
@@ -355,7 +592,9 @@ document.addEventListener('DOMContentLoaded', function () {
         .then(data => {
             if (!data.success) return;
             cachedClients = data.clients;
-            renderMarkers(cachedClients);
+            cachedServers = data.servers || [];
+            renderServerMarkers();
+            renderClientMarkers(cachedClients);
         })
         .catch(err => console.error('Map data error:', err));
 });
