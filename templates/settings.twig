@@ -182,7 +182,7 @@
                         <div class="flex items-center space-x-3">
                             <label class="relative inline-flex items-center cursor-pointer gap-3">
                                 <input type="checkbox" name="backup_auto_enabled" value="true" {% if backup_auto_enabled == 'true' %}checked{% endif %} class="sr-only peer" aria-label="{{ t('settings.enable_auto_backup') }}">
-                                <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent flex-shrink-0"></div>
+                                <div class="relative w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-accent flex-shrink-0"></div>
                                 <span class="text-xs font-medium">{{ t('settings.enable_auto_backup') }}</span>
                             </label>
                         </div>
@@ -372,7 +372,7 @@
                                 <h3 class="text-xs font-bold text-muted uppercase tracking-widest">{{ t('settings.proxy_settings') }}</h3>
                                 <label class="relative inline-flex items-center cursor-pointer">
                                     <input type="checkbox" name="tg_proxy_enabled" value="true" {% if tg_config.proxy_enabled == 'true' %}checked{% endif %} class="sr-only peer" aria-label="Enable Telegram Proxy">
-                                    <div class="w-9 h-5 toggle-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
+                                    <div class="relative w-9 h-5 toggle-bg peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all"></div>
                                 </label>
                             </div>
                             <div>
