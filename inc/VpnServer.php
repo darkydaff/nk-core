@@ -137,7 +137,7 @@ class VpnServer
         }
 
         try {
-            $url = "http://ip-api.com/json/{$ip}?fields=status,message,country,countryCode,city,isp,org,query";
+            $url = "http://ip-api.com/json/{$ip}?fields=status,message,country,countryCode,city,isp,org,lat,lon,query";
             $ch = curl_init();
             curl_setopt($ch, CURLOPT_URL, $url);
             curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -152,7 +152,7 @@ class VpnServer
             $pdo = DB::conn();
             $stmt = $pdo->prepare('
                 UPDATE vpn_servers 
-                SET country = ?, country_code = ?, city = ?, isp = ?, org = ? 
+                SET country = ?, country_code = ?, city = ?, isp = ?, org = ?, lat = ?, lon = ? 
                 WHERE id = ?
             ');
             
@@ -162,6 +162,8 @@ class VpnServer
                 $geo['city'] ?? null,
                 $geo['isp'] ?? null,
                 $geo['org'] ?? null,
+                $geo['lat'] ?? null,
+                $geo['lon'] ?? null,
                 $this->serverId
             ]);
 
