@@ -97,33 +97,39 @@ class MapController
         }, $rows);
 
         // Fetch all active servers with resolved coordinates
-        $serverSql = "
-            SELECT 
-                s.id, s.name, s.host, s.status, s.country, s.country_code, s.city, s.isp, s.org, s.lat, s.lon,
-                (SELECT COUNT(*) FROM vpn_clients c WHERE c.server_id = s.id AND c.deleted_at IS NULL) as client_count
-            FROM vpn_servers s
-            WHERE s.deleted_at IS NULL
-              AND s.lat IS NOT NULL
-              AND s.lon IS NOT NULL
-        ";
-        $serverStmt = $pdo->prepare($serverSql);
-        $serverStmt->execute();
-        $serverRows = $serverStmt->fetchAll(PDO::FETCH_ASSOC);
+        $servers = [];
+        try {
+            $serverSql = "
+                SELECT 
+                    s.id, s.name, s.host, s.status, s.country, s.country_code, s.city, s.isp, s.org, s.lat, s.lon,
+                    (SELECT COUNT(*) FROM vpn_clients c WHERE c.server_id = s.id AND c.deleted_at IS NULL) as client_count
+                FROM vpn_servers s
+                WHERE s.deleted_at IS NULL
+                  AND s.lat IS NOT NULL
+                  AND s.lon IS NOT NULL
+            ";
+            $serverStmt = $pdo->prepare($serverSql);
+            $serverStmt->execute();
+            $serverRows = $serverStmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $servers = array_map(function ($row) {
-            return [
-                'id'           => (int) $row['id'],
-                'name'         => $row['name'],
-                'host'         => $row['host'],
-                'status'       => $row['status'],
-                'lat'          => (float) $row['lat'],
-                'lon'          => (float) $row['lon'],
-                'city'         => $row['city'],
-                'country'      => $row['country'],
-                'country_code' => $row['country_code'],
-                'client_count' => (int) $row['client_count'],
-            ];
-        }, $serverRows);
+            $servers = array_map(function ($row) {
+                return [
+                    'id'           => (int) $row['id'],
+                    'name'         => $row['name'],
+                    'host'         => $row['host'],
+                    'status'       => $row['status'],
+                    'lat'          => (float) $row['lat'],
+                    'lon'          => (float) $row['lon'],
+                    'city'         => $row['city'],
+                    'country'      => $row['country'],
+                    'country_code' => $row['country_code'],
+                    'client_count' => (int) $row['client_count'],
+                ];
+            }, $serverRows);
+        } catch (Throwable $e) {
+            // Fallback for missing columns (migration 066 not run yet)
+            $servers = [];
+        }
 
         echo json_encode([
             'success' => true,
