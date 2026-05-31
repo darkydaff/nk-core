@@ -368,11 +368,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // ── Marker factories ─────────────────────────────────────────────────
 
-    function makeServerIcon() {
+    function makeServerIcon(count = 1) {
+        const badge = count > 1 ? `<div class="cluster-badge" style="background:#a855f7; border-color:var(--color-surface-panel);">${count}</div>` : '';
         return L.divIcon({
             className: '',
             html: `<div class="server-icon-wrapper">
                        <i class="fas fa-server"></i>
+                       ${badge}
                    </div>`,
             iconSize: [32, 32], iconAnchor: [16, 16], popupAnchor: [0, -20]
         });
@@ -453,21 +455,60 @@ document.addEventListener('DOMContentLoaded', function () {
         </div>`;
     }
 
+    function buildMultiServerPopup(group) {
+        const location = group[0].city ? `${group[0].city}, ${group[0].country}` : `${group[0].lat.toFixed(3)}, ${group[0].lon.toFixed(3)}`;
+        
+        const items = group.map(srv => `
+            <div class="popup-client-row popup-list-item" onclick="window.location='/servers/${srv.id}'"
+                 onmouseover="highlightServerConnection(${srv.id})"
+                 onmouseout="clearServerConnection()">
+                <div class="popup-item-name" style="color: #c084fc;">
+                    <i class="fas fa-server" style="font-size: 11px;"></i> ${srv.name}
+                </div>
+                <div class="popup-item-meta">
+                    <span><i class="fas fa-network-wired mr-1 text-content-muted"></i>IP: ${srv.host}</span>
+                    <span><i class="fas fa-users mr-1 text-content-muted"></i>Clients: ${srv.client_count}</span>
+                </div>
+            </div>`).join('');
+
+        return `<div class="popup-header" style="color:#c084fc; border-bottom: 1px solid rgba(168, 85, 247, 0.2);">
+                    <i class="fas fa-server" style="margin-right:5px;color:#a855f7;"></i>
+                    ${location} &mdash; ${group.length} servers
+                </div>
+                <div class="popup-list">${items}</div>`;
+    }
+
     // ── Render ───────────────────────────────────────────────────────────
 
     function renderServerMarkers() {
         allServerMarkers.forEach(m => map.removeLayer(m));
         allServerMarkers = [];
 
+        // Group by rounded coordinate key
+        const groups = {};
         cachedServers.forEach(srv => {
-            const marker = L.marker([srv.lat, srv.lon], { icon: makeServerIcon() });
-            marker.bindPopup(buildServerPopup(srv), { maxWidth: 300 });
+            const key = `${srv.lat.toFixed(4)},${srv.lon.toFixed(4)}`;
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(srv);
+        });
+
+        Object.entries(groups).forEach(([key, group]) => {
+            const { lat, lon } = group[0];
+            const count = group.length;
+
+            const marker = L.marker([lat, lon], { icon: makeServerIcon(count) });
+            const popup = count === 1 ? buildServerPopup(group[0]) : buildMultiServerPopup(group);
+            marker.bindPopup(popup, { maxWidth: 300 });
 
             // Hover: draw connections (no text tooltip)
             marker.on('mouseover', () => {
                 if (currentOpenServerId) return;
                 clearLines();
-                drawServerConnections(srv.id);
+                if (count === 1) {
+                    drawServerConnections(group[0].id);
+                } else {
+                    group.forEach(srv => drawServerConnections(srv.id, true));
+                }
             });
 
             marker.on('mouseout', () => {
@@ -478,13 +519,21 @@ document.addEventListener('DOMContentLoaded', function () {
             // Click: smart panning and draw connections on popupopen
             marker.on('popupopen', () => {
                 clearLines();
-                currentOpenServerId = srv.id;
-                drawServerConnections(srv.id);
-                map.panTo([srv.lat, srv.lon]);
+                if (count === 1) {
+                    currentOpenServerId = group[0].id;
+                    drawServerConnections(group[0].id);
+                } else {
+                    currentOpenServerId = `group_${key}`;
+                    group.forEach(srv => drawServerConnections(srv.id, true));
+                }
+                map.panTo([lat, lon]);
             });
 
             marker.on('popupclose', () => {
-                if (currentOpenServerId === srv.id) {
+                if (count === 1 && currentOpenServerId === group[0].id) {
+                    clearLines();
+                    currentOpenServerId = null;
+                } else if (count > 1 && currentOpenServerId === `group_${key}`) {
                     clearLines();
                     currentOpenServerId = null;
                 }
@@ -501,7 +550,13 @@ document.addEventListener('DOMContentLoaded', function () {
         clearLines();
 
         if (currentOpenServerId) {
-            drawServerConnections(currentOpenServerId);
+            if (currentOpenServerId.toString().startsWith('group_')) {
+                const key = currentOpenServerId.substring(6);
+                const srvs = cachedServers.filter(s => `${s.lat.toFixed(4)},${s.lon.toFixed(4)}` === key);
+                srvs.forEach(srv => drawServerConnections(srv.id, true));
+            } else {
+                drawServerConnections(currentOpenServerId);
+            }
         }
 
         const visible = clients.filter(c => currentFilter === 'all' || c.status === currentFilter);
@@ -574,6 +629,22 @@ document.addEventListener('DOMContentLoaded', function () {
     window.clearClientConnection = function() {
         if (currentOpenServerId) return;
         clearLines();
+    };
+
+    window.highlightServerConnection = function(serverId) {
+        if (currentOpenServerId && !currentOpenServerId.toString().startsWith('group_')) return;
+        clearLines();
+        drawServerConnections(serverId, false);
+    };
+
+    window.clearServerConnection = function() {
+        if (currentOpenServerId && !currentOpenServerId.toString().startsWith('group_')) return;
+        clearLines();
+        if (currentOpenServerId && currentOpenServerId.toString().startsWith('group_')) {
+            const key = currentOpenServerId.substring(6);
+            const srvs = cachedServers.filter(s => `${s.lat.toFixed(4)},${s.lon.toFixed(4)}` === key);
+            srvs.forEach(srv => drawServerConnections(srv.id, true));
+        }
     };
 
     // ── Filter toggle ────────────────────────────────────────────────────
