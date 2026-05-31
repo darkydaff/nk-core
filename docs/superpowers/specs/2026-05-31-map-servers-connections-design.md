@@ -65,16 +65,18 @@ Update the Map API to return both client and server data. We'll load all active 
 Update Leaflet map setup to fetch both clients and servers and render them with interactive connections.
 * **Server Markers**:
   * Rendered using custom Leaflet `L.divIcon` with a purple theme containing `<i class="fas fa-server"></i>` and a subtle glow.
-  * Add `mouseover` listener: draws dashed connection lines to all of its clients (online and offline).
+  * Add `mouseover` listener: draws dashed connection lines to all of its clients (online and offline) in a highly subtle/low-opacity style so it doesn't block the base map.
   * Add `mouseout` listener: clears connection lines.
+  * Add `click` listener: opens an information card popup showing the server name, IP/host, city/country location, total & online client count, ping latency, and a link to view server details (`/servers/${server.id}`).
 * **Client Markers**:
   * Render standalone dots (1 client) and clustered dots (>1 clients).
   * Add `mouseover` listener to standalone client dots to immediately highlight their connection line.
   * Update cluster popups to list clients. Add `onmouseover` and `onmouseout` to the row elements so hovering a list row draws the corresponding client's line.
 * **Connection Lines**:
   * Drawn using Leaflet `L.polyline`.
-  * **Online Connection**: Green/purple flowing dashed line (using CSS stroke-dashoffset animation).
+  * **Online Connection**: Purple flowing dashed line (using CSS stroke-dashoffset animation).
   * **Offline Connection**: Thin, low-opacity, static dashed gray line.
+  * **Server Hover Overlay**: When highlighting connections by hovering over a server, line weight and opacity are reduced (e.g. `opacity: 0.35` for active, `opacity: 0.15` for inactive) to prevent blocking the map details.
 
 ## Verification Plan
 
