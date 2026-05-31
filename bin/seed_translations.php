@@ -12,13 +12,13 @@ $pdo = DB::conn();
 
 $data = [
     // English
-    ['en', 'dashboard', 'overview_subtitle', 'Global fleet and client overview'],
-    ['en', 'dashboard', 'active_nodes', 'Nodes across regions'],
+    ['en', 'dashboard', 'overview_subtitle', 'Global servers and client overview'],
+    ['en', 'dashboard', 'active_nodes', 'Active Servers'],
     ['en', 'dashboard', 'provisioned_access', 'Total configs'],
     ['en', 'dashboard', 'total_ingress', 'Total Inbound'],
     ['en', 'dashboard', 'total_egress', 'Total Outbound'],
     ['en', 'dashboard', 'traffic_analytics', 'Traffic Analytics'],
-    ['en', 'dashboard', 'fleet_health', 'Fleet Health'],
+    ['en', 'dashboard', 'fleet_health', 'Server Status'],
     ['en', 'common', 'download', 'Download'],
     ['en', 'common', 'upload', 'Upload'],
     ['en', 'common', 'status_all', 'All Status'],
@@ -28,13 +28,13 @@ $data = [
     ['en', 'dashboard', 'sort_handshake', 'Last Activity'],
     
     // Ukrainian
-    ['uk', 'dashboard', 'overview_subtitle', 'Загальний огляд флоту та клієнтів'],
-    ['uk', 'dashboard', 'active_nodes', 'Вузли в різних регіонах'],
+    ['uk', 'dashboard', 'overview_subtitle', 'Загальний огляд серверів та клієнтів'],
+    ['uk', 'dashboard', 'active_nodes', 'Активні сервери'],
     ['uk', 'dashboard', 'provisioned_access', 'Всього конфігурацій'],
     ['uk', 'dashboard', 'total_ingress', 'Сумарний вхідний трафік'],
     ['uk', 'dashboard', 'total_egress', 'Сумарний вихідний трафік'],
     ['uk', 'dashboard', 'traffic_analytics', 'Аналітика трафіку'],
-    ['uk', 'dashboard', 'fleet_health', 'Здоров\'я флоту'],
+    ['uk', 'dashboard', 'fleet_health', 'Стан серверів'],
     ['uk', 'common', 'download', 'Завантаження'],
     ['uk', 'common', 'upload', 'Віддача'],
     ['uk', 'common', 'status', 'Статус'],
@@ -48,13 +48,13 @@ $data = [
     ['uk', 'clients', 'last_seen', 'Активність'],
 
     // Russian
-    ['ru', 'dashboard', 'overview_subtitle', 'Общий обзор флота и клиентов'],
-    ['ru', 'dashboard', 'active_nodes', 'Узлы в разных регионах'],
+    ['ru', 'dashboard', 'overview_subtitle', 'Общий обзор серверов и клиентов'],
+    ['ru', 'dashboard', 'active_nodes', 'Активные серверы'],
     ['ru', 'dashboard', 'provisioned_access', 'Всего конфигураций'],
     ['ru', 'dashboard', 'total_ingress', 'Суммарный входящий трафик'],
     ['ru', 'dashboard', 'total_egress', 'Суммарный исходящий трафик'],
     ['ru', 'dashboard', 'traffic_analytics', 'Аналитика трафика'],
-    ['ru', 'dashboard', 'fleet_health', 'Здоровье флота'],
+    ['ru', 'dashboard', 'fleet_health', 'Состояние серверов'],
     ['ru', 'common', 'download', 'Загрузка'],
     ['ru', 'common', 'upload', 'Отдача'],
     ['ru', 'common', 'status', 'Статус'],

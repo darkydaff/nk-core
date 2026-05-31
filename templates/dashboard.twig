@@ -19,12 +19,6 @@
                 <h1 class="text-3xl font-bold tracking-tight">NK-CORE</h1>
                 <p class="text-secondary mt-1 text-sm">{{ t('dashboard.overview_subtitle', [], 'Global fleet and client overview') }}</p>
             </div>
-            <div class="flex items-center gap-3">
-                <div class="bg-surface-base px-4 py-2.5 rounded-xl border border-default flex items-center gap-3">
-                    <span class="w-2 h-2 rounded-full bg-status-active animate-pulse"></span>
-                    <span class="text-xs font-bold uppercase tracking-widest opacity-60">{{ t('status.live_monitoring', [], 'Live Monitoring') }}</span>
-                </div>
-            </div>
         </div>
 
         <!-- Summary Stats -->
@@ -38,7 +32,7 @@
                     <div class="flex items-baseline gap-2">
                         <span class="text-2xl font-bold">{{ servers|length }}</span>
                     </div>
-                    <p class="text-xs font-bold text-muted uppercase tracking-widest mt-1">{{ t('dashboard.active_nodes', [], 'Nodes across regions') }}</p>
+                    <p class="text-xs font-bold text-muted uppercase tracking-widest mt-1">{{ t('dashboard.active_nodes', [], 'Active Servers') }}</p>
                 </div>
             </div>
 
@@ -97,7 +91,7 @@
             <!-- Fleet Health -->
             <div class="panel overflow-hidden">
                 <div class="px-5 py-4 border-b border-default bg-surface-base/30">
-                    <h2 class="text-xs font-bold uppercase tracking-widest opacity-70">{{ t('dashboard.fleet_health', [], 'Fleet Health') }}</h2>
+                    <h2 class="text-xs font-bold uppercase tracking-widest opacity-70">{{ t('dashboard.fleet_health', [], 'Server Status') }}</h2>
                 </div>
                 <div class="p-4 pr-2 grid grid-cols-1 xl:grid-cols-2 gap-3 max-h-[380px] overflow-y-auto custom-scrollbar">
                     {% for server in servers %}
