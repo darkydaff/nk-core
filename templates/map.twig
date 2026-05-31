@@ -611,12 +611,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 clearLines();
             });
 
-            // Click: smart panning on client click and draw connections on popupopen
-            marker.on('click', () => {
-                clearLines();
-                map.panTo([lat, lon]);
-            });
-
+            // Click: smart panning and draw connections on popupopen
             marker.on('popupopen', () => {
                 clearLines();
                 currentOpenServerId = null; // Leaflet closes other popups automatically
@@ -627,6 +622,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         drawConnection([lat, lon], [srv.lat, srv.lon], c.status, false);
                     }
                 });
+                map.panTo([lat, lon]);
             });
 
             marker.on('popupclose', () => {
