@@ -67,16 +67,20 @@ Update Leaflet map setup to fetch both clients and servers and render them with 
   * Rendered using custom Leaflet `L.divIcon` with a purple theme containing `<i class="fas fa-server"></i>` and a subtle glow.
   * Add `mouseover` listener: draws dashed connection lines to all of its clients (online and offline) in a highly subtle/low-opacity style so it doesn't block the base map.
   * Add `mouseout` listener: clears connection lines.
-  * Add `click` listener: opens an information card popup showing the server name, IP/host, city/country location, total & online client count, ping latency, and a link to view server details (`/servers/${server.id}`).
+  * Add `click` listener: opens an information card popup showing the server name, IP/host, city/country location, total & online client count, ping latency, and a link to view server details (`/servers/${server.id}`). Smart-pans the map to center the server.
 * **Client Markers**:
   * Render standalone dots (1 client) and clustered dots (>1 clients).
   * Add `mouseover` listener to standalone client dots to immediately highlight their connection line.
   * Update cluster popups to list clients. Add `onmouseover` and `onmouseout` to the row elements so hovering a list row draws the corresponding client's line.
+  * Add `click` listener to center the map on the client marker.
 * **Connection Lines**:
   * Drawn using Leaflet `L.polyline`.
   * **Online Connection**: Purple flowing dashed line (using CSS stroke-dashoffset animation).
   * **Offline Connection**: Thin, low-opacity, static dashed gray line.
   * **Server Hover Overlay**: When highlighting connections by hovering over a server, line weight and opacity are reduced (e.g. `opacity: 0.35` for active, `opacity: 0.15` for inactive) to prevent blocking the map details.
+  * **Respect Status Filters**: Connection lines shown on the map (including those drawn during server hovers) must respect the active map status filters (All, Online, Offline). For example, filtering by "Online" hides offline client dots and their inactive connection lines.
+* **Smart Map Panning**:
+  * Clicking any marker (client, cluster, or server) automatically pans the map to center on that coordinate to ensure the popup is fully visible and the connections are easy to trace.
 
 ## Verification Plan
 
