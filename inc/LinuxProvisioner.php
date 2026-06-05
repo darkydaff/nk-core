@@ -346,18 +346,35 @@ class LinuxProvisioner
         return $loaded;
     }
 
-    /**
-     * Set up Cloudflare WARP firewall and policy-based routing on the remote host.
-     */
     public function setupWarpHostRules(string $vpnSubnet): void
     {
         $escapedSubnet = escapeshellarg($vpnSubnet);
         
         $setupCmd = implode(' && ', [
-            // 1. Ensure Table warp (ID 200) registered
+            // 1. Install and register Cloudflare WARP automatically if not present
+            "if [ ! -f /etc/wireguard/wg-warp.conf ]; then " .
+                "if [ ! -f /usr/local/bin/wgcf ]; then " .
+                    "curl -fsSL https://github.com/ViRb3/wgcf/releases/latest/download/wgcf_linux_amd64 -o /usr/local/bin/wgcf && " .
+                    "chmod +x /usr/local/bin/wgcf; " .
+                "fi && " .
+                "mkdir -p /tmp/wgcf_setup && " .
+                "cd /tmp/wgcf_setup && " .
+                "wgcf register --accept-tos && " .
+                "wgcf generate && " .
+                "mkdir -p /etc/wireguard && " .
+                "cp wgcf-profile.conf /etc/wireguard/wg-warp.conf && " .
+                "echo 'Table = off' >> /etc/wireguard/wg-warp.conf && " .
+                "rm -rf /tmp/wgcf_setup; " .
+            "fi",
+            
+            // 2. Enable and start wg-warp WireGuard interface
+            "systemctl enable wg-quick@wg-warp.service",
+            "systemctl start wg-quick@wg-warp.service",
+
+            // 3. Ensure Table warp (ID 200) registered
             "if ! grep -q '200 warp' /etc/iproute2/rt_tables; then echo '200 warp' >> /etc/iproute2/rt_tables; fi",
             
-            // 2. Deploy nftables custom config
+            // 4. Deploy nftables custom config
             "mkdir -p /etc/nftables.d",
             "echo 'table inet nkcore {
                 set warp_clients {
@@ -369,7 +386,7 @@ class LinuxProvisioner
                 }
             }' > /etc/nftables.d/nkcore-warp.nft",
             
-            // 3. Deploy nat postrouting config (pure nftables)
+            // 5. Deploy nat postrouting config (pure nftables)
             "echo 'table ip nat {
                 chain postrouting {
                     type nat hook postrouting priority 100; policy accept;
@@ -382,7 +399,7 @@ class LinuxProvisioner
             "if ! grep -q 'nkcore-nat.nft' /etc/nftables.conf; then echo 'include \"/etc/nftables.d/nkcore-nat.nft\"' >> /etc/nftables.conf; fi",
             "systemctl reload nftables 2>/dev/null || systemctl restart nftables 2>/dev/null || true",
 
-            // 4. Create persistent startup routing commands
+            // 6. Create persistent startup routing commands
             "mkdir -p /etc/wireguard/post-up.d",
             "echo \"#!/bin/bash
 ip route replace \" . $escapedSubnet . \" dev wg0 table warp 2>/dev/null || true
