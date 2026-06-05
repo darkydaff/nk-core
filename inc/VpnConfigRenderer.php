@@ -5,6 +5,7 @@ class VpnConfigRenderer
 {
     private VpnServer $server;
     private SshClient $ssh;
+    private array $clients = [];
 
     public function __construct(VpnServer $server)
     {
@@ -30,7 +31,7 @@ class VpnConfigRenderer
         $pdo = DB::conn();
         $stmt = $pdo->prepare("SELECT *, client_ip AS ip_address FROM vpn_clients WHERE server_id = ? AND status IN ('active', 'verifying', 'provisioning') AND deleted_at IS NULL ORDER BY client_ip ASC");
         $stmt->execute([$this->server->getId()]);
-        $clients = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $this->clients = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
         $subnetBase = preg_replace('/\.0\/24$/', '', $serverData['vpn_subnet'] ?? '10.8.1.0/24');
         $serverData['vpn_subnet_base'] = $subnetBase;
@@ -45,7 +46,7 @@ class VpnConfigRenderer
 
         return View::fetch('vpn/wg0.conf.twig', [
             'server' => $serverData,
-            'clients' => $clients
+            'clients' => $this->clients
         ]);
     }
 
@@ -114,7 +115,7 @@ class VpnConfigRenderer
             // Apply traffic shaping limits
             $defaultUp = (int)Config::get('DEFAULT_SPEED_LIMIT_UP', 0);
             $defaultDown = (int)Config::get('DEFAULT_SPEED_LIMIT_DOWN', 0);
-            $this->applyTrafficShaping($containerName, $clients, $defaultUp, $defaultDown);
+            $this->applyTrafficShaping($containerName, $this->clients, $defaultUp, $defaultDown);
             
             Logger::channel('control-plane')->info('Declarative Sync Successful', ['server_id' => $this->server->getId()]);
             
