@@ -329,6 +329,12 @@ iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null
 iptables -t nat -A POSTROUTING -s {$subnet} -o "\$DEFAULT_IF" -j MASQUERADE 2>/dev/null
 iptables -t mangle -A FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null
 
+# Restore traffic shaping rules if they exist
+if [ -f /opt/amnezia/awg/tc_rules.sh ]; then
+    echo "Restoring traffic shaping rules..."
+    bash /opt/amnezia/awg/tc_rules.sh || echo "Notice: Failed to restore traffic shaping rules"
+fi
+
 echo "VPN service fully operational. Waiting for signals..."
 
 # 6. Keep container alive and wait for signals

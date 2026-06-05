@@ -111,6 +111,11 @@ class VpnConfigRenderer
             $swapCmd = "docker exec $containerName bash -c 'mv /opt/amnezia/awg/wg0.conf.next /opt/amnezia/awg/wg0.conf && /usr/local/bin/awg syncconf wg0 <(/usr/local/bin/awg-quick strip /opt/amnezia/awg/wg0.conf)'";
             $this->ssh->executeCommand($swapCmd, true, true);
             
+            // Apply traffic shaping limits
+            $defaultUp = (int)Config::get('DEFAULT_SPEED_LIMIT_UP', 0);
+            $defaultDown = (int)Config::get('DEFAULT_SPEED_LIMIT_DOWN', 0);
+            $this->applyTrafficShaping($containerName, $clients, $defaultUp, $defaultDown);
+            
             Logger::channel('control-plane')->info('Declarative Sync Successful', ['server_id' => $this->server->getId()]);
             
         } catch (\Throwable $e) {
@@ -119,6 +124,78 @@ class VpnConfigRenderer
             throw new Exception("Declarative Sync Failed: " . $e->getMessage());
         } finally {
             $this->ssh->executeCommand("rm -f $tmpPath", false, false);
+        }
+    }
+
+    /**
+     * Apply traffic shaping limits on the server wg0 interface.
+     */
+    private function applyTrafficShaping(string $containerName, array $clients, int $defaultUp, int $defaultDown): void
+    {
+        try {
+            $script = "#!/bin/bash\n";
+            $script .= "# Check if tc is installed\n";
+            $script .= "if ! command -v tc >/dev/null 2>&1; then\n";
+            $script .= "    echo \"Warning: tc (iproute2) is not installed in the container. Bandwidth limits cannot be applied.\"\n";
+            $script .= "    exit 0\n";
+            $script .= "fi\n\n";
+            $script .= "# Clear existing qdiscs\n";
+            $script .= "tc qdisc del dev wg0 root 2>/dev/null || true\n";
+            $script .= "tc qdisc del dev wg0 ingress 2>/dev/null || true\n";
+            
+            $hasDownloadLimits = false;
+            $hasUploadLimits = false;
+            $downloadRules = "";
+            $uploadRules = "";
+            $index = 0;
+            
+            foreach ($clients as $client) {
+                $clientIp = $client['client_ip'];
+                
+                $limitDown = $client['speed_limit_down'] !== null ? (int)$client['speed_limit_down'] : $defaultDown;
+                $limitUp = $client['speed_limit_up'] !== null ? (int)$client['speed_limit_up'] : $defaultUp;
+                
+                // Map each client to a unique sequential class ID (offset to avoid reserved IDs)
+                $classId = 100 + $index;
+                $index++;
+                
+                if ($limitDown > 0) {
+                    if (!$hasDownloadLimits) {
+                        $downloadRules .= "tc qdisc add dev wg0 root handle 1: htb default 10\n";
+                        $downloadRules .= "tc class add dev wg0 parent 1: classid 1:10 htb rate 100gbit\n";
+                        $hasDownloadLimits = true;
+                    }
+                    $downloadRules .= "tc class add dev wg0 parent 1: classid 1:{$classId} htb rate {$limitDown}mbit ceil {$limitDown}mbit\n";
+                    $downloadRules .= "tc qdisc add dev wg0 parent 1:{$classId} handle {$classId}: fq_codel\n";
+                    $downloadRules .= "tc filter add dev wg0 protocol ip parent 1:0 prio 1 u32 match ip dst {$clientIp} flowid 1:{$classId}\n";
+                }
+                
+                if ($limitUp > 0) {
+                    if (!$hasUploadLimits) {
+                        $uploadRules .= "tc qdisc add dev wg0 handle ffff: ingress\n";
+                        $hasUploadLimits = true;
+                    }
+                    // Ingress policing drops packets exceeding the limit
+                    $uploadRules .= "tc filter add dev wg0 parent ffff: protocol ip u32 match ip src {$clientIp} action police rate {$limitUp}mbit burst 100k drop flowid :1\n";
+                }
+            }
+            
+            $script .= $downloadRules;
+            $script .= $uploadRules;
+            
+            $base64 = base64_encode($script);
+            $execCmd = sprintf(
+                "docker exec -i %s bash -c " . escapeshellarg(
+                    "echo " . escapeshellarg($base64) . " | base64 -d > /opt/amnezia/awg/tc_rules.sh && " .
+                    "chmod +x /opt/amnezia/awg/tc_rules.sh && " .
+                    "/opt/amnezia/awg/tc_rules.sh"
+                ),
+                $containerName
+            );
+            
+            $this->ssh->executeCommand($execCmd, true, true);
+        } catch (\Throwable $e) {
+            Logger::channel('control-plane')->warning("Failed to apply traffic shaping limits on server: " . $e->getMessage());
         }
     }
 }

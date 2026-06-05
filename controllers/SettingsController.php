@@ -89,6 +89,8 @@ class SettingsController {
             'backup_schedule_time' => Config::get('BACKUP_SCHEDULE_TIME', '00:00'),
             'backup_last_run' => Config::get('BACKUP_LAST_RUN'),
             'backup_last_status' => Config::get('BACKUP_LAST_STATUS'),
+            'default_speed_limit_up' => Config::get('DEFAULT_SPEED_LIMIT_UP', 0),
+            'default_speed_limit_down' => Config::get('DEFAULT_SPEED_LIMIT_DOWN', 0),
             'server_time' => date('H:i:s')
         ];
         
@@ -531,6 +533,38 @@ class SettingsController {
             return $this->respond(true, "Backup schedule updated successfully.");
         } else {
             return $this->respond(false, "Failed to save backup schedule.");
+        }
+    }
+
+    public function saveSpeedLimit() {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            return $this->respond(false, "Invalid request method.");
+        }
+
+        $limitUp = (int)($_POST['default_speed_limit_up'] ?? 0);
+        $limitDown = (int)($_POST['default_speed_limit_down'] ?? 0);
+
+        // Clamp values between 0 (unlimited) and 10000 (max)
+        if ($limitUp < 0) $limitUp = 0;
+        if ($limitUp > 10000) $limitUp = 10000;
+
+        if ($limitDown < 0) $limitDown = 0;
+        if ($limitDown > 10000) $limitDown = 10000;
+
+        $data = [
+            'DEFAULT_SPEED_LIMIT_UP'   => $limitUp,
+            'DEFAULT_SPEED_LIMIT_DOWN' => $limitDown
+        ];
+
+        if (Config::updateEnv($data)) {
+            require_once __DIR__ . '/../inc/Queue.php';
+            Queue::push('deployments', [
+                'type' => 'sync_all_servers',
+                'requested_by' => Auth::user()['id'] ?? null
+            ]);
+            return $this->respond(true, "Default speed limits updated successfully.");
+        } else {
+            return $this->respond(false, "Failed to save speed limits.");
         }
     }
 

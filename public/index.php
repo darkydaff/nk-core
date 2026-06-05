@@ -270,6 +270,7 @@ Router::post('/settings/delete-backup', ['SettingsController', 'deleteBackup']);
 Router::post('/settings/save-telegram', ['SettingsController', 'saveTelegram']);
 Router::post('/settings/save-backup-schedule', ['SettingsController', 'saveBackupSchedule']);
 Router::post('/settings/save-beszel', ['SettingsController', 'saveBeszel']);
+Router::post('/settings/save-speed-limit', ['SettingsController', 'saveSpeedLimit']);
 Router::post('/settings/upload-restore', ['SettingsController', 'uploadRestore']);
 
 /**

@@ -172,11 +172,33 @@ try {
             $servers = VpnServer::listAll();
             foreach ($servers as $serverData) {
                 if ($serverData['status'] === 'active' || $serverData['status'] === 'error') {
+                    // Queue stats sync
                     Queue::push('deployments', [
                         'type' => 'sync_server',
                         'server_id' => (int)$serverData['id']
                     ]);
+                    // Queue config and traffic shaping sync
+                    Queue::push('deployments', [
+                        'type' => 'sync_server_config',
+                        'server_id' => (int)$serverData['id']
+                    ]);
                 }
+            }
+            break;
+
+        case 'sync_server_config':
+            if (empty($payload['server_id'])) throw new Exception("Missing server_id");
+            $serverId = (int)$payload['server_id'];
+            $lockName = "server:{$serverId}:infra"; // Reuse infra lock for config modifications
+            if (!Lock::acquire($lockName, 120)) exit(2);
+            try {
+                Logger::info('Syncing server config', ['server_id' => $serverId]);
+                $vs = new VpnServer($serverId);
+                require_once __DIR__ . '/../inc/VpnConfigRenderer.php';
+                $renderer = new VpnConfigRenderer($vs);
+                $renderer->syncDeclarative();
+            } finally {
+                Lock::release($lockName);
             }
             break;
 

@@ -108,6 +108,18 @@ class Translator
             'servers.deploy_step_hint' => ['en' => 'Tailoring kernel parameters for high-performance VPN throughput...', 'uk' => 'Налаштування параметрів ядра для високої пропускної здатності VPN...', 'ru' => 'Настройка параметров ядра для высокой пропускной способности VPN...'],
             'servers.deployment_in_progress' => ['en' => 'Deployment In Progress', 'uk' => 'Розгортання триває', 'ru' => 'Выполняется развертывание'],
             'servers.deploying_to' => ['en' => 'Provisioning node:', 'uk' => 'Налаштування вузла:', 'ru' => 'Настройка узла:'],
+            'settings.speed_limits' => ['en' => 'Default Speed Limits', 'uk' => 'Обмеження швидкості за замовчуванням', 'ru' => 'Ограничения скорости по умолчанию'],
+            'settings.speed_limits_desc' => ['en' => 'Set default upload and download speed limits for VPN clients. Individual client overrides will take precedence.', 'uk' => 'Встановіть обмеження швидкості завантаження та вивантаження за замовчуванням для клієнтів VPN. Індивідуальні налаштування клієнта мають пріоритет.', 'ru' => 'Установите ограничения скорости отдачи и скачивания по умолчанию для клиентов VPN. Индивидуальные настройки клиента имеют приоритет.'],
+            'settings.speed_limit_up' => ['en' => 'Default Upload Speed (Mbps)', 'uk' => 'Швидкість вивантаження за замовчуванням (Мбіт/с)', 'ru' => 'Скорость отдачи по умолчанию (Мбит/с)'],
+            'settings.speed_limit_down' => ['en' => 'Default Download Speed (Mbps)', 'uk' => 'Швидкість завантаження за замовчуванням (Мбіт/с)', 'ru' => 'Скорость скачивания по умолчанию (Мбит/с)'],
+            'settings.speed_limit_help' => ['en' => 'Use 0 for unlimited speed.', 'uk' => 'Використовуйте 0 для необмеженої швидкості.', 'ru' => 'Используйте 0 для неограниченной скорости.'],
+            'clients.speed_limit' => ['en' => 'Speed Limits', 'uk' => 'Обмеження швидкості', 'ru' => 'Ограничения скорости'],
+            'clients.speed_limit_up' => ['en' => 'Upload Limit (Mbps)', 'uk' => 'Ліміт вивантаження (Мбіт/с)', 'ru' => 'Лимит отдачи (Мбит/с)'],
+            'clients.speed_limit_down' => ['en' => 'Download Limit (Mbps)', 'uk' => 'Ліміт завантаження (Мбіт/с)', 'ru' => 'Лимит скачивания (Мбит/с)'],
+            'clients.speed_limit_placeholder_inherit' => ['en' => 'Inherit default (%s Mbps)', 'uk' => 'Успадкувати за замовчуванням (%s Мбіт/с)', 'ru' => 'Наследовать по умолчанию (%s Мбит/с)'],
+            'clients.speed_limit_placeholder_inherit_unlimited' => ['en' => 'Inherit default (Unlimited)', 'uk' => 'Успадкувати за замовчуванням (Необмежено)', 'ru' => 'Наследовать по умолчанию (Безлимитно)'],
+            'clients.speed_limit_placeholder_unlimited' => ['en' => 'Unlimited (0)', 'uk' => 'Необмежено (0)', 'ru' => 'Безлимитно (0)'],
+            'clients.speed_limit_help' => ['en' => 'Enter custom speed in Mbps, 0 for unlimited, or leave empty to inherit settings.', 'uk' => 'Введіть швидкість у Мбіт/с, 0 для необмеженої або залиште порожнім, щоб успадкувати.', 'ru' => 'Введите скорость в Мбит/с, 0 для неограниченной или оставьте пустым, чтобы наследовать.'],
         ];
 
         $stmt = $pdo->prepare("INSERT INTO translations (locale, category, key_name, translation) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE translation = VALUES(translation)");

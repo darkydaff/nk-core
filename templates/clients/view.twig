@@ -147,12 +147,32 @@
             
             <form onsubmit="handleAjaxForm(event, '/clients/{{ client.id }}/update')" class="mb-6">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <label for="editClientName" class="block text-xs font-medium text-muted uppercase tracking-wide mb-2">{{ t('clients.name') }}</label>
-                <div class="flex gap-2">
-                    <input id="editClientName" name="name" value="{{ client.name }}" class="input-field flex-grow px-4 py-2.5 text-sm" required autocomplete="off" spellcheck="false">
-                    <button type="submit" class="btn-primary px-4 py-2.5 text-sm">
-                        <i class="fas fa-save mr-2"></i>{{ t('form.save') }}
-                    </button>
+                <div class="space-y-4">
+                    <div>
+                        <label for="editClientName" class="block text-xs font-medium text-muted uppercase tracking-wide mb-2">{{ t('clients.name') }}</label>
+                        <input id="editClientName" name="name" value="{{ client.name }}" class="input-field w-full px-4 py-2.5 text-sm" required autocomplete="off" spellcheck="false">
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label for="speed_limit_down" class="block text-xs font-medium text-muted uppercase tracking-wide mb-2">{{ t('clients.speed_limit_down') }}</label>
+                            <input type="number" id="speed_limit_down" name="speed_limit_down" value="{{ client.speed_limit_down }}" min="0" max="10000" class="input-field w-full px-4 py-2.5 text-sm" 
+                                   placeholder="{% if default_speed_limit_down > 0 %}{{ t('clients.speed_limit_placeholder_inherit', [default_speed_limit_down]) }}{% else %}{{ t('clients.speed_limit_placeholder_inherit_unlimited') }}{% endif %}" autocomplete="off">
+                        </div>
+                        <div>
+                            <label for="speed_limit_up" class="block text-xs font-medium text-muted uppercase tracking-wide mb-2">{{ t('clients.speed_limit_up') }}</label>
+                            <input type="number" id="speed_limit_up" name="speed_limit_up" value="{{ client.speed_limit_up }}" min="0" max="10000" class="input-field w-full px-4 py-2.5 text-sm" 
+                                   placeholder="{% if default_speed_limit_up > 0 %}{{ t('clients.speed_limit_placeholder_inherit', [default_speed_limit_up]) }}{% else %}{{ t('clients.speed_limit_placeholder_inherit_unlimited') }}{% endif %}" autocomplete="off">
+                        </div>
+                    </div>
+                    
+                    <p class="text-xs text-muted">{{ t('clients.speed_limit_help') }}</p>
+                    
+                    <div class="flex justify-end pt-2">
+                        <button type="submit" class="btn-primary px-5 py-2.5 text-sm">
+                            <i class="fas fa-save mr-2"></i>{{ t('form.save') }}
+                        </button>
+                    </div>
                 </div>
             </form>
 

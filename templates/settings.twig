@@ -45,6 +45,9 @@
         <button onclick="NK_Settings.showTab('beszel')" id="tab-beszel" class="tab-btn px-4 py-2 text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all whitespace-nowrap">
             <i class="fas fa-microchip mr-2"></i>{{ t('settings.beszel') }}
         </button>
+        <button onclick="NK_Settings.showTab('speed-limits')" id="tab-speed-limits" class="tab-btn px-4 py-2 text-[11px] font-bold uppercase tracking-wider rounded-lg transition-all whitespace-nowrap">
+            <i class="fas fa-tachometer-alt mr-2"></i>{{ t('settings.speed_limits') }}
+        </button>
     </div>
 
     <div id="content-profile">
@@ -434,6 +437,43 @@
                             <div>
                                 <label for="beszel_password" class="block text-sm font-medium mb-2">{{ t('common.password') }}</label>
                                 <input type="password" id="beszel_password" name="beszel_password" value="{{ beszel_config.password }}" placeholder="••••••••" class="input-field w-full px-4 py-2.5 font-mono" autocomplete="current-password">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="pt-8 border-t border-default/50 mt-8 flex justify-end gap-3">
+                        <button type="submit" class="btn-primary px-8 py-3 text-sm">
+                            <i class="fas fa-save mr-2"></i>{{ t('common.save_settings') }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div id="content-speed-limits" class="hidden">
+        <div class="panel overflow-hidden mb-6">
+            <div class="px-5 py-4 border-b border-default bg-panel/30">
+                <h2 class="text-base font-semibold flex items-center">
+                    <i class="fas fa-tachometer-alt mr-2 text-muted"></i>{{ t('settings.speed_limits') }}
+                </h2>
+            </div>
+            <div class="p-5">
+                <form onsubmit="handleAjaxForm(event, '/settings/save-speed-limit')" class="max-w-4xl">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="space-y-4">
+                            <h3 class="text-xs font-bold text-muted uppercase tracking-widest mb-4">{{ t('settings.speed_limits') }}</h3>
+                            <p class="text-xs text-muted mb-4">{{ t('settings.speed_limits_desc') }}</p>
+                            
+                            <div>
+                                <label for="default_speed_limit_down" class="block text-sm font-medium mb-2">{{ t('settings.speed_limit_down') }}</label>
+                                <input type="number" id="default_speed_limit_down" name="default_speed_limit_down" value="{{ default_speed_limit_down }}" min="0" max="10000" class="input-field w-full px-4 py-2.5 font-mono" required autocomplete="off">
+                                <p class="mt-1 text-xs text-secondary">{{ t('settings.speed_limit_help') }}</p>
+                            </div>
+                            
+                            <div>
+                                <label for="default_speed_limit_up" class="block text-sm font-medium mb-2">{{ t('settings.speed_limit_up') }}</label>
+                                <input type="number" id="default_speed_limit_up" name="default_speed_limit_up" value="{{ default_speed_limit_up }}" min="0" max="10000" class="input-field w-full px-4 py-2.5 font-mono" required autocomplete="off">
+                                <p class="mt-1 text-xs text-secondary">{{ t('settings.speed_limit_help') }}</p>
                             </div>
                         </div>
                     </div>

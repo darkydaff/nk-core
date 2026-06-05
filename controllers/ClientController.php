@@ -98,10 +98,14 @@ class ClientController {
                 return;
             }
             $stats = $client->getFormattedStats();
-            
+            $defaultSpeedLimitUp = (int)Config::get('DEFAULT_SPEED_LIMIT_UP', 0);
+            $defaultSpeedLimitDown = (int)Config::get('DEFAULT_SPEED_LIMIT_DOWN', 0);
+
             View::render('clients/view.twig', [
                 'client' => $clientData,
-                'stats' => $stats
+                'stats' => $stats,
+                'default_speed_limit_up' => $defaultSpeedLimitUp,
+                'default_speed_limit_down' => $defaultSpeedLimitDown
             ]);
         } catch (Exception $e) {
             http_response_code(404);
@@ -158,6 +162,48 @@ class ClientController {
                         $client->setTrafficLimit($mb * 1024 * 1024);
                     }
                 }
+            }
+
+            $speedLimitUpChanged = false;
+            $speedLimitDownChanged = false;
+
+            if (isset($_POST['speed_limit_up'])) {
+                $limitUpVal = trim($_POST['speed_limit_up']);
+                $newLimitUp = ($limitUpVal === '') ? null : (int)$limitUpVal;
+                if ($newLimitUp !== null) {
+                    $newLimitUp = max(0, min(10000, $newLimitUp));
+                }
+                
+                $oldLimitUp = $clientData['speed_limit_up'] !== null ? (int)$clientData['speed_limit_up'] : null;
+                if ($newLimitUp !== $oldLimitUp) {
+                    $stmt = $pdo->prepare('UPDATE vpn_clients SET speed_limit_up = ? WHERE id = ?');
+                    $stmt->execute([$newLimitUp, $clientId]);
+                    $speedLimitUpChanged = true;
+                }
+            }
+
+            if (isset($_POST['speed_limit_down'])) {
+                $limitDownVal = trim($_POST['speed_limit_down']);
+                $newLimitDown = ($limitDownVal === '') ? null : (int)$limitDownVal;
+                if ($newLimitDown !== null) {
+                    $newLimitDown = max(0, min(10000, $newLimitDown));
+                }
+                
+                $oldLimitDown = $clientData['speed_limit_down'] !== null ? (int)$clientData['speed_limit_down'] : null;
+                if ($newLimitDown !== $oldLimitDown) {
+                    $stmt = $pdo->prepare('UPDATE vpn_clients SET speed_limit_down = ? WHERE id = ?');
+                    $stmt->execute([$newLimitDown, $clientId]);
+                    $speedLimitDownChanged = true;
+                }
+            }
+
+            if ($speedLimitUpChanged || $speedLimitDownChanged) {
+                require_once __DIR__ . '/../inc/Queue.php';
+                Queue::push('deployments', [
+                    'type' => 'provision_client',
+                    'client_id' => $clientId,
+                    'server_id' => $clientData['server_id']
+                ]);
             }
 
             return $this->respond(true, "Client updated successfully");
