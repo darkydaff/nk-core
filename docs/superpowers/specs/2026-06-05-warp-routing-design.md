@@ -49,6 +49,7 @@ ip route replace ${VPN_SUBNET} dev wg0 table warp
 ip route replace default dev wg-warp table warp
 
 # Add the PBR rules
+ip rule del fwmark 100 lookup warp priority 200 2>/dev/null || true
 ip rule add fwmark 100 lookup warp priority 200
 ```
 This script runs dynamically using the configured `${VPN_SUBNET}` of the VPN server.
@@ -64,7 +65,6 @@ We deploy a custom configuration fragment at `/etc/nftables.d/nkcore-warp.nft`:
 table inet nkcore {
     set warp_clients {
         type ipv4_addr
-        flags timeout
     }
 
     chain prerouting {
@@ -81,11 +81,15 @@ include "/etc/nftables.d/nkcore-warp.nft"
 ```
 
 #### Egress NAT / Masquerading
-To translate the client's internal VPN IP to the `wg-warp` interface IP, we masquerade outgoing traffic on `wg-warp`:
-```bash
-iptables -t nat -A POSTROUTING -o wg-warp -j MASQUERADE
+To translate the client's internal VPN IP to the `wg-warp` interface IP, we register a nat postrouting chain to masquerade outgoing traffic on `wg-warp` using nftables:
+```nftables
+table ip nat {
+    chain postrouting {
+        type nat hook postrouting priority 100; policy accept;
+        oifname "wg-warp" masquerade
+    }
+}
 ```
-*(Note: If the server uses pure `nftables` nat tables, we will insert a masquerade rule in the nftables nat postrouting chain for `oifname "wg-warp"`.)*
 
 ---
 
@@ -98,24 +102,33 @@ During server provisioning and subnet updates, we will run a detection routine t
 ---
 
 ### 5. Health Watchdog and Automatic Failover (Option A)
-To prevent clients from being blackholed if the WARP interface (`wg-warp`) goes down or loses connection to Cloudflare:
+To prevent clients from being blackholed if the WARP interface (`wg-warp`) goes down or loses connection to Cloudflare, we run a cron/timer watchdog. 
+
+The **database remains the authoritative source of truth**, and the remote `nftables` set is treated as an active routing cache.
+
 1. We install a health watchdog script at `/usr/local/bin/nk-warp-watchdog.sh` run by a systemd timer or cron job every minute:
    ```bash
    #!/bin/bash
-   # Check if wg-warp interface exists and is up
-   if ! ip link show wg-warp >/dev/null 2>&1; then
-       # Clear set to fallback to direct
+   # 1. Verify policy routing points to the correct interface
+   ROUTE_DEV=$(ip route get 1.1.1.1 mark 100 2>/dev/null | grep -oE "dev [a-zA-Z0-9_-]+" | awk '{print $2}')
+   if [ "$ROUTE_DEV" != "wg-warp" ]; then
+       echo "WARP policy route path invalid! Dev was: $ROUTE_DEV. Clearing set to force fallback."
        nft flush set inet nkcore warp_clients
        exit 0
    fi
 
-   # Ping Cloudflare DNS through the warp interface routing table
+   # 2. Verify link state and test ping through the route
    if ! ping -c 2 -W 3 -I wg-warp 1.1.1.1 >/dev/null 2>&1; then
        echo "WARP health check failed! Falling back to direct routing."
        nft flush set inet nkcore warp_clients
    fi
    ```
-2. When the watchdog detects a recovery (ping succeeds again), it will reload active WARP-enabled clients from the local database cache or panel telemetry to restore their route path.
+2. If WARP recovers (watchdog or manual test ping succeeds again), the panel's sync worker will reload the set. The panel retrieves all active warp-enabled clients (`routing_mode = 'warp'`) from the database and updates the remote set:
+   ```bash
+   # Sync worker reconstructs set from authoritative DB state
+   nft flush set inet nkcore warp_clients
+   nft add element inet nkcore warp_clients { client_ip_1, client_ip_2, ... }
+   ```
 
 ---
 
