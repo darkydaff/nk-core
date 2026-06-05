@@ -348,8 +348,35 @@ class LinuxProvisioner
 
     public function setupWarpHostRules(string $vpnSubnet): void
     {
-        $escapedSubnet = escapeshellarg($vpnSubnet);
-        
+        // Construct the custom nftables rule for packet marking
+        $nftWarp = "table inet nkcore {\n" .
+                   "    set warp_clients {\n" .
+                   "        type ipv4_addr\n" .
+                   "    }\n" .
+                   "    chain prerouting {\n" .
+                   "        type filter hook prerouting priority mangle; policy accept;\n" .
+                   "        ip saddr @warp_clients meta mark set 100\n" .
+                   "    }\n" .
+                   "}\n";
+        $base64NftWarp = base64_encode($nftWarp);
+
+        // Construct the custom nftables rule for masquerading nat
+        $nftNat = "table ip nat {\n" .
+                  "    chain postrouting {\n" .
+                  "        type nat hook postrouting priority 100; policy accept;\n" .
+                  "        oifname \"wg-warp\" masquerade\n" .
+                  "    }\n" .
+                  "}\n";
+        $base64NftNat = base64_encode($nftNat);
+
+        // Construct the persistent post-up interface routing setup script
+        $wgWarpScript = "#!/bin/bash\n" .
+                        "ip route replace " . $vpnSubnet . " dev wg0 table warp 2>/dev/null || true\n" .
+                        "ip route replace default dev wg-warp table warp 2>/dev/null || true\n" .
+                        "ip rule del fwmark 100 lookup warp priority 200 2>/dev/null || true\n" .
+                        "ip rule add fwmark 100 lookup warp priority 200\n";
+        $base64WarpScript = base64_encode($wgWarpScript);
+
         $setupCmd = implode(' && ', [
             // 1. Install and register Cloudflare WARP automatically if not present
             "if [ ! -f /etc/wireguard/wg-warp.conf ]; then " .
@@ -363,6 +390,7 @@ class LinuxProvisioner
                 "wgcf generate && " .
                 "mkdir -p /etc/wireguard && " .
                 "cp wgcf-profile.conf /etc/wireguard/wg-warp.conf && " .
+                "echo '' >> /etc/wireguard/wg-warp.conf && " .
                 "echo 'Table = off' >> /etc/wireguard/wg-warp.conf && " .
                 "rm -rf /tmp/wgcf_setup; " .
             "fi",
@@ -374,38 +402,21 @@ class LinuxProvisioner
             // 3. Ensure Table warp (ID 200) registered
             "if ! grep -q '200 warp' /etc/iproute2/rt_tables; then echo '200 warp' >> /etc/iproute2/rt_tables; fi",
             
-            // 4. Deploy nftables custom config
+            // 4. Deploy nftables custom config using base64 decoding to avoid multiline shell parsing issues
             "mkdir -p /etc/nftables.d",
-            "echo 'table inet nkcore {
-                set warp_clients {
-                    type ipv4_addr
-                }
-                chain prerouting {
-                    type filter hook prerouting priority mangle; policy accept;
-                    ip saddr @warp_clients meta mark set 100
-                }
-            }' > /etc/nftables.d/nkcore-warp.nft",
+            "echo '{$base64NftWarp}' | base64 -d > /etc/nftables.d/nkcore-warp.nft",
             
             // 5. Deploy nat postrouting config (pure nftables)
-            "echo 'table ip nat {
-                chain postrouting {
-                    type nat hook postrouting priority 100; policy accept;
-                    oifname \"wg-warp\" masquerade
-                }
-            }' > /etc/nftables.d/nkcore-nat.nft",
+            "echo '{$base64NftNat}' | base64 -d > /etc/nftables.d/nkcore-nat.nft",
             
             // Ensure they are included in /etc/nftables.conf
             "if ! grep -q 'nkcore-warp.nft' /etc/nftables.conf; then echo 'include \"/etc/nftables.d/nkcore-warp.nft\"' >> /etc/nftables.conf; fi",
             "if ! grep -q 'nkcore-nat.nft' /etc/nftables.conf; then echo 'include \"/etc/nftables.d/nkcore-nat.nft\"' >> /etc/nftables.conf; fi",
             "systemctl reload nftables 2>/dev/null || systemctl restart nftables 2>/dev/null || true",
 
-            // 6. Create persistent startup routing commands
+            // 6. Create persistent startup routing commands using base64 decoding
             "mkdir -p /etc/wireguard/post-up.d",
-            "echo \"#!/bin/bash
-ip route replace \" . $escapedSubnet . \" dev wg0 table warp 2>/dev/null || true
-ip route replace default dev wg-warp table warp 2>/dev/null || true
-ip rule del fwmark 100 lookup warp priority 200 2>/dev/null || true
-ip rule add fwmark 100 lookup warp priority 200\" > /etc/wireguard/post-up.d/wg-warp.sh",
+            "echo '{$base64WarpScript}' | base64 -d > /etc/wireguard/post-up.d/wg-warp.sh",
             "chmod +x /etc/wireguard/post-up.d/wg-warp.sh",
             
             // Execute rules immediately

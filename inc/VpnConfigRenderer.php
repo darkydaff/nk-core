@@ -222,7 +222,7 @@ class VpnConfigRenderer
         $warpClients = $stmtWarp->fetchAll(PDO::FETCH_COLUMN);
 
         $syncCmds = [
-            "nft flush set inet nkcore warp_clients"
+            "nft flush set inet nkcore warp_clients 2>/dev/null || true"
         ];
         
         if (!empty($warpClients)) {
@@ -237,7 +237,7 @@ class VpnConfigRenderer
             
             if (!empty($validIps)) {
                 $ipList = implode(', ', $validIps);
-                $syncCmds[] = "nft add element inet nkcore warp_clients { {$ipList} }";
+                $syncCmds[] = "nft add element inet nkcore warp_clients { {$ipList} } 2>/dev/null || true";
             }
         }
         
