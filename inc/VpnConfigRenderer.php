@@ -117,6 +117,9 @@ class VpnConfigRenderer
             $defaultDown = (int)Config::get('DEFAULT_SPEED_LIMIT_DOWN', 0);
             $this->applyTrafficShaping($containerName, $this->clients, $defaultUp, $defaultDown);
             
+            // Sync dynamic routing mode packet markings (nftables sets)
+            $this->syncWarpRoutingClients();
+            
             Logger::channel('control-plane')->info('Declarative Sync Successful', ['server_id' => $this->server->getId()]);
             
         } catch (\Throwable $e) {
@@ -197,5 +200,47 @@ class VpnConfigRenderer
         } catch (\Throwable $e) {
             Logger::channel('control-plane')->warning("Failed to apply traffic shaping limits on server: " . $e->getMessage());
         }
+    }
+
+    /**
+     * Synchronize the nftables set of warp clients on the host server based on the database state.
+     */
+    private function syncWarpRoutingClients(): void
+    {
+        $pdo = DB::conn();
+        
+        // Fetch active clients with routing_mode = 'warp'
+        $stmtWarp = $pdo->prepare("
+            SELECT client_ip 
+            FROM vpn_clients 
+            WHERE server_id = ? 
+              AND routing_mode = 'warp' 
+              AND status IN ('active', 'verifying', 'provisioning') 
+              AND deleted_at IS NULL
+        ");
+        $stmtWarp->execute([$this->server->getId()]);
+        $warpClients = $stmtWarp->fetchAll(PDO::FETCH_COLUMN);
+
+        $syncCmds = [
+            "nft flush set inet nkcore warp_clients"
+        ];
+        
+        if (!empty($warpClients)) {
+            $validIps = [];
+            foreach ($warpClients as $ip) {
+                if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                    $validIps[] = $ip;
+                } else {
+                    Logger::channel('control-plane')->warning("Security Alert: Skip invalid IP address for routing set sync", ['ip' => $ip]);
+                }
+            }
+            
+            if (!empty($validIps)) {
+                $ipList = implode(', ', $validIps);
+                $syncCmds[] = "nft add element inet nkcore warp_clients { {$ipList} }";
+            }
+        }
+        
+        $this->ssh->executeCommand(implode(' && ', $syncCmds), true, true);
     }
 }
