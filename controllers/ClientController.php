@@ -206,6 +206,26 @@ class ClientController {
                 ]);
             }
 
+            $routingModeChanged = false;
+            if (isset($_POST['routing_mode'])) {
+                $newRoutingMode = trim($_POST['routing_mode']);
+                if (in_array($newRoutingMode, ['direct', 'warp'], true)) {
+                    $oldRoutingMode = $clientData['routing_mode'] ?? 'direct';
+                    if ($newRoutingMode !== $oldRoutingMode) {
+                        $client->setRoutingMode($newRoutingMode);
+                        $routingModeChanged = true;
+                    }
+                }
+            }
+
+            if ($routingModeChanged) {
+                require_once __DIR__ . '/../inc/Queue.php';
+                Queue::push('deployments', [
+                    'type' => 'sync_server_config',
+                    'server_id' => $clientData['server_id']
+                ]);
+            }
+
             return $this->respond(true, "Client updated successfully");
         } catch (Exception $e) {
             return $this->respond(false, "Update failed", $e->getMessage());
