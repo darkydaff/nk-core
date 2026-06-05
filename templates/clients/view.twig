@@ -168,6 +168,15 @@
                     
                     <p class="text-xs text-muted">{{ t('clients.speed_limit_help') }}</p>
                     
+                    <div class="border-t border-default/30 pt-4">
+                        <label for="routing_mode" class="block text-xs font-medium text-muted uppercase tracking-wide mb-2">Routing Backend</label>
+                        <select id="routing_mode" name="routing_mode" class="input-field w-full px-4 py-2.5 text-sm">
+                            <option value="direct" {% if client.routing_mode == 'direct' or client.routing_mode is empty %}selected{% endif %}>Direct (Server WAN)</option>
+                            <option value="warp" {% if client.routing_mode == 'warp' %}selected{% endif %}>Cloudflare WARP</option>
+                        </select>
+                        <p class="text-xs text-muted mt-2">Select the egress routing path for this client's traffic. Speed limits remain active on all paths.</p>
+                    </div>
+                    
                     <div class="flex justify-end pt-2">
                         <button type="submit" class="btn-primary px-5 py-2.5 text-sm">
                             <i class="fas fa-save mr-2"></i>{{ t('form.save') }}
