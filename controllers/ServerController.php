@@ -145,7 +145,22 @@ class ServerController
     {
         requireAuth();
         $randomPort = rand(30000, 65000);
-        View::render('servers/create.twig', ['random_port' => $randomPort]);
+        $allowedSubnets = [
+            '10.8.1.0/24',
+            '10.9.1.0/24',
+            '10.10.1.0/24',
+            '10.20.1.0/24',
+            '10.30.1.0/24',
+            '10.50.1.0/24',
+            '10.100.1.0/24',
+            '192.168.100.0/24',
+            '192.168.150.0/24',
+            '192.168.200.0/24',
+        ];
+        View::render('servers/create.twig', [
+            'random_port' => $randomPort,
+            'allowed_subnets' => $allowedSubnets
+        ]);
     }
 
     public function store()
@@ -158,9 +173,40 @@ class ServerController
         $port = (int) ($_POST['port'] ?? 22);
         $username = trim($_POST['username'] ?? 'root');
         $password = $_POST['password'] ?? '';
+        $vpnPort = !empty($_POST['vpn_port']) ? (int) $_POST['vpn_port'] : NULL;
+        $vpnSubnet = trim($_POST['vpn_subnet'] ?? '10.8.1.0/24');
+        $mimicryType = $_POST['mimicry_type'] ?? 'quic';
+
+        $allowedSubnets = [
+            '10.8.1.0/24',
+            '10.9.1.0/24',
+            '10.10.1.0/24',
+            '10.20.1.0/24',
+            '10.30.1.0/24',
+            '10.50.1.0/24',
+            '10.100.1.0/24',
+            '192.168.100.0/24',
+            '192.168.150.0/24',
+            '192.168.200.0/24',
+        ];
+
+        if (!in_array($vpnSubnet, $allowedSubnets)) {
+            $randomPort = $vpnPort ?: rand(30000, 65000);
+            View::render('servers/create.twig', [
+                'error' => 'Invalid VPN subnet selected',
+                'random_port' => $randomPort,
+                'allowed_subnets' => $allowedSubnets
+            ]);
+            return;
+        }
 
         if (empty($name) || empty($host) || empty($password)) {
-            View::render('servers/create.twig', ['error' => 'All fields are required']);
+            $randomPort = $vpnPort ?: rand(30000, 65000);
+            View::render('servers/create.twig', [
+                'error' => 'All fields are required',
+                'random_port' => $randomPort,
+                'allowed_subnets' => $allowedSubnets
+            ]);
             return;
         }
 
@@ -172,13 +218,19 @@ class ServerController
                 'port' => $port,
                 'username' => $username,
                 'password' => $password,
-                'vpn_port' => !empty($_POST['vpn_port']) ? (int) $_POST['vpn_port'] : NULL,
-                'mimicry_type' => $_POST['mimicry_type'] ?? 'quic'
+                'vpn_port' => $vpnPort,
+                'vpn_subnet' => $vpnSubnet,
+                'mimicry_type' => $mimicryType
             ]);
 
             redirect('/servers/' . $serverId . '/deploy');
         } catch (Exception $e) {
-            View::render('servers/create.twig', ['error' => $e->getMessage()]);
+            $randomPort = $vpnPort ?: rand(30000, 65000);
+            View::render('servers/create.twig', [
+                'error' => $e->getMessage(),
+                'random_port' => $randomPort,
+                'allowed_subnets' => $allowedSubnets
+            ]);
         }
     }
 

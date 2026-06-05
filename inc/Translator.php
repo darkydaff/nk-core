@@ -120,6 +120,8 @@ class Translator
             'clients.speed_limit_placeholder_inherit_unlimited' => ['en' => 'Inherit default (Unlimited)', 'uk' => 'Успадкувати за замовчуванням (Необмежено)', 'ru' => 'Наследовать по умолчанию (Безлимитно)'],
             'clients.speed_limit_placeholder_unlimited' => ['en' => 'Unlimited (0)', 'uk' => 'Необмежено (0)', 'ru' => 'Безлимитно (0)'],
             'clients.speed_limit_help' => ['en' => 'Enter custom speed in Mbps, 0 for unlimited, or leave empty to inherit settings.', 'uk' => 'Введіть швидкість у Мбіт/с, 0 для необмеженої або залиште порожнім, щоб успадкувати.', 'ru' => 'Введите скорость в Мбит/с, 0 для неограниченной или оставьте пустым, чтобы наследовать.'],
+            'servers.vpn_subnet' => ['en' => 'VPN Subnet', 'uk' => 'Підмережа VPN', 'ru' => 'Подсеть VPN'],
+            'servers.vpn_subnet_hint' => ['en' => 'Choose a subnet for the VPN network to avoid conflicts.', 'uk' => 'Виберіть підмережу для мережі VPN, щоб уникнути конфліктів.', 'ru' => 'Выберите подсеть для сети VPN во избежание конфликтов.'],
         ];
 
         $stmt = $pdo->prepare("INSERT INTO translations (locale, category, key_name, translation) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE translation = VALUES(translation)");
