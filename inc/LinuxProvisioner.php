@@ -397,4 +397,38 @@ ip rule add fwmark 100 lookup warp priority 200\" > /etc/wireguard/post-up.d/wg-
 
         $this->ssh->executeCommand($setupCmd, true, true);
     }
+
+    /**
+     * Install the health watchdog failover systemd service/cron job on the host.
+     */
+    public function installWarpWatchdog(): void {
+        $watchdogScript = <<<'BASH'
+#!/bin/bash
+# 1. Verify policy routing dev matches wg-warp
+ROUTE_DEV=$(ip route get 1.1.1.1 mark 100 2>/dev/null | grep -oE "dev [a-zA-Z0-9_-]+" | awk '{print $2}')
+if [ "$ROUTE_DEV" != "wg-warp" ]; then
+    echo "WARP routing invalid! Dev: $ROUTE_DEV. Flushing warp_clients set."
+    nft flush set inet nkcore warp_clients
+    exit 0
+fi
+
+# 2. Verify link state and test ping through the route
+if ! ping -c 2 -W 3 -I wg-warp 1.1.1.1 >/dev/null 2>&1; then
+    echo "WARP health check failed! Flushing set to fallback to direct."
+    nft flush set inet nkcore warp_clients
+fi
+BASH;
+
+        $base64Script = base64_encode($watchdogScript);
+        
+        $setupCmd = implode(' && ', [
+            "echo '{$base64Script}' | base64 -d > /usr/local/bin/nk-warp-watchdog.sh",
+            "chmod +x /usr/local/bin/nk-warp-watchdog.sh",
+            
+            // Setup Cron job to run watchdog every minute
+            "(crontab -l 2>/dev/null | grep -v 'nk-warp-watchdog.sh'; echo '* * * * * /usr/local/bin/nk-warp-watchdog.sh') | crontab -"
+        ]);
+
+        $this->ssh->executeCommand($setupCmd, true, true);
+    }
 }

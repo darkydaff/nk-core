@@ -266,6 +266,15 @@ class VpnProvisioner
             ]);
         }
 
+        // Install health watchdog for Cloudflare WARP failover
+        try {
+            $this->linux->installWarpWatchdog();
+        } catch (Exception $e) {
+            Logger::channel('deployments')->error("Failed to install WARP health watchdog: " . $e->getMessage(), [
+                'server_id' => $this->getId()
+            ]);
+        }
+
         // Automatically install adaptive push telemetry agent
         try {
             $this->installTelemetryAgent();
