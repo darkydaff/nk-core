@@ -174,7 +174,7 @@ class ClientController {
                     $newLimitUp = max(0, min(10000, $newLimitUp));
                 }
                 
-                $oldLimitUp = $clientData['speed_limit_up'] !== null ? (int)$clientData['speed_limit_up'] : null;
+                $oldLimitUp = ($clientData['speed_limit_up'] ?? null) !== null ? (int)$clientData['speed_limit_up'] : null;
                 if ($newLimitUp !== $oldLimitUp) {
                     $stmt = $pdo->prepare('UPDATE vpn_clients SET speed_limit_up = ? WHERE id = ?');
                     $stmt->execute([$newLimitUp, $clientId]);
@@ -189,7 +189,7 @@ class ClientController {
                     $newLimitDown = max(0, min(10000, $newLimitDown));
                 }
                 
-                $oldLimitDown = $clientData['speed_limit_down'] !== null ? (int)$clientData['speed_limit_down'] : null;
+                $oldLimitDown = ($clientData['speed_limit_down'] ?? null) !== null ? (int)$clientData['speed_limit_down'] : null;
                 if ($newLimitDown !== $oldLimitDown) {
                     $stmt = $pdo->prepare('UPDATE vpn_clients SET speed_limit_down = ? WHERE id = ?');
                     $stmt->execute([$newLimitDown, $clientId]);

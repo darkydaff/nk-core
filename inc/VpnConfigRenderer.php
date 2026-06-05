@@ -151,9 +151,8 @@ class VpnConfigRenderer
             
             foreach ($clients as $client) {
                 $clientIp = $client['client_ip'];
-                
-                $limitDown = $client['speed_limit_down'] !== null ? (int)$client['speed_limit_down'] : $defaultDown;
-                $limitUp = $client['speed_limit_up'] !== null ? (int)$client['speed_limit_up'] : $defaultUp;
+                $limitDown = ($client['speed_limit_down'] ?? null) !== null ? (int)$client['speed_limit_down'] : $defaultDown;
+                $limitUp = ($client['speed_limit_up'] ?? null) !== null ? (int)$client['speed_limit_up'] : $defaultUp;
                 
                 // Map each client to a unique sequential class ID (offset to avoid reserved IDs)
                 $classId = 100 + $index;
