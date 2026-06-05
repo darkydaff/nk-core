@@ -695,13 +695,47 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     // ── Load data ────────────────────────────────────────────────────────
-
+ 
     fetch('/api/map/clients')
         .then(r => r.json())
         .then(data => {
             if (!data.success) return;
             cachedClients = data.clients;
             cachedServers = data.servers || [];
+
+            // Displace overlapping servers and clients in the same city
+            const serverCoords = {};
+            cachedServers.forEach(srv => {
+                if (typeof srv.lat === 'number' && typeof srv.lon === 'number') {
+                    const key = `${srv.lat.toFixed(4)},${srv.lon.toFixed(4)}`;
+                    serverCoords[key] = true;
+                }
+            });
+
+            cachedClients.forEach(c => {
+                if (typeof c.lat === 'number' && typeof c.lon === 'number') {
+                    const key = `${c.lat.toFixed(4)},${c.lon.toFixed(4)}`;
+                    if (serverCoords[key]) {
+                        c.lat -= 0.008;
+                        c.lon -= 0.008;
+                    }
+                }
+            });
+
+            cachedServers.forEach(srv => {
+                if (typeof srv.lat === 'number' && typeof srv.lon === 'number') {
+                    const hasOverlap = cachedClients.some(c => 
+                        typeof c.lat === 'number' && typeof c.lon === 'number' &&
+                        Math.abs((c.lat + 0.008) - srv.lat) < 0.0001 &&
+                        Math.abs((c.lon + 0.008) - srv.lon) < 0.0001
+                    );
+                    if (hasOverlap) {
+                        srv.lat += 0.008;
+                        srv.lon += 0.008;
+                    }
+                }
+            });
+
             renderServerMarkers();
             renderClientMarkers(cachedClients);
         })
