@@ -56,6 +56,9 @@ class VpnProvisioner
             throw new Exception('Server not loaded');
         }
 
+        // Verify no subnet overlap with Cloudflare WARP range
+        $this->verifyNoSubnetConflict($serverData['vpn_subnet'] ?? '10.8.1.0/24');
+
         // Disable PHP timeout for long builds (Go compilation takes several minutes)
         ini_set('max_execution_time', '0');
 
@@ -253,6 +256,15 @@ class VpnProvisioner
 
         // Automatically fetch GeoIP data after successful deployment
         $this->server->updateGeoIp();
+
+        // Setup Cloudflare WARP routing host tables, PBR rules, and nftables rulesets
+        try {
+            $this->linux->setupWarpHostRules($serverData['vpn_subnet'] ?? '10.8.1.0/24');
+        } catch (Exception $e) {
+            Logger::channel('deployments')->error("Failed to setup WARP host rules: " . $e->getMessage(), [
+                'server_id' => $this->getId()
+            ]);
+        }
 
         // Automatically install adaptive push telemetry agent
         try {
@@ -741,4 +753,31 @@ WantedBy=multi-user.target' > /etc/systemd/system/nk-telemetry.service",
         }
     }
 
+    /**
+     * Checks if the configured VPN subnet conflicts with the Cloudflare WARP range (172.16.0.0/12)
+     */
+    private function verifyNoSubnetConflict(string $vpnSubnet): void {
+        if (strpos($vpnSubnet, '/') === false) {
+            $vpnSubnet .= '/24';
+        }
+        
+        list($vpnIp, $vpnMask) = explode('/', $vpnSubnet);
+        $vpnMask = (int)$vpnMask;
+        
+        $vpnLong = ip2long($vpnIp);
+        if ($vpnLong === false) {
+            throw new Exception("Invalid VPN subnet IP: {$vpnIp}");
+        }
+        
+        $warpLong = ip2long('172.16.0.0');
+        $warpMask = 12;
+        
+        $minMask = min($vpnMask, $warpMask);
+        $vpnPrefix = $vpnLong & ~((1 << (32 - $minMask)) - 1);
+        $warpPrefix = $warpLong & ~((1 << (32 - $minMask)) - 1);
+        
+        if ($vpnPrefix === $warpPrefix) {
+            throw new Exception("VPN Subnet {$vpnSubnet} overlaps with Cloudflare WARP IP space (172.16.0.0/12). Please use another subnet (e.g. 10.8.1.0/24) to avoid routing conflicts.");
+        }
+    }
 }
