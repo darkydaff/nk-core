@@ -705,6 +705,8 @@ class VpnClient {
             $data['status'] = $data['status']->value;
         }
         
+        $data['routing_mode'] = $data['routing_mode'] ?? 'direct';
+        
         return $data;
     }
     
@@ -1473,5 +1475,19 @@ public static function getClientsOverLimit(): array {
         }
         
         return false;
+    }
+
+    /**
+     * Update client routing mode
+     */
+    public function setRoutingMode(string $mode): void {
+        if (!in_array($mode, ['direct', 'warp'], true)) {
+            throw new InvalidArgumentException("Invalid routing mode: {$mode}");
+        }
+        
+        $pdo = DB::conn();
+        $stmt = $pdo->prepare('UPDATE vpn_clients SET routing_mode = ? WHERE id = ?');
+        $stmt->execute([$mode, $this->clientId]);
+        $this->data['routing_mode'] = $mode;
     }
 }
