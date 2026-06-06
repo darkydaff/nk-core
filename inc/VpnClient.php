@@ -301,11 +301,11 @@ class VpnClient {
             'H2' => ['H2', 'h2'],
             'H3' => ['H3', 'h3'],
             'H4' => ['H4', 'h4'],
-            'i1' => ['I1', 'i1'],
-            'i2' => ['I2', 'i2'],
-            'i3' => ['I3', 'i3'],
-            'i4' => ['I4', 'i4'],
-            'i5' => ['I5', 'i5']
+            'I1' => ['I1', 'i1'],
+            'I2' => ['I2', 'i2'],
+            'I3' => ['I3', 'i3'],
+            'I4' => ['I4', 'i4'],
+            'I5' => ['I5', 'i5']
         ];
 
         foreach ($keys as $outputKey => $sourceKeys) {
@@ -730,8 +730,40 @@ class VpnClient {
             }
         }
         
-        // If config is missing, old, or has incorrect MTU placement, regenerate it
-        if (!$config || strpos($config, '# Name:') === false || $hasWrongMtu) {
+        $isOutOfSync = false;
+        if ($config && !$hasWrongMtu) {
+            try {
+                $server = new VpnServer($this->data['server_id']);
+                $serverData = $server->getData();
+                $awgParams = $serverData['awg_params'] ?? [];
+                if (is_string($awgParams)) {
+                    $awgParams = json_decode($awgParams, true) ?: [];
+                }
+                
+                $checkParams = ['Jc', 'Jmin', 'Jmax', 'S1', 'S2', 'S3', 'S4', 'H1', 'H2', 'H3', 'H4', 'I1', 'I2', 'I3', 'I4', 'I5'];
+                foreach ($checkParams as $paramKey) {
+                    if (isset($awgParams[$paramKey]) && $awgParams[$paramKey] !== '' && $awgParams[$paramKey] !== null) {
+                        $expected = $awgParams[$paramKey];
+                        $pattern = '/^\s*' . preg_quote($paramKey, '/') . '\s*=\s*(.+)$/m';
+                        if (preg_match($pattern, $config, $matches)) {
+                            $currentVal = trim($matches[1]);
+                            if ((string)$currentVal !== (string)$expected) {
+                                $isOutOfSync = true;
+                                break;
+                            }
+                        } else {
+                            $isOutOfSync = true;
+                            break;
+                        }
+                    }
+                }
+            } catch (Exception $e) {
+                // Ignore errors during sync check
+            }
+        }
+        
+        // If config is missing, old, has incorrect MTU placement, or is out of sync, regenerate it
+        if (!$config || strpos($config, '# Name:') === false || $hasWrongMtu || $isOutOfSync) {
             try {
                 $this->regenerateConfig();
                 return $this->data['config'] ?? '';
