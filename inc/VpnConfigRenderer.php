@@ -183,6 +183,7 @@ class VpnConfigRenderer
                 if ($limitUp > 0) {
                     if (!$hasUploadLimits) {
                         $uploadRules .= "ip link add ifb-wg0 type ifb 2>/dev/null || true\n";
+                        $uploadRules .= "ip link set dev ifb-wg0 txqueuelen 1000\n";
                         $uploadRules .= "ip link set dev ifb-wg0 up\n";
                         $uploadRules .= "tc qdisc add dev wg0 handle ffff: ingress\n";
                         $uploadRules .= "tc filter add dev wg0 parent ffff: protocol ip u32 match u32 0 0 action mirred egress redirect dev ifb-wg0\n";
