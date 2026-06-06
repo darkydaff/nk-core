@@ -257,6 +257,15 @@ class VpnProvisioner
         // Automatically fetch GeoIP data after successful deployment
         $this->server->updateGeoIp();
 
+        // Setup host-level NAT masquerading rules
+        try {
+            $this->linux->setupHostNatRules($serverData['vpn_subnet'] ?? '10.8.1.0/24');
+        } catch (Exception $e) {
+            Logger::channel('deployments')->error("Failed to setup host NAT rules: " . $e->getMessage(), [
+                'server_id' => $this->getId()
+            ]);
+        }
+
         // Setup Cloudflare WARP routing host tables, PBR rules, and nftables rulesets
         try {
             $this->linux->setupWarpHostRules($serverData['vpn_subnet'] ?? '10.8.1.0/24');

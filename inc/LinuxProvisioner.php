@@ -437,6 +437,31 @@ class LinuxProvisioner
     }
 
     /**
+     * Setup native host-level NAT masquerading rules for the VPN subnet via nftables
+     */
+    public function setupHostNatRules(string $vpnSubnet): void
+    {
+        $nftNat = "table ip nkcore_vpn_nat {\n" .
+                  "    chain postrouting {\n" .
+                  "        type nat hook postrouting priority 100; policy accept;\n" .
+                  "        ip saddr {$vpnSubnet} masquerade\n" .
+                  "    }\n" .
+                  "}\n";
+        $base64NftNat = base64_encode($nftNat);
+
+        $setupCmd = implode(' && ', [
+            "which nft >/dev/null 2>&1 || (apt-get update -q && apt-get install -y nftables) || (yum install -y nftables) || true",
+            "systemctl enable nftables",
+            "mkdir -p /etc/nftables.d",
+            "echo '{$base64NftNat}' | base64 -d > /etc/nftables.d/nkcore-vpn-nat.nft",
+            "if ! grep -q 'nkcore-vpn-nat.nft' /etc/nftables.conf; then echo 'include \"/etc/nftables.d/nkcore-vpn-nat.nft\"' >> /etc/nftables.conf; fi",
+            "systemctl reload nftables 2>/dev/null || systemctl restart nftables 2>/dev/null || true"
+        ]);
+
+        $this->ssh->executeCommand($setupCmd, true, true);
+    }
+
+    /**
      * Install the health watchdog failover systemd service/cron job on the host.
      */
     public function installWarpWatchdog(): void {
