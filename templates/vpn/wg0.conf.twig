@@ -6,7 +6,7 @@ MTU = 1280
 
 {% for key, value in server.awg_params %}
 {% if value is not null and value != '' and key != 'mimicry_type' %}
-{{ key }} = {{ value }}
+{{ key }} = {{ value|raw }}
 {% endif %}
 {% endfor %}
 
