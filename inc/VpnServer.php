@@ -194,6 +194,34 @@ class VpnServer
         if (isset($this->data['awg_params']) && is_string($this->data['awg_params'])) {
             $this->data['awg_params'] = json_decode($this->data['awg_params'], true);
         }
+
+        // Self-heal: If server is active or has an error, and has un-obfuscated default parameters (H1 = 1)
+        if ($this->data['status'] === ServerStatus::ACTIVE || $this->data['status'] === ServerStatus::ERROR) {
+            $params = $this->data['awg_params'] ?? [];
+            if (is_array($params) && (isset($params['H1']) && (string)$params['H1'] === '1')) {
+                require_once __DIR__ . '/AwgConfigGenerator.php';
+                $generator = new AwgConfigGenerator();
+                $newParams = $generator->generateAwgParams(null, $generator->getMimicryPreset($params['mimicry_type'] ?? 'quic'));
+                
+                // Keep I1/I2 from existing if present
+                foreach (['I1', 'I2', 'I3', 'I4', 'I5'] as $iKey) {
+                    if (isset($params[$iKey])) {
+                        $newParams[$iKey] = $params[$iKey];
+                    }
+                }
+                
+                $pdo->prepare('UPDATE vpn_servers SET awg_params = ? WHERE id = ?')
+                    ->execute([json_encode($newParams), $this->serverId]);
+                $this->data['awg_params'] = $newParams;
+                
+                // Push a sync server config job to queue to apply new parameters and rebuild client configurations
+                require_once __DIR__ . '/Queue.php';
+                Queue::push('deployments', [
+                    'type' => 'sync_server_config',
+                    'server_id' => $this->serverId
+                ]);
+            }
+        }
     }
 
     /**

@@ -275,6 +275,7 @@ class VpnClient {
         $config .= "PrivateKey = {$privateKey}\n";
         $config .= "Address = {$clientIP}/32\n";
         $config .= "DNS = 1.1.1.1, 1.0.0.1\n";
+        $config .= "MTU = 1280\n";
 
         // Accept both key casings and normalize to I1-I5 in exported config.
         for ($idx = 1; $idx <= 5; $idx++) {
@@ -327,7 +328,6 @@ class VpnClient {
         $config .= "Endpoint = {$serverHost}:{$serverPort}\n";
         $config .= "AllowedIPs = 0.0.0.0/0\n";
         $config .= "PersistentKeepalive = 25\n";
-        $config .= "MTU = 1280\n";
         
         return $config;
     }
@@ -692,6 +692,9 @@ class VpnClient {
     public function getData(): ?array {
         if (!$this->data) return null;
         
+        // Ensure configuration is up to date and correct (e.g. self-heals incorrect MTU section)
+        $this->getConfig();
+        
         $data = $this->data;
         
         // Calculate connection status — threshold: 300s (5 min) matches WireGuard keepalive
@@ -715,8 +718,20 @@ class VpnClient {
      */
     public function getConfig(): string {
         $config = $this->data['config'] ?? '';
-        // If config is missing or old, regenerate it
-        if (!$config || strpos($config, '# Name:') === false) {
+        
+        $hasWrongMtu = false;
+        if ($config) {
+            $peerPos = strpos($config, '[Peer]');
+            $mtuPos = strpos($config, 'MTU =');
+            if ($mtuPos === false) {
+                $hasWrongMtu = true;
+            } elseif ($peerPos !== false && $mtuPos > $peerPos) {
+                $hasWrongMtu = true;
+            }
+        }
+        
+        // If config is missing, old, or has incorrect MTU placement, regenerate it
+        if (!$config || strpos($config, '# Name:') === false || $hasWrongMtu) {
             try {
                 $this->regenerateConfig();
                 return $this->data['config'] ?? '';

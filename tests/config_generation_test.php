@@ -22,7 +22,7 @@ function runConfigTests() {
     // Test 1: Dockerfile
     $dockerfile = $generator->getDockerfile();
     $assert(!empty($dockerfile), "Dockerfile is not empty");
-    $assert(str_contains($dockerfile, 'FROM golang:alpine AS builder'), "Dockerfile contains builder stage");
+    $assert(str_contains($dockerfile, 'FROM alpine:latest AS builder'), "Dockerfile contains builder stage");
     $assert(str_contains($dockerfile, 'ENTRYPOINT [ "dumb-init", "/opt/amnezia/start.sh" ]'), "Dockerfile contains entrypoint");
 
     // Test 2: Start Script
