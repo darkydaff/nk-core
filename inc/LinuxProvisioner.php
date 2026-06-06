@@ -205,8 +205,9 @@ class LinuxProvisioner
         $this->ssh->executeCommand('apt-get update', true, false, false, 300);
         $this->ssh->executeCommand('DEBIAN_FRONTEND=noninteractive apt-get install -y amneziawg', true, false, false, 600);
 
-        // Step 5: Load module
+        // Step 5: Load module and persist on boot
         $this->ssh->executeCommand('modprobe amneziawg 2>/dev/null || true', true);
+        $this->ssh->executeCommand('echo "amneziawg" | tee /etc/modules-load.d/amneziawg.conf 2>/dev/null || true', true);
 
         // Verify
         $check = $this->ssh->executeCommand('lsmod | grep -c amneziawg 2>/dev/null || echo 0');
@@ -343,7 +344,9 @@ class LinuxProvisioner
 
         $this->ssh->executeCommand("{$mgr} install -y amneziawg-dkms amneziawg-tools 2>/dev/null || true", true, false, false, 600);
 
+        // Load module and persist on boot
         $this->ssh->executeCommand('modprobe amneziawg 2>/dev/null || true', true);
+        $this->ssh->executeCommand('echo "amneziawg" | tee /etc/modules-load.d/amneziawg.conf 2>/dev/null || true', true);
 
         $check = $this->ssh->executeCommand('lsmod | grep -c amneziawg 2>/dev/null || echo 0');
         $loaded = (int)trim($check) > 0;
