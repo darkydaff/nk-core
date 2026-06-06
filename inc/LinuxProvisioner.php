@@ -44,12 +44,19 @@ class LinuxProvisioner
             $this->ssh->executeCommand("{$mgr} install -y sudo curl ca-certificates 2>/dev/null || true", true, false, false, 300);
         }
 
-        // Enable and persist IP forwarding on the host system (critical for VPN routing/forwarding)
-        $this->ssh->executeCommand('sysctl -w net.ipv4.ip_forward=1 net.ipv6.conf.all.forwarding=1 2>/dev/null || true', true);
+        // Enable and persist IP forwarding and optimize network buffers for high-speed VPN on the host
+        $this->ssh->executeCommand(
+            'sysctl -w net.ipv4.ip_forward=1 net.ipv6.conf.all.forwarding=1 ' .
+            'net.core.rmem_max=16777216 net.core.wmem_max=16777216 net.core.netdev_max_backlog=10000 2>/dev/null || true', 
+            true
+        );
         $this->ssh->executeCommand(
             'mkdir -p /etc/sysctl.d && ' .
             'echo "net.ipv4.ip_forward=1" | tee /etc/sysctl.d/99-ip-forward.conf && ' .
             'echo "net.ipv6.conf.all.forwarding=1" | tee /etc/sysctl.d/99-ip-forward-v6.conf && ' .
+            'echo "net.core.rmem_max=16777216" | tee /etc/sysctl.d/99-vpn-buffers.conf && ' .
+            'echo "net.core.wmem_max=16777216" | tee -a /etc/sysctl.d/99-vpn-buffers.conf && ' .
+            'echo "net.core.netdev_max_backlog=10000" | tee -a /etc/sysctl.d/99-vpn-buffers.conf && ' .
             'sysctl --system 2>/dev/null || true',
             true
         );

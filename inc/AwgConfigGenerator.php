@@ -212,7 +212,7 @@ RUN git clone --branch \${AMNEZIAWG_TOOLS_REF} https://github.com/amnezia-vpn/am
 
 # Stage 2: Final Image
 FROM alpine:latest
-RUN apk add --no-cache bash iptables iproute2 coreutils dumb-init libmnl ethtool
+RUN apk add --no-cache bash iptables iproute2 coreutils dumb-init libmnl
 
 # Copy binaries from builder
 COPY --from=builder /usr/bin/awg /usr/local/bin/
