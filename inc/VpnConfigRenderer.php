@@ -143,9 +143,16 @@ class VpnConfigRenderer
             $script .= "    echo \"Warning: tc (iproute2) is not installed in the container. Bandwidth limits cannot be applied.\"\n";
             $script .= "    exit 0\n";
             $script .= "fi\n\n";
-            $script .= "# Clear existing qdiscs\n";
+
+            $script .= "# Try loading the IFB and action mirred kernel modules on the host\n";
+            $script .= "modprobe ifb numifbs=0 2>/dev/null || modprobe ifb 2>/dev/null || true\n";
+            $script .= "modprobe act_mirred 2>/dev/null || true\n\n";
+
+            $script .= "# Clear existing qdiscs and virtual devices\n";
             $script .= "tc qdisc del dev wg0 root 2>/dev/null || true\n";
             $script .= "tc qdisc del dev wg0 ingress 2>/dev/null || true\n";
+            $script .= "tc qdisc del dev ifb-wg0 root 2>/dev/null || true\n";
+            $script .= "ip link delete ifb-wg0 2>/dev/null || true\n\n";
             
             $hasDownloadLimits = false;
             $hasUploadLimits = false;
@@ -175,14 +182,17 @@ class VpnConfigRenderer
                 
                 if ($limitUp > 0) {
                     if (!$hasUploadLimits) {
+                        $uploadRules .= "ip link add ifb-wg0 type ifb 2>/dev/null || true\n";
+                        $uploadRules .= "ip link set dev ifb-wg0 up\n";
                         $uploadRules .= "tc qdisc add dev wg0 handle ffff: ingress\n";
+                        $uploadRules .= "tc filter add dev wg0 parent ffff: protocol ip u32 match u32 0 0 action mirred egress redirect dev ifb-wg0\n";
+                        $uploadRules .= "tc qdisc add dev ifb-wg0 root handle 1: htb default 10\n";
+                        $uploadRules .= "tc class add dev ifb-wg0 parent 1: classid 1:10 htb rate 100gbit\n";
                         $hasUploadLimits = true;
                     }
-                    // Calculate a dynamic burst size (approx 200ms of traffic at the rate limit) to prevent TCP throttling/drops.
-                    // 100 Mbps * 0.2s = 20 Mb = 2.5 MB. We cap the minimum burst at 512k.
-                    $burstKb = (int)max(512, ($limitUp * 1000 / 8) * 0.2);
-                    // Ingress policing drops packets exceeding the limit
-                    $uploadRules .= "tc filter add dev wg0 parent ffff: protocol ip u32 match ip src {$clientIp} action police rate {$limitUp}mbit burst {$burstKb}k drop flowid :1\n";
+                    $uploadRules .= "tc class add dev ifb-wg0 parent 1: classid 1:{$classId} htb rate {$limitUp}mbit ceil {$limitUp}mbit\n";
+                    $uploadRules .= "tc qdisc add dev ifb-wg0 parent 1:{$classId} handle {$classId}: fq_codel\n";
+                    $uploadRules .= "tc filter add dev ifb-wg0 protocol ip parent 1:0 prio 1 u32 match ip src {$clientIp} flowid 1:{$classId}\n";
                 }
             }
             
