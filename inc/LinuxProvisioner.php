@@ -447,6 +447,11 @@ class LinuxProvisioner
                   "        type nat hook postrouting priority 100; policy accept;\n" .
                   "        ip saddr {$vpnSubnet} masquerade\n" .
                   "    }\n" .
+                  "    chain forward {\n" .
+                  "        type filter hook forward priority 0; policy accept;\n" .
+                  "        ip saddr {$vpnSubnet} tcp flags syn tcp option maxseg size set 1240\n" .
+                  "        ip daddr {$vpnSubnet} tcp flags syn tcp option maxseg size set 1240\n" .
+                  "    }\n" .
                   "}\n";
         $base64NftNat = base64_encode($nftNat);
 
