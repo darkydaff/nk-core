@@ -43,6 +43,16 @@ class LinuxProvisioner
             // Install sudo/curl on RPM-based systems
             $this->ssh->executeCommand("{$mgr} install -y sudo curl ca-certificates 2>/dev/null || true", true, false, false, 300);
         }
+
+        // Enable and persist IP forwarding on the host system (critical for VPN routing/forwarding)
+        $this->ssh->executeCommand('sysctl -w net.ipv4.ip_forward=1 net.ipv6.conf.all.forwarding=1 2>/dev/null || true', true);
+        $this->ssh->executeCommand(
+            'mkdir -p /etc/sysctl.d && ' .
+            'echo "net.ipv4.ip_forward=1" | tee /etc/sysctl.d/99-ip-forward.conf && ' .
+            'echo "net.ipv6.conf.all.forwarding=1" | tee /etc/sysctl.d/99-ip-forward-v6.conf && ' .
+            'sysctl --system 2>/dev/null || true',
+            true
+        );
     }
 
     /**
