@@ -233,9 +233,22 @@ class LinuxProvisioner
             return;
         }
 
-        // Attempt 1 — exact versioned match (most reliable on standard kernels)
+        // 1. Attempt exact versioned match (most reliable for current running kernel)
         $this->ssh->executeCommand("apt-get install -y linux-headers-{$kernel} 2>/dev/null || true", true, false, false, 300);
 
+        // 2. Also install the metapackage to ensure future kernel updates pull headers automatically (prevents DKMS breaks on reboot)
+        if ($isXanmod) {
+            $this->ssh->executeCommand(
+                'apt-get install -y linux-headers-xanmod-edge 2>/dev/null || ' .
+                'apt-get install -y linux-headers-xanmod-lts 2>/dev/null || ' .
+                'apt-get install -y linux-headers-xanmod 2>/dev/null || true',
+                true, false, false, 300
+            );
+        } else {
+            $this->ssh->executeCommand('apt-get install -y linux-headers-generic 2>/dev/null || true', true, false, false, 300);
+        }
+
+        // Verify if headers for the current kernel exist
         $headersExist = $this->ssh->executeCommand(
             "test -d /usr/src/linux-headers-{$kernel} && echo yes || echo no", true
         );
@@ -243,6 +256,7 @@ class LinuxProvisioner
             return;
         }
 
+        // 3. Version-flavor fallback if exact match wasn't found (e.g. linux-headers-amd64, linux-headers-generic)
         $flavor = '';
         if (preg_match('/^\d+\.\d+\.\d+-\d+-(.+)$/', $kernel, $m)) {
             $flavor = $m[1];
@@ -258,28 +272,12 @@ class LinuxProvisioner
             }
         }
 
-        if ($isXanmod) {
-            $this->ssh->executeCommand(
-                'apt-get install -y linux-headers-xanmod-edge 2>/dev/null || ' .
-                'apt-get install -y linux-headers-xanmod-lts 2>/dev/null || ' .
-                'apt-get install -y linux-headers-xanmod 2>/dev/null || true',
-                true, false, false, 300
-            );
-        } else {
-            $this->ssh->executeCommand('apt-get install -y linux-headers-generic 2>/dev/null || true', true, false, false, 300);
-        }
-
-        $headersExist = $this->ssh->executeCommand(
-            "test -d /usr/src/linux-headers-{$kernel} && echo yes || echo no", true
-        );
-        if (trim($headersExist) !== 'yes') {
-            Logger::channel('deployments')->warning('Could not install kernel headers — DKMS may fail, userspace fallback will be used', [
-                'server_id' => $this->serverId,
-                'kernel'    => $kernel,
-                'dpkg_arch' => $dpkgArch,
-                'xanmod'    => $isXanmod,
-            ]);
-        }
+        Logger::channel('deployments')->warning('Could not install kernel headers — DKMS may fail, userspace fallback will be used', [
+            'server_id' => $this->serverId,
+            'kernel'    => $kernel,
+            'dpkg_arch' => $dpkgArch,
+            'xanmod'    => $isXanmod,
+        ]);
     }
 
     /**

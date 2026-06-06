@@ -178,8 +178,11 @@ class VpnConfigRenderer
                         $uploadRules .= "tc qdisc add dev wg0 handle ffff: ingress\n";
                         $hasUploadLimits = true;
                     }
+                    // Calculate a dynamic burst size (approx 200ms of traffic at the rate limit) to prevent TCP throttling/drops.
+                    // 100 Mbps * 0.2s = 20 Mb = 2.5 MB. We cap the minimum burst at 512k.
+                    $burstKb = (int)max(512, ($limitUp * 1000 / 8) * 0.2);
                     // Ingress policing drops packets exceeding the limit
-                    $uploadRules .= "tc filter add dev wg0 parent ffff: protocol ip u32 match ip src {$clientIp} action police rate {$limitUp}mbit burst 100k drop flowid :1\n";
+                    $uploadRules .= "tc filter add dev wg0 parent ffff: protocol ip u32 match ip src {$clientIp} action police rate {$limitUp}mbit burst {$burstKb}k drop flowid :1\n";
                 }
             }
             

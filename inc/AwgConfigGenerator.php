@@ -288,8 +288,11 @@ if [ -f /opt/amnezia/awg/wg0.conf ]; then
     # Ensure no ghost interface exists
     /usr/local/bin/awg-quick down /opt/amnezia/awg/wg0.conf 2>/dev/null || ip link delete wg0 2>/dev/null || true
     
-    # Check if amneziawg kernel module is available
-    if lsmod | grep -q "amneziawg"; then
+    # Try loading the module in case it's not loaded yet (since container has privileged access)
+    modprobe amneziawg 2>/dev/null || true
+
+    # Check if amneziawg kernel module is available (checking lsmod, or reading /proc/modules directly)
+    if lsmod 2>/dev/null | grep -q "amneziawg" || grep -q "amneziawg" /proc/modules 2>/dev/null; then
         echo "AmneziaWG kernel module detected. Using kernel mode."
         unset WG_QUICK_USERSPACE_IMPLEMENTATION
     else
