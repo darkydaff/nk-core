@@ -151,6 +151,7 @@ class VpnConfigRenderer
             $script .= "# Clear existing qdiscs and virtual devices\n";
             $script .= "tc qdisc del dev wg0 root 2>/dev/null || true\n";
             $script .= "tc qdisc del dev wg0 ingress 2>/dev/null || true\n";
+            $script .= "ethtool -K wg0 gro off gso off tso off 2>/dev/null || true\n";
             $script .= "tc qdisc del dev ifb-wg0 root 2>/dev/null || true\n";
             $script .= "ip link delete ifb-wg0 2>/dev/null || true\n\n";
             
@@ -184,6 +185,7 @@ class VpnConfigRenderer
                     if (!$hasUploadLimits) {
                         $uploadRules .= "ip link add ifb-wg0 type ifb 2>/dev/null || true\n";
                         $uploadRules .= "ip link set dev ifb-wg0 txqueuelen 1000\n";
+                        $uploadRules .= "ethtool -K ifb-wg0 gro off gso off tso off 2>/dev/null || true\n";
                         $uploadRules .= "ip link set dev ifb-wg0 up\n";
                         $uploadRules .= "tc qdisc add dev wg0 handle ffff: ingress\n";
                         $uploadRules .= "tc filter add dev wg0 parent ffff: protocol ip u32 match u32 0 0 action mirred egress redirect dev ifb-wg0\n";
