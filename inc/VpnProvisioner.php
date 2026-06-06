@@ -214,6 +214,35 @@ class VpnProvisioner
         try {
             if ($this->detectAndImportExistingConfig()) {
                 $this->server->load();
+                $serverData = $this->getData();
+                
+                // Re-apply host NAT rules during adoption
+                try {
+                    $this->linux->setupHostNatRules($serverData['vpn_subnet'] ?? '10.8.1.0/24');
+                } catch (Exception $e) {
+                    Logger::channel('deployments')->error("Failed to setup host NAT rules during adoption: " . $e->getMessage(), [
+                        'server_id' => $this->getId()
+                    ]);
+                }
+
+                // Re-apply host WARP routing rules during adoption
+                try {
+                    $this->linux->setupWarpHostRules($serverData['vpn_subnet'] ?? '10.8.1.0/24');
+                } catch (Exception $e) {
+                    Logger::channel('deployments')->error("Failed to setup WARP host rules during adoption: " . $e->getMessage(), [
+                        'server_id' => $this->getId()
+                    ]);
+                }
+
+                // Re-install/verify WARP watchdog during adoption
+                try {
+                    $this->linux->installWarpWatchdog();
+                } catch (Exception $e) {
+                    Logger::channel('deployments')->error("Failed to install WARP health watchdog during adoption: " . $e->getMessage(), [
+                        'server_id' => $this->getId()
+                    ]);
+                }
+
                 // Automatically install telemetry agent if push mode is active
                 $this->installTelemetryAgent();
                 return true;
