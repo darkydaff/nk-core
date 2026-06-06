@@ -275,7 +275,7 @@ class VpnClient {
         $config .= "PrivateKey = {$privateKey}\n";
         $config .= "Address = {$clientIP}/32\n";
         $config .= "DNS = 1.1.1.1, 1.0.0.1\n";
-        $config .= "MTU = 1280\n";
+        $config .= "MTU = 1420\n";
 
         // Accept both key casings and normalize to I1-I5 in exported config.
         for ($idx = 1; $idx <= 5; $idx++) {

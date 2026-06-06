@@ -456,8 +456,8 @@ class LinuxProvisioner
                   "    }\n" .
                   "    chain forward {\n" .
                   "        type filter hook forward priority 0; policy accept;\n" .
-                  "        ip saddr {$vpnSubnet} tcp flags syn tcp option maxseg size set 1240\n" .
-                  "        ip daddr {$vpnSubnet} tcp flags syn tcp option maxseg size set 1240\n" .
+                  "        ip saddr {$vpnSubnet} tcp flags syn tcp option maxseg size set 1380\n" .
+                  "        ip daddr {$vpnSubnet} tcp flags syn tcp option maxseg size set 1380\n" .
                   "    }\n" .
                   "}\n";
         $base64NftNat = base64_encode($nftNat);

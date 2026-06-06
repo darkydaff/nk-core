@@ -2,7 +2,7 @@
 PrivateKey = {{ server.server_private_key }}
 Address = {{ server.vpn_subnet_base }}.1/24
 ListenPort = {{ server.vpn_port }}
-MTU = 1280
+MTU = 1420
 
 {% for key, value in server.awg_params %}
 {% if value is not null and value != '' and key != 'mimicry_type' %}
