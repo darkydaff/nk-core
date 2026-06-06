@@ -166,7 +166,7 @@ class AwgConfigGenerator
         $wgConfig .= "PrivateKey = {$privKey}\n";
         $wgConfig .= "Address = {$subnetBase}.1/24\n";
         $wgConfig .= "ListenPort = {$vpnPort}\n";
-        $wgConfig .= "MTU = 1420\n";
+        $wgConfig .= "MTU = 1280\n";
 
         foreach ($awgParams as $key => $value) {
             if ($value === null || $value === '' || $key === 'mimicry_type')

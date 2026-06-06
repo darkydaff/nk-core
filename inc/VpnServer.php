@@ -893,7 +893,7 @@ class VpnServer
         $subnetBase = preg_replace('/\.\d+\/\d+$/', '', $this->data['vpn_subnet']);
         $wgConfig .= "Address = {$subnetBase}.1/24\n";
         $wgConfig .= "ListenPort = {$this->data['vpn_port']}\n";
-        $wgConfig .= "MTU = 1420\n";
+        $wgConfig .= "MTU = 1280\n";
 
         foreach ($awgParams as $key => $value) {
             if ($value === null || $value === '' || $key === 'mimicry_type')
