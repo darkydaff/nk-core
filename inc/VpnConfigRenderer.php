@@ -172,10 +172,10 @@ class VpnConfigRenderer
                 if ($limitDown > 0) {
                     if (!$hasDownloadLimits) {
                         $downloadRules .= "tc qdisc add dev wg0 root handle 1: htb default 10\n";
-                        $downloadRules .= "tc class add dev wg0 parent 1: classid 1:10 htb rate 100gbit\n";
+                        $downloadRules .= "tc class add dev wg0 parent 1: classid 1:10 htb rate 100gbit burst 256k\n";
                         $hasDownloadLimits = true;
                     }
-                    $downloadRules .= "tc class add dev wg0 parent 1: classid 1:{$classId} htb rate {$limitDown}mbit ceil {$limitDown}mbit\n";
+                    $downloadRules .= "tc class add dev wg0 parent 1: classid 1:{$classId} htb rate {$limitDown}mbit ceil {$limitDown}mbit burst 256k\n";
                     $downloadRules .= "tc qdisc add dev wg0 parent 1:{$classId} handle {$classId}: fq_codel\n";
                     $downloadRules .= "tc filter add dev wg0 protocol ip parent 1:0 prio 1 u32 match ip dst {$clientIp} flowid 1:{$classId}\n";
                 }
@@ -188,10 +188,10 @@ class VpnConfigRenderer
                         $uploadRules .= "tc qdisc add dev wg0 handle ffff: ingress\n";
                         $uploadRules .= "tc filter add dev wg0 parent ffff: protocol ip u32 match u32 0 0 action mirred egress redirect dev ifb-wg0\n";
                         $uploadRules .= "tc qdisc add dev ifb-wg0 root handle 1: htb default 10\n";
-                        $uploadRules .= "tc class add dev ifb-wg0 parent 1: classid 1:10 htb rate 100gbit\n";
+                        $uploadRules .= "tc class add dev ifb-wg0 parent 1: classid 1:10 htb rate 100gbit burst 256k\n";
                         $hasUploadLimits = true;
                     }
-                    $uploadRules .= "tc class add dev ifb-wg0 parent 1: classid 1:{$classId} htb rate {$limitUp}mbit ceil {$limitUp}mbit\n";
+                    $uploadRules .= "tc class add dev ifb-wg0 parent 1: classid 1:{$classId} htb rate {$limitUp}mbit ceil {$limitUp}mbit burst 256k\n";
                     $uploadRules .= "tc qdisc add dev ifb-wg0 parent 1:{$classId} handle {$classId}: fq_codel\n";
                     $uploadRules .= "tc filter add dev ifb-wg0 protocol ip parent 1:0 prio 1 u32 match ip src {$clientIp} flowid 1:{$classId}\n";
                 }
