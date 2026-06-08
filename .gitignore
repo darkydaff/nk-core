@@ -9,3 +9,5 @@ node_modules/
 .antigravity/
 .agent/
 .kilo/
+.superpowers/
+package-lock.json
