@@ -451,18 +451,22 @@ class LinuxProvisioner
                 "rm -rf /tmp/wgcf_setup; " .
             "fi",
 
-            // Clean up any existing Table, PostUp, PostDown, DNS, or MTU configuration lines to ensure idempotency and correct section placement
+            // Clean up any existing Table, PostUp, PostDown, DNS, MTU, or PersistentKeepalive configuration lines to ensure idempotency and correct section placement
             "sed -i '/^[[:space:]]*Table[[:space:]]*=/d' /etc/wireguard/wg-warp.conf",
             "sed -i '/^[[:space:]]*PostUp[[:space:]]*=/d' /etc/wireguard/wg-warp.conf",
             "sed -i '/^[[:space:]]*PostDown[[:space:]]*=/d' /etc/wireguard/wg-warp.conf",
             "sed -i '/^[[:space:]]*DNS[[:space:]]*=/d' /etc/wireguard/wg-warp.conf",
             "sed -i '/^[[:space:]]*MTU[[:space:]]*=/d' /etc/wireguard/wg-warp.conf",
+            "sed -i '/^[[:space:]]*PersistentKeepalive[[:space:]]*=/d' /etc/wireguard/wg-warp.conf",
             
             // Ensure Table, PostUp, PostDown, and MTU rules are correctly placed in the [Interface] section of configuration
             "sed -i '/\\[Interface\\]/a Table = off' /etc/wireguard/wg-warp.conf",
             "sed -i '/\\[Interface\\]/a MTU = 1280' /etc/wireguard/wg-warp.conf",
             "sed -i '/\\[Interface\\]/a PostUp = /etc/wireguard/post-up.d/wg-warp.sh' /etc/wireguard/wg-warp.conf",
             "sed -i '/\\[Interface\\]/a PostDown = ip rule del fwmark 100 lookup warp priority 11000 2>/dev/null || true' /etc/wireguard/wg-warp.conf",
+            
+            // Ensure PersistentKeepalive is correctly placed in the [Peer] section of configuration to maintain handshake and prevent idle timeouts
+            "sed -i '/\\[Peer\\]/a PersistentKeepalive = 25' /etc/wireguard/wg-warp.conf",
             
             // Resolve engage.cloudflareclient.com to IPv4 to prevent connection failures on hosts with broken IPv6 routing
             "EP_IP=\$(getent ahostsv4 engage.cloudflareclient.com 2>/dev/null | head -n 1 | awk '{print \$1}') && " .
