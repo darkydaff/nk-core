@@ -377,7 +377,7 @@ class LinuxProvisioner
                    "    chain prerouting {\n" .
                    "        type filter hook prerouting priority mangle; policy accept;\n" .
                    "        ip saddr @warp_clients_v4 meta mark set 100\n" .
-                   "        ip saddr @warp_clients_v6 meta mark set 100\n" .
+                   "        ip6 saddr @warp_clients_v6 meta mark set 100\n" .
                    "    }\n" .
                    "}\n";
         $base64NftWarp = base64_encode($nftWarp);
