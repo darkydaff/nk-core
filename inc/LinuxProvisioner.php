@@ -414,8 +414,14 @@ class LinuxProvisioner
         $base64WarpScript = base64_encode($wgWarpScript);
 
         $setupCmd = implode(' && ', [
-            // Create config dir
-            "mkdir -p /var/lib/nk-core/state",
+            // Ensure wireguard-tools package and iproute2 directory/file are present on the host
+            "mkdir -p /var/lib/nk-core/state /etc/iproute2 /etc/wireguard",
+            "touch /etc/iproute2/rt_tables",
+            "if ! command -v wg-quick >/dev/null 2>&1; then " .
+                "(apt-get update -q && apt-get install -y wireguard-tools) || " .
+                "(yum install -y wireguard-tools) || " .
+                "(apk add wireguard-tools) || true; " .
+            "fi",
             
             // Capture original gateway only if not already saved
             "if [ ! -f /var/lib/nk-core/state/warp-config.sh ]; then " .
