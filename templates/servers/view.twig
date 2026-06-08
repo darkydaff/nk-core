@@ -1,4 +1,4 @@
-﻿{% extends "layout.twig" %}
+{% extends "layout.twig" %}
 {% block title %}
 	{{ server.name }}
 {% endblock %}
@@ -422,17 +422,14 @@
 								{{ t('warp.run_health_check', [], 'Run Health Check') }}
 							</button>
 							<div class="flex gap-2">
-								<button onclick="window.serverView.repairWarp({{ server.id }})" id="warpRepairBtn" class="flex-1 py-1.5 rounded-lg bg-surface-hover hover:bg-primary/10 hover:text-primary border border-surface-border/50 text-xs transition-all flex items-center justify-center gap-1">
+								<button onclick="window.serverView.repairWarp({{ server.id }})" id="warpRepairBtn" class="flex-1 py-2 rounded-lg bg-surface-hover hover:bg-primary/10 hover:text-primary border border-surface-border/50 text-xs transition-all flex items-center justify-center" title="{{ t('warp.repair', [], 'Repair') }}" aria-label="{{ t('warp.repair', [], 'Repair') }}">
 									<i class="fas fa-tools"></i>
-									{{ t('warp.repair', [], 'Repair') }}
 								</button>
-								<button onclick="window.serverView.reinstallWarp({{ server.id }})" id="warpReinstallBtn" class="flex-1 py-1.5 rounded-lg bg-surface-hover hover:bg-surface-border text-content-secondary border border-surface-border/50 text-xs transition-all flex items-center justify-center gap-1">
+								<button onclick="window.serverView.reinstallWarp({{ server.id }})" id="warpReinstallBtn" class="flex-1 py-2 rounded-lg bg-surface-hover hover:bg-surface-border text-content-secondary border border-surface-border/50 text-xs transition-all flex items-center justify-center" title="{{ t('warp.reinstall', [], 'Reinstall') }}" aria-label="{{ t('warp.reinstall', [], 'Reinstall') }}">
 									<i class="fas fa-redo"></i>
-									{{ t('warp.reinstall', [], 'Reinstall') }}
 								</button>
-								<button onclick="window.serverView.uninstallWarp({{ server.id }}, '{{ server.name|e('js') }}')" id="warpUninstallBtn" class="flex-1 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs transition-all flex items-center justify-center gap-1">
+								<button onclick="window.serverView.uninstallWarp({{ server.id }}, '{{ server.name|e('js') }}')" id="warpUninstallBtn" class="flex-1 py-2 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs transition-all flex items-center justify-center" title="{{ t('warp.remove', [], 'Remove') }}" aria-label="{{ t('warp.remove', [], 'Remove') }}">
 									<i class="fas fa-trash-alt"></i>
-									{{ t('warp.remove', [], 'Remove') }}
 								</button>
 							</div>
 						</div>
