@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../inc/Config.php';
 require_once __DIR__ . '/../inc/DB.php';
+require_once __DIR__ . '/../inc/Enums.php';
 require_once __DIR__ . '/../inc/VpnServer.php';
 
 Config::load(__DIR__ . '/../.env');
