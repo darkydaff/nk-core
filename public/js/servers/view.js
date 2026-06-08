@@ -178,6 +178,25 @@ class ServerView {
             });
         }
 
+        const getRoutingBadge = (c) => {
+            if (c.routing_mode === 'warp') {
+                if (c.effective_routing === 'warp') {
+                    return `
+                        <span class="inline-flex items-center gap-1 text-[9px] text-primary font-bold bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded-md leading-none w-fit">
+                            <i class="fas fa-shield-alt text-[8px]"></i>WARP
+                        </span>
+                    `;
+                } else {
+                    return `
+                        <span class="inline-flex items-center gap-1 text-[9px] text-amber-400 font-bold bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-md leading-none w-fit animate-pulse" title="WARP interface degraded. Falling back to direct WAN egress.">
+                            <i class="fas fa-exclamation-triangle text-[8px]"></i>Direct (WARP down)
+                        </span>
+                    `;
+                }
+            }
+            return '';
+        };
+
         if (!results || results.length === 0) {
             this.resultsContainer.innerHTML = `
                 <div class="flex flex-col items-center justify-center h-64 text-center p-10">
@@ -208,8 +227,9 @@ class ServerView {
                                     <span class="text-sm font-bold ${isDisabled ? 'text-muted line-through' : ''} block">${highlightedName}</span>
                                 </div>
                             </div>
-                            <div class="flex items-center gap-1.5">
+                            <div class="flex items-center gap-1.5 flex-wrap justify-end">
                                 ${NK.renderStatusBadge(client.db_status, client.connection_status, this.labels)}
+                                ${getRoutingBadge(client)}
                             </div>
                         </div>
                         <div class="flex items-center justify-between text-[10px] bg-panel/50 rounded p-2">
@@ -266,8 +286,11 @@ class ServerView {
                             const statusCell = row.querySelector('.cell-status');
                             if (statusCell) {
                                 const statusHtml = `
-                                    <div class="flex flex-col gap-1">
-                                        ${NK.renderStatusBadge(client.db_status, client.connection_status, this.labels)}
+                                    <div class="flex flex-col gap-1.5">
+                                        <div class="flex items-center gap-1.5">
+                                            ${NK.renderStatusBadge(client.db_status, client.connection_status, this.labels)}
+                                            ${getRoutingBadge(client)}
+                                        </div>
                                         <code class="text-[10px] text-secondary font-mono">${highlightedIp}</code>
                                     </div>
                                 `;
@@ -337,8 +360,11 @@ class ServerView {
                                         </div>
                                     </td>
                                     <td class="px-5 py-4 whitespace-nowrap cell-status">
-                                        <div class="flex flex-col gap-1">
-                                            ${NK.renderStatusBadge(client.db_status, client.connection_status, this.labels)}
+                                        <div class="flex flex-col gap-1.5">
+                                            <div class="flex items-center gap-1.5">
+                                                ${NK.renderStatusBadge(client.db_status, client.connection_status, this.labels)}
+                                                ${getRoutingBadge(client)}
+                                            </div>
                                             <code class="text-[10px] text-secondary font-mono">${highlightedIp}</code>
                                         </div>
                                     </td>
@@ -416,8 +442,11 @@ class ServerView {
                             </div>
                         </td>
                         <td class="px-5 py-4 whitespace-nowrap cell-status">
-                            <div class="flex flex-col gap-1">
-                                ${NK.renderStatusBadge(client.db_status, client.connection_status, this.labels)}
+                            <div class="flex flex-col gap-1.5">
+                                <div class="flex items-center gap-1.5">
+                                    ${NK.renderStatusBadge(client.db_status, client.connection_status, this.labels)}
+                                    ${getRoutingBadge(client)}
+                                </div>
                                 <code class="text-[10px] text-secondary font-mono">${highlightedIp}</code>
                             </div>
                         </td>
@@ -574,6 +603,126 @@ class ServerView {
             if (icon) {
                 icon.className = 'fas fa-magic';
             }
+        }
+    }
+
+    }
+
+    async installWarp(serverId) {
+        const btn = document.getElementById('installWarpBtn');
+        if (btn) btn.disabled = true;
+        
+        try {
+            const result = await NK.handleAjaxAction(`/servers/${serverId}/warp/install`);
+            if (result && result.success) {
+                if (result.job_id && result.subscription_token) {
+                    this.currentJobId = result.job_id;
+                    this.subscriptionToken = result.subscription_token;
+                    if (this.centrifuge) {
+                        this.subscribeJobEvents();
+                    }
+                }
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                if (btn) btn.disabled = false;
+            }
+        } catch (err) {
+            console.error('Failed to trigger WARP install:', err);
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    async uninstallWarp(serverId, serverName) {
+        if (!confirm(`Are you sure you want to remove Cloudflare WARP from server "${serverName}"? This will disable WARP routing for all clients.`)) {
+            return;
+        }
+        
+        const btn = document.getElementById('warpUninstallBtn');
+        if (btn) btn.disabled = true;
+
+        try {
+            const result = await NK.handleAjaxAction(`/servers/${serverId}/warp/uninstall`);
+            if (result && result.success) {
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                if (btn) btn.disabled = false;
+            }
+        } catch (err) {
+            console.error('Failed to trigger WARP uninstall:', err);
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    async repairWarp(serverId) {
+        const btn = document.getElementById('warpRepairBtn');
+        if (btn) btn.disabled = true;
+
+        try {
+            const result = await NK.handleAjaxAction(`/servers/${serverId}/warp/repair`);
+            if (result && result.success) {
+                if (result.job_id && result.subscription_token) {
+                    this.currentJobId = result.job_id;
+                    this.subscriptionToken = result.subscription_token;
+                    if (this.centrifuge) {
+                        this.subscribeJobEvents();
+                    }
+                }
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                if (btn) btn.disabled = false;
+            }
+        } catch (err) {
+            console.error('Failed to trigger WARP repair:', err);
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    async reinstallWarp(serverId) {
+        if (!confirm('Are you sure you want to perform a full reinstall of Cloudflare WARP? This will register a new wgcf profile.')) {
+            return;
+        }
+
+        const btn = document.getElementById('warpReinstallBtn');
+        if (btn) btn.disabled = true;
+
+        try {
+            const result = await NK.handleAjaxAction(`/servers/${serverId}/warp/reinstall`);
+            if (result && result.success) {
+                if (result.job_id && result.subscription_token) {
+                    this.currentJobId = result.job_id;
+                    this.subscriptionToken = result.subscription_token;
+                    if (this.centrifuge) {
+                        this.subscribeJobEvents();
+                    }
+                }
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                if (btn) btn.disabled = false;
+            }
+        } catch (err) {
+            console.error('Failed to trigger WARP reinstall:', err);
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    async runWarpHealthCheck(serverId) {
+        const btn = document.getElementById('warpHealthBtn');
+        const icon = document.getElementById('warpHealthIcon');
+        if (btn) btn.disabled = true;
+        if (icon) icon.classList.add('fa-spin');
+
+        try {
+            const result = await NK.handleAjaxAction(`/servers/${serverId}/warp/health-check`);
+            if (result && result.success) {
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                if (btn) btn.disabled = false;
+                if (icon) icon.classList.remove('fa-spin');
+            }
+        } catch (err) {
+            console.error('Failed to run health check:', err);
+            if (btn) btn.disabled = false;
+            if (icon) icon.classList.remove('fa-spin');
         }
     }
 

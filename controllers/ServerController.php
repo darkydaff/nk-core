@@ -631,7 +631,7 @@ class ServerController
             }
 
             $sql = "
-                SELECT c.*, s.name as server_name, s.host as server_host
+                SELECT c.*, s.name as server_name, s.host as server_host, s.warp_status as server_warp_status
                 FROM vpn_clients c
                 LEFT JOIN vpn_servers s ON c.server_id = s.id
                 WHERE ($where)
@@ -694,6 +694,16 @@ class ServerController
                     $r['last_seen'] = 'Never';
                 }
                 $r['flag'] = View::getFlag($r['ip_country_code'] ?? '');
+
+                // Effective routing mode logic
+                $r['effective_routing'] = 'direct';
+                if (($r['routing_mode'] ?? 'direct') === 'warp') {
+                    if (($r['server_warp_status'] ?? 'not_installed') === 'connected') {
+                        $r['effective_routing'] = 'warp';
+                    } else {
+                        $r['effective_routing'] = 'fallback';
+                    }
+                }
             }
 
             $response = ['results' => $results, 'truncated' => $truncated ?? false];
@@ -978,6 +988,341 @@ class ServerController
         } catch (\Exception $e) {
             http_response_code(500);
             echo json_encode(['error' => $e->getMessage()]);
+        }
+    }
+
+    public function installWarp($params)
+    {
+        requireAuth();
+        header('Content-Type: application/json');
+        $serverId = (int) $params['id'];
+
+        unlockSession();
+
+        try {
+            $server = new VpnServer($serverId);
+            $serverData = $server->getData();
+
+            $user = Auth::user();
+            if ($serverData['user_id'] != $user['id'] && !Auth::isAdmin()) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Forbidden']);
+                return;
+            }
+
+            $status = $serverData['warp_status'] ?? 'not_installed';
+            if ($status === 'installing' || $status === 'initializing') {
+                throw new Exception("Another operation is already in progress on this server. Please wait.");
+            }
+            if ($status === 'connected' || $status === 'degraded' || $status === 'error' || $status === 'installed') {
+                throw new Exception("WARP is already installed. Use Reinstall or Repair instead.");
+            }
+
+            if (!class_exists('Queue')) {
+                require_once __DIR__ . '/../inc/Queue.php';
+            }
+
+            $job = Job::create((int)$user['id'], 'warp_install', $serverId, [
+                'server_name' => $serverData['name'],
+                'host' => $serverData['host']
+            ]);
+
+            if (!$job) {
+                throw new Exception("Failed to create orchestration job.");
+            }
+
+            $pdo = DB::conn();
+            $pdo->prepare("UPDATE vpn_servers SET warp_status = 'installing', current_job_id = ? WHERE id = ?")
+                ->execute([$job->getId(), $serverId]);
+
+            Queue::push('deployments', [
+                'type' => 'warp_install',
+                'server_id' => $serverId,
+                'job_id' => $job->getId()
+            ]);
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Cloudflare WARP installation queued',
+                'job_id' => $job->getId(),
+                'subscription_token' => EventBus::generateSubscriptionToken((string)$user['id'], "job:{$job->getId()}")
+            ]);
+        } catch (Throwable $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    public function uninstallWarp($params)
+    {
+        requireAuth();
+        header('Content-Type: application/json');
+        $serverId = (int) $params['id'];
+
+        unlockSession();
+
+        try {
+            $server = new VpnServer($serverId);
+            $serverData = $server->getData();
+
+            $user = Auth::user();
+            if ($serverData['user_id'] != $user['id'] && !Auth::isAdmin()) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Forbidden']);
+                return;
+            }
+
+            $status = $serverData['warp_status'] ?? 'not_installed';
+            if ($status === 'installing' || $status === 'initializing') {
+                throw new Exception("Another operation is already in progress on this server. Please wait.");
+            }
+            if ($status === 'not_installed') {
+                throw new Exception("WARP is not installed on this server.");
+            }
+
+            if (!class_exists('Queue')) {
+                require_once __DIR__ . '/../inc/Queue.php';
+            }
+
+            $job = Job::create((int)$user['id'], 'warp_uninstall', $serverId, [
+                'server_name' => $serverData['name'],
+                'host' => $serverData['host']
+            ]);
+
+            if (!$job) {
+                throw new Exception("Failed to create orchestration job.");
+            }
+
+            $pdo = DB::conn();
+            $pdo->prepare("UPDATE vpn_servers SET warp_status = 'initializing', current_job_id = ? WHERE id = ?")
+                ->execute([$job->getId(), $serverId]);
+
+            Queue::push('deployments', [
+                'type' => 'warp_uninstall',
+                'server_id' => $serverId,
+                'job_id' => $job->getId()
+            ]);
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Cloudflare WARP uninstallation queued',
+                'job_id' => $job->getId(),
+                'subscription_token' => EventBus::generateSubscriptionToken((string)$user['id'], "job:{$job->getId()}")
+            ]);
+        } catch (Throwable $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    public function repairWarp($params)
+    {
+        requireAuth();
+        header('Content-Type: application/json');
+        $serverId = (int) $params['id'];
+
+        unlockSession();
+
+        try {
+            $server = new VpnServer($serverId);
+            $serverData = $server->getData();
+
+            $user = Auth::user();
+            if ($serverData['user_id'] != $user['id'] && !Auth::isAdmin()) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Forbidden']);
+                return;
+            }
+
+            $status = $serverData['warp_status'] ?? 'not_installed';
+            if ($status === 'installing' || $status === 'initializing') {
+                throw new Exception("Another operation is already in progress on this server. Please wait.");
+            }
+            if ($status === 'not_installed') {
+                throw new Exception("WARP is not installed. Please install it first.");
+            }
+
+            if (!class_exists('Queue')) {
+                require_once __DIR__ . '/../inc/Queue.php';
+            }
+
+            $job = Job::create((int)$user['id'], 'warp_repair', $serverId, [
+                'server_name' => $serverData['name'],
+                'host' => $serverData['host']
+            ]);
+
+            if (!$job) {
+                throw new Exception("Failed to create orchestration job.");
+            }
+
+            $pdo = DB::conn();
+            $pdo->prepare("UPDATE vpn_servers SET warp_status = 'initializing', current_job_id = ? WHERE id = ?")
+                ->execute([$job->getId(), $serverId]);
+
+            Queue::push('deployments', [
+                'type' => 'warp_repair',
+                'server_id' => $serverId,
+                'job_id' => $job->getId()
+            ]);
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Cloudflare WARP repair queued',
+                'job_id' => $job->getId(),
+                'subscription_token' => EventBus::generateSubscriptionToken((string)$user['id'], "job:{$job->getId()}")
+            ]);
+        } catch (Throwable $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    public function reinstallWarp($params)
+    {
+        requireAuth();
+        header('Content-Type: application/json');
+        $serverId = (int) $params['id'];
+
+        unlockSession();
+
+        try {
+            $server = new VpnServer($serverId);
+            $serverData = $server->getData();
+
+            $user = Auth::user();
+            if ($serverData['user_id'] != $user['id'] && !Auth::isAdmin()) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Forbidden']);
+                return;
+            }
+
+            $status = $serverData['warp_status'] ?? 'not_installed';
+            if ($status === 'installing' || $status === 'initializing') {
+                throw new Exception("Another operation is already in progress on this server. Please wait.");
+            }
+            if ($status === 'not_installed') {
+                throw new Exception("WARP is not installed. Please install it first.");
+            }
+
+            if (!class_exists('Queue')) {
+                require_once __DIR__ . '/../inc/Queue.php';
+            }
+
+            $job = Job::create((int)$user['id'], 'warp_reinstall', $serverId, [
+                'server_name' => $serverData['name'],
+                'host' => $serverData['host']
+            ]);
+
+            if (!$job) {
+                throw new Exception("Failed to create orchestration job.");
+            }
+
+            $pdo = DB::conn();
+            $pdo->prepare("UPDATE vpn_servers SET warp_status = 'installing', current_job_id = ? WHERE id = ?")
+                ->execute([$job->getId(), $serverId]);
+
+            Queue::push('deployments', [
+                'type' => 'warp_reinstall',
+                'server_id' => $serverId,
+                'job_id' => $job->getId()
+            ]);
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Cloudflare WARP reinstallation queued',
+                'job_id' => $job->getId(),
+                'subscription_token' => EventBus::generateSubscriptionToken((string)$user['id'], "job:{$job->getId()}")
+            ]);
+        } catch (Throwable $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+    public function runWarpHealthCheck($params)
+    {
+        requireAuth();
+        header('Content-Type: application/json');
+        $serverId = (int) $params['id'];
+
+        unlockSession();
+
+        try {
+            $server = new VpnServer($serverId);
+            $serverData = $server->getData();
+
+            $user = Auth::user();
+            if ($serverData['user_id'] != $user['id'] && !Auth::isAdmin()) {
+                http_response_code(403);
+                echo json_encode(['error' => 'Forbidden']);
+                return;
+            }
+
+            $status = $serverData['warp_status'] ?? 'not_installed';
+            if ($status === 'installing' || $status === 'initializing') {
+                throw new Exception("Operation in progress. Cannot run health check.");
+            }
+            if ($status === 'not_installed') {
+                throw new Exception("WARP is not installed on this server.");
+            }
+
+            require_once __DIR__ . '/../inc/LinuxProvisioner.php';
+            $linux = new LinuxProvisioner($server->getSshClient(), $serverId);
+            
+            $diagnostics = $linux->runWarpDiagnostics();
+            
+            $status = $diagnostics['status'] ?? 'error';
+            if (!in_array($status, ['connected', 'degraded', 'error'], true)) {
+                $status = 'error';
+            }
+
+            $db = DB::conn();
+            $db->prepare("
+                UPDATE vpn_servers 
+                SET warp_status = ?,
+                    warp_connected = ?,
+                    warp_cloudflare_ip = ?,
+                    warp_last_check_status = ?,
+                    warp_last_check_at = NOW(),
+                    warp_last_repair_at = CASE WHEN ? IS NOT NULL THEN NOW() ELSE warp_last_repair_at END,
+                    warp_last_repair_result = CASE WHEN ? IS NOT NULL THEN ? ELSE warp_last_repair_result END
+                WHERE id = ?
+            ")->execute([
+                $status,
+                ($status === 'connected' ? 1 : 0),
+                $diagnostics['cloudflare_ip'] ?? null,
+                $diagnostics['last_check_status'] ?? 'Completed',
+                !empty($diagnostics['last_repair_at']) ? $diagnostics['last_repair_at'] : null,
+                !empty($diagnostics['last_repair_result']) ? $diagnostics['last_repair_result'] : null,
+                !empty($diagnostics['last_repair_result']) ? $diagnostics['last_repair_result'] : null,
+                $serverId
+            ]);
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'WARP health check completed',
+                'warp_status' => $status,
+                'cloudflare_ip' => $diagnostics['cloudflare_ip'] ?? null,
+                'last_check_status' => $diagnostics['last_check_status'] ?? 'Completed'
+            ]);
+        } catch (Throwable $e) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]);
         }
     }
 }

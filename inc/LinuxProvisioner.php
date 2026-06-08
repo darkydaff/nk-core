@@ -368,12 +368,16 @@ class LinuxProvisioner
     {
         // Construct the custom nftables rule for packet marking
         $nftWarp = "table inet nkcore {\n" .
-                   "    set warp_clients {\n" .
+                   "    set warp_clients_v4 {\n" .
                    "        type ipv4_addr\n" .
+                   "    }\n" .
+                   "    set warp_clients_v6 {\n" .
+                   "        type ipv6_addr\n" .
                    "    }\n" .
                    "    chain prerouting {\n" .
                    "        type filter hook prerouting priority mangle; policy accept;\n" .
-                   "        ip saddr @warp_clients meta mark set 100\n" .
+                   "        ip saddr @warp_clients_v4 meta mark set 100\n" .
+                   "        ip saddr @warp_clients_v6 meta mark set 100\n" .
                    "    }\n" .
                    "}\n";
         $base64NftWarp = base64_encode($nftWarp);
@@ -382,7 +386,7 @@ class LinuxProvisioner
         $nftNat = "table ip nat {\n" .
                   "    chain postrouting {\n" .
                   "        type nat hook postrouting priority 100; policy accept;\n" .
-                  "        oifname \"wg-warp\" masquerade\n" .
+                  "        ip saddr {$vpnSubnet} oifname \"wg-warp\" masquerade\n" .
                   "    }\n" .
                   "}\n";
         $base64NftNat = base64_encode($nftNat);
@@ -391,11 +395,38 @@ class LinuxProvisioner
         $wgWarpScript = "#!/bin/bash\n" .
                         "ip route replace " . $vpnSubnet . " dev wg0 table warp 2>/dev/null || true\n" .
                         "ip route replace default dev wg-warp table warp 2>/dev/null || true\n" .
-                        "ip rule del fwmark 100 lookup warp priority 200 2>/dev/null || true\n" .
-                        "ip rule add fwmark 100 lookup warp priority 200\n";
+                        "ip rule del fwmark 100 lookup warp priority 11000 2>/dev/null || true\n" .
+                        "ip rule add fwmark 100 lookup warp priority 11000\n" .
+                        "\n" .
+                        "# Re-populate nftables sets from saved state files on startup/interface up\n" .
+                        "if [ -f /var/lib/nk-core/state/warp-clients-v4.txt ]; then\n" .
+                        "    IPS=\$(tr '\\n' ',' < /var/lib/nk-core/state/warp-clients-v4.txt | sed 's/,\$//')\n" .
+                        "    if [ -n \"\$IPS\" ]; then\n" .
+                        "        nft add element inet nkcore warp_clients_v4 { \$IPS } 2>/dev/null || true\n" .
+                        "    fi\n" .
+                        "fi\n" .
+                        "if [ -f /var/lib/nk-core/state/warp-clients-v6.txt ]; then\n" .
+                        "    IPS=\$(tr '\\n' ',' < /var/lib/nk-core/state/warp-clients-v6.txt | sed 's/,\$//')\n" .
+                        "    if [ -n \"\$IPS\" ]; then\n" .
+                        "        nft add element inet nkcore warp_clients_v6 { \$IPS } 2>/dev/null || true\n" .
+                        "    fi\n" .
+                        "fi\n";
         $base64WarpScript = base64_encode($wgWarpScript);
 
         $setupCmd = implode(' && ', [
+            // Create config dir
+            "mkdir -p /var/lib/nk-core/state",
+            
+            // Capture original gateway only if not already saved
+            "if [ ! -f /var/lib/nk-core/state/warp-config.sh ]; then " .
+                "GW=\$(ip route show default | awk '/default/ {print \$3}') && " .
+                "DEV=\$(ip route show default | awk '/default/ {print \$5}') && " .
+                "echo \"ORIG_GW=\\\"\$GW\\\"\" > /var/lib/nk-core/state/warp-config.sh && " .
+                "echo \"ORIG_DEV=\\\"\$DEV\\\"\" >> /var/lib/nk-core/state/warp-config.sh && " .
+                "echo \"VPN_SUBNET=\\\"$vpnSubnet\\\"\" >> /var/lib/nk-core/state/warp-config.sh && " .
+                "echo \"WARP_DEV=\\\"wg-warp\\\"\" >> /var/lib/nk-core/state/warp-config.sh; " .
+            "fi",
+
             // 1. Install and register Cloudflare WARP automatically if not present
             "if [ ! -f /etc/wireguard/wg-warp.conf ]; then " .
                 "if [ ! -f /usr/local/bin/wgcf ]; then " .
@@ -408,23 +439,21 @@ class LinuxProvisioner
                 "wgcf generate && " .
                 "mkdir -p /etc/wireguard && " .
                 "cp wgcf-profile.conf /etc/wireguard/wg-warp.conf && " .
-                "echo '' >> /etc/wireguard/wg-warp.conf && " .
-                "echo 'Table = off' >> /etc/wireguard/wg-warp.conf && " .
+                "cp wgcf-account.toml /etc/wireguard/wgcf-account.toml && " .
                 "rm -rf /tmp/wgcf_setup; " .
             "fi",
-            
-            // 2. Enable and start wg-warp WireGuard interface
-            "systemctl enable wg-quick@wg-warp.service",
-            "systemctl start wg-quick@wg-warp.service",
 
-            // 3. Ensure Table warp (ID 200) registered
+            // Ensure Table, PostUp, and PostDown rules are present in configuration
+            "if ! grep -q 'Table = off' /etc/wireguard/wg-warp.conf; then echo 'Table = off' >> /etc/wireguard/wg-warp.conf; fi",
+            "if ! grep -q 'PostUp = /etc/wireguard/post-up.d/wg-warp.sh' /etc/wireguard/wg-warp.conf; then echo 'PostUp = /etc/wireguard/post-up.d/wg-warp.sh' >> /etc/wireguard/wg-warp.conf; fi",
+            "if ! grep -q 'PostDown' /etc/wireguard/wg-warp.conf; then echo 'PostDown = ip rule del fwmark 100 lookup warp priority 11000 2>/dev/null || true' >> /etc/wireguard/wg-warp.conf; fi",
+            
+            // 2. Ensure Table warp (ID 200) registered
             "if ! grep -q '200 warp' /etc/iproute2/rt_tables; then echo '200 warp' >> /etc/iproute2/rt_tables; fi",
             
-            // 4. Deploy nftables custom config using base64 decoding to avoid multiline shell parsing issues
+            // 3. Deploy nftables custom config
             "mkdir -p /etc/nftables.d",
             "echo '{$base64NftWarp}' | base64 -d > /etc/nftables.d/nkcore-warp.nft",
-            
-            // 5. Deploy nat postrouting config (pure nftables)
             "echo '{$base64NftNat}' | base64 -d > /etc/nftables.d/nkcore-nat.nft",
             
             // Ensure they are included in /etc/nftables.conf
@@ -432,10 +461,14 @@ class LinuxProvisioner
             "if ! grep -q 'nkcore-nat.nft' /etc/nftables.conf; then echo 'include \"/etc/nftables.d/nkcore-nat.nft\"' >> /etc/nftables.conf; fi",
             "systemctl reload nftables 2>/dev/null || systemctl restart nftables 2>/dev/null || true",
 
-            // 6. Create persistent startup routing commands using base64 decoding
+            // 4. Create persistent startup routing commands
             "mkdir -p /etc/wireguard/post-up.d",
             "echo '{$base64WarpScript}' | base64 -d > /etc/wireguard/post-up.d/wg-warp.sh",
             "chmod +x /etc/wireguard/post-up.d/wg-warp.sh",
+            
+            // 5. Enable and start wg-warp interface
+            "systemctl enable wg-quick@wg-warp.service",
+            "systemctl restart wg-quick@wg-warp.service",
             
             // Execute rules immediately
             "/etc/wireguard/post-up.d/wg-warp.sh"
@@ -480,31 +513,239 @@ class LinuxProvisioner
     public function installWarpWatchdog(): void {
         $watchdogScript = <<<'BASH'
 #!/bin/bash
-# 1. Verify policy routing dev matches wg-warp
-ROUTE_DEV=$(ip route get 1.1.1.1 mark 100 2>/dev/null | grep -oE "dev [a-zA-Z0-9_-]+" | awk '{print $2}')
-if [ "$ROUTE_DEV" != "wg-warp" ]; then
-    echo "WARP routing invalid! Dev: $ROUTE_DEV. Flushing warp_clients set."
-    nft flush set inet nkcore warp_clients
-    exit 0
+mkdir -p /var/lib/nk-core/state
+CONFIG_FILE="/var/lib/nk-core/state/warp-config.sh"
+HEALTH_FILE="/var/lib/nk-core/state/warp-health.json"
+
+if [ ! -f "$CONFIG_FILE" ]; then
+    echo "Error: Configuration file $CONFIG_FILE not found. Exiting."
+    exit 1
+fi
+source "$CONFIG_FILE"
+
+# Initialize health variables if not exists
+if [ ! -f "$HEALTH_FILE" ] || [ ! -s "$HEALTH_FILE" ]; then
+    echo '{"status":"error","failures":0,"repairs":0,"cloudflare_ip":null,"last_check_at":null,"last_check_status":null,"last_repair_at":null,"last_repair_result":null}' > "$HEALTH_FILE"
 fi
 
-# 2. Verify link state and test ping through the route
-if ! ping -c 2 -W 3 -I wg-warp 1.1.1.1 >/dev/null 2>&1; then
-    echo "WARP health check failed! Flushing set to fallback to direct."
-    nft flush set inet nkcore warp_clients
+get_json_val() {
+    local key=$1
+    grep -oP '"'"$key"'"\s*:\s*(("[^"]*")|([0-9]+)|(null))' "$HEALTH_FILE" | head -1 | cut -d: -f2- | tr -d '" '
+}
+
+FAILURES=$(get_json_val "failures")
+REPAIRS=$(get_json_val "repairs")
+LAST_REPAIR_AT=$(grep -oP '"last_repair_at"\s*:\s*"[^"]*"' "$HEALTH_FILE" | cut -d: -f2- | tr -d '" ')
+[ -z "$FAILURES" ] && FAILURES=0
+[ -z "$REPAIRS" ] && REPAIRS=0
+
+CHECK_STATUS="Healthy"
+IS_HEALTHY=1
+CLOUDFLARE_IP=""
+
+# 1. Link check
+if ! ip link show "$WARP_DEV" >/dev/null 2>&1; then
+    IS_HEALTHY=0
+    CHECK_STATUS="Interface $WARP_DEV missing"
+elif ! ip link show "$WARP_DEV" | grep -q "UP"; then
+    IS_HEALTHY=0
+    CHECK_STATUS="Interface $WARP_DEV down"
 fi
+
+# 2. Handshake age check
+if [ "$IS_HEALTHY" -eq 1 ]; then
+    HANDSHAKE=$(wg show "$WARP_DEV" latest-handshakes 2>/dev/null | awk '{print $2}')
+    if [ -z "$HANDSHAKE" ] || [ "$HANDSHAKE" -eq 0 ]; then
+        IS_HEALTHY=0
+        CHECK_STATUS="No WireGuard handshake"
+    else
+        NOW=$(date +%s)
+        AGE=$((NOW - HANDSHAKE))
+        if [ "$AGE" -gt 300 ]; then
+            IS_HEALTHY=0
+            CHECK_STATUS="Handshake age is $AGE seconds"
+        fi
+    fi
+fi
+
+# 3. Internet connectivity via WARP
+if [ "$IS_HEALTHY" -eq 1 ]; then
+    TRACE=$(curl -s --interface "$WARP_DEV" --connect-timeout 5 https://www.cloudflare.com/cdn-cgi/trace)
+    if [ $? -ne 0 ]; then
+        IS_HEALTHY=0
+        CHECK_STATUS="Trace request failed"
+    elif ! echo "$TRACE" | grep -q "warp=on"; then
+        IS_HEALTHY=0
+        CHECK_STATUS="WARP is off in trace"
+    else
+        CLOUDFLARE_IP=$(echo "$TRACE" | grep -E "^ip=" | cut -d= -f2)
+    fi
+fi
+
+TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+REPAIR_MSG=""
+
+if [ "$IS_HEALTHY" -eq 1 ]; then
+    FAILURES=0
+    REPAIRS=0
+    STATUS_STR="connected"
+    
+    # Restore WARP route
+    ip route replace default dev "$WARP_DEV" table warp 2>/dev/null || true
+else
+    FAILURES=$((FAILURES + 1))
+    
+    if [ "$FAILURES" -ge 3 ]; then
+        STATUS_STR="error"
+        if [ -n "$ORIG_GW" ] && [ -n "$ORIG_DEV" ]; then
+            ip route replace default via "$ORIG_GW" dev "$ORIG_DEV" table warp 2>/dev/null || true
+            STATUS_STR="degraded"
+            CHECK_STATUS="$CHECK_STATUS (Failover Active)"
+        fi
+        
+        NOW_SEC=$(date +%s)
+        LAST_REPAIR_SEC=0
+        if [ -n "$LAST_REPAIR_AT" ] && [ "$LAST_REPAIR_AT" != "null" ]; then
+            LAST_REPAIR_SEC=$(date -d "$LAST_REPAIR_AT" +%s 2>/dev/null || echo 0)
+        fi
+        TIME_DIFF=$((NOW_SEC - LAST_REPAIR_SEC))
+        
+        if [ "$TIME_DIFF" -lt 900 ]; then
+            if [ "$REPAIRS" -ge 3 ]; then
+                REPAIR_MSG="Ceased repairs (Cooldown active, diff: ${TIME_DIFF}s)"
+            else
+                REPAIRS=$((REPAIRS + 1))
+                systemctl restart wg-quick@"$WARP_DEV".service
+                LAST_REPAIR_AT="$TIMESTAMP"
+                REPAIR_MSG="Restarted wg-quick@$WARP_DEV (Attempt $REPAIRS)"
+            fi
+        else
+            REPAIRS=1
+            systemctl restart wg-quick@"$WARP_DEV".service
+            LAST_REPAIR_AT="$TIMESTAMP"
+            REPAIR_MSG="Restarted wg-quick@$WARP_DEV (New Window)"
+        fi
+    else
+        STATUS_STR="connected"
+    fi
+fi
+
+TMP_JSON=$(mktemp)
+CF_IP_VAL="null"
+[ -n "$CLOUDFLARE_IP" ] && CF_IP_VAL="\"$CLOUDFLARE_IP\""
+
+REP_AT_VAL="null"
+[ -n "$LAST_REPAIR_AT" ] && [ "$LAST_REPAIR_AT" != "null" ] && REP_AT_VAL="\"$LAST_REPAIR_AT\""
+
+REP_MSG_VAL="null"
+[ -n "$REPAIR_MSG" ] && REP_MSG_VAL="\"$REPAIR_MSG\""
+
+cat <<EOF > "$TMP_JSON"
+{
+  "status": "$STATUS_STR",
+  "failures": $FAILURES,
+  "repairs": $REPAIRS,
+  "cloudflare_ip": $CF_IP_VAL,
+  "last_check_at": "$TIMESTAMP",
+  "last_check_status": "$CHECK_STATUS",
+  "last_repair_at": $REP_AT_VAL,
+  "last_repair_result": $REP_MSG_VAL
+}
+EOF
+
+mv "$TMP_JSON" "$HEALTH_FILE"
 BASH;
 
         $base64Script = base64_encode($watchdogScript);
+
+        $serviceDef = <<<SYSTEMD
+[Unit]
+Description=NK-Core Cloudflare WARP Watchdog
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/nk-warp-watchdog.sh
+StandardOutput=journal
+StandardError=journal
+SYSTEMD;
+        $base64Service = base64_encode($serviceDef);
+
+        $timerDef = <<<SYSTEMD
+[Unit]
+Description=Run NK-Core Cloudflare WARP Watchdog every minute
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+
+[Install]
+WantedBy=timers.target
+SYSTEMD;
+        $base64Timer = base64_encode($timerDef);
         
         $setupCmd = implode(' && ', [
             "echo '{$base64Script}' | base64 -d > /usr/local/bin/nk-warp-watchdog.sh",
             "chmod +x /usr/local/bin/nk-warp-watchdog.sh",
             
-            // Setup Cron job to run watchdog every minute
-            "(crontab -l 2>/dev/null | grep -v 'nk-warp-watchdog.sh'; echo '* * * * * /usr/local/bin/nk-warp-watchdog.sh') | crontab -"
+            "echo '{$base64Service}' | base64 -d > /etc/systemd/system/nk-warp-watchdog.service",
+            "echo '{$base64Timer}' | base64 -d > /etc/systemd/system/nk-warp-watchdog.timer",
+            
+            "systemctl daemon-reload",
+            "systemctl enable nk-warp-watchdog.timer",
+            "systemctl restart nk-warp-watchdog.timer",
+            
+            // Trigger immediately
+            "systemctl start nk-warp-watchdog.service"
         ]);
 
         $this->ssh->executeCommand($setupCmd, true, true);
+    }
+
+    public function removeWarp(): void
+    {
+        $removeCmd = implode(' && ', [
+            // Stop and disable systemd timer
+            "systemctl disable --now nk-warp-watchdog.timer 2>/dev/null || true",
+            "systemctl stop wg-quick@wg-warp 2>/dev/null || true",
+            "systemctl disable wg-quick@wg-warp 2>/dev/null || true",
+            
+            // Delete configuration & helper files
+            "rm -f /etc/wireguard/wg-warp.conf",
+            "rm -f /etc/wireguard/wgcf-account.toml",
+            "rm -f /etc/wireguard/post-up.d/wg-warp.sh",
+            "rm -f /etc/nftables.d/nkcore-warp.nft",
+            "rm -f /etc/nftables.d/nkcore-nat.nft",
+            "rm -f /usr/local/bin/nk-warp-watchdog.sh",
+            "rm -f /etc/systemd/system/nk-warp-watchdog.service",
+            "rm -f /etc/systemd/system/nk-warp-watchdog.timer",
+            "rm -rf /var/lib/nk-core",
+            
+            "systemctl daemon-reload",
+            "systemctl reload nftables 2>/dev/null || systemctl restart nftables 2>/dev/null || true",
+            
+            // Delete PBR rules & table (ignore if fail)
+            "ip rule del fwmark 100 lookup warp priority 11000 2>/dev/null || true"
+        ]);
+
+        $this->ssh->executeCommand($removeCmd, true, true);
+    }
+
+    public function readWarpHealthCache(): array
+    {
+        try {
+            $out = $this->ssh->executeCommand("cat /var/lib/nk-core/state/warp-health.json 2>/dev/null || echo '{}'", true);
+            $data = json_decode(trim($out), true);
+            return is_array($data) ? $data : [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    public function runWarpDiagnostics(): array
+    {
+        // Force-run systemd service immediately to refresh stats
+        $this->ssh->executeCommand("systemctl start nk-warp-watchdog.service", true, true);
+        return $this->readWarpHealthCache();
     }
 }

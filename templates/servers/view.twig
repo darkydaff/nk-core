@@ -349,6 +349,110 @@
 					</div>
 				</div>
 
+				<!-- Cloudflare WARP Panel -->
+				<div class="panel p-5" id="warp-panel">
+					<div class="flex items-center justify-between mb-4">
+						<h3 class="text-sm font-semibold uppercase tracking-wider opacity-70">Cloudflare WARP</h3>
+						
+						{% if server.warp_status == 'connected' %}
+							<span class="badge-active text-[10px] px-2 py-0.5 rounded font-bold flex items-center bg-emerald-500/10 border-emerald-500/20 text-emerald-400 border">
+								<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
+								Connected
+							</span>
+						{% elseif server.warp_status == 'installing' or server.warp_status == 'initializing' %}
+							<span class="badge-primary text-[10px] px-2 py-0.5 rounded font-bold flex items-center bg-sky-500/10 border-sky-500/20 text-sky-400 border">
+								<i class="fas fa-spinner fa-spin text-[8px] mr-1.5"></i>
+								Setup...
+							</span>
+						{% elseif server.warp_status == 'degraded' %}
+							<span class="badge-warning text-[10px] px-2 py-0.5 rounded font-bold flex items-center bg-amber-500/10 border-amber-500/20 text-amber-400 border">
+								<span class="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5"></span>
+								Degraded
+							</span>
+						{% elseif server.warp_status == 'error' %}
+							<span class="badge-error text-[10px] px-2 py-0.5 rounded font-bold flex items-center bg-red-500/10 border-red-500/20 text-red-400 border">
+								<span class="w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5"></span>
+								Error
+							</span>
+						{% else %}
+							<span class="text-[10px] px-2 py-0.5 rounded font-bold flex items-center bg-slate-500/10 border-slate-500/20 text-slate-400 border">
+								Not Installed
+							</span>
+						{% endif %}
+					</div>
+
+					{% if server.warp_status == 'not_installed' or server.warp_status is empty %}
+						<p class="text-xs text-muted leading-relaxed mb-4">
+							Route client egress traffic through Cloudflare's network. Prevents destination blocking and hides host server IP.
+						</p>
+						<button onclick="window.serverView.installWarp({{ server.id }})" id="installWarpBtn" class="btn-primary w-full py-2 text-xs font-semibold flex items-center justify-center gap-1.5">
+							<i class="fas fa-download"></i>
+							Install Cloudflare WARP
+						</button>
+					{% elseif server.warp_status == 'installing' or server.warp_status == 'initializing' %}
+						<div class="py-4 text-center">
+							<div class="animate-spin text-primary text-xl mb-2">
+								<i class="fas fa-circle-notch"></i>
+							</div>
+							<p class="text-xs text-muted">Orchestrating Cloudflare WARP backend setup. This might take up to a minute...</p>
+						</div>
+					{% else %}
+						<div class="space-y-3 font-mono text-xs mb-4">
+							<div class="flex justify-between items-center pb-2 border-b border-default/10">
+								<span class="text-[10px] text-muted uppercase font-bold tracking-tight font-sans">Cloudflare IP</span>
+								<span class="font-bold text-content-primary">{{ server.warp_cloudflare_ip|default('—') }}</span>
+							</div>
+							<div class="flex justify-between items-center pb-2 border-b border-default/10">
+								<span class="text-[10px] text-muted uppercase font-bold tracking-tight font-sans">Active Clients</span>
+								<span class="font-bold text-content-primary">{{ server.warp_client_count|default(0) }} clients</span>
+							</div>
+							<div class="flex flex-col gap-0.5 pb-2 border-b border-default/10">
+								<span class="text-[10px] text-muted uppercase font-bold tracking-tight font-sans">Health Status</span>
+								<span class="font-sans font-medium text-xs {% if server.warp_status == 'connected' %}text-emerald-400{% elseif server.warp_status == 'degraded' %}text-amber-400{% else %}text-red-400{% endif %}">
+									{{ server.warp_last_check_status|default('Unknown check status') }}
+								</span>
+								{% if server.warp_last_check_at %}
+									<span class="text-[9px] text-muted font-sans">Checked: {{ server.warp_last_check_at|date('H:i:s') }}</span>
+								{% endif %}
+							</div>
+							{% if server.warp_last_repair_at %}
+								<div class="flex flex-col gap-0.5">
+									<span class="text-[10px] text-muted uppercase font-bold tracking-tight font-sans">Last Auto Repair</span>
+									<span class="text-[10px] text-content-secondary leading-tight font-sans">{{ server.warp_last_repair_result|default('System restored') }}</span>
+									<span class="text-[9px] text-muted font-sans">{{ server.warp_last_repair_at|date('Y-m-d H:i') }}</span>
+								</div>
+							{% endif %}
+							{% if server.warp_status == 'error' and server.warp_last_error %}
+								<div class="bg-red-500/10 border border-red-500/20 p-2.5 rounded text-[10px] text-red-400 font-sans leading-relaxed max-h-24 overflow-y-auto">
+									<strong class="block mb-0.5">Last Error:</strong>
+									{{ server.warp_last_error }}
+								</div>
+							{% endif %}
+						</div>
+
+						<div class="space-y-2 border-t border-default/20 pt-3">
+							<button onclick="window.serverView.runWarpHealthCheck({{ server.id }})" id="warpHealthBtn" class="w-full py-2 rounded-lg bg-surface-hover hover:bg-surface-border text-content-secondary border border-surface-border/50 text-xs font-semibold transition-all flex items-center justify-center gap-1.5">
+								<i class="fas fa-sync-alt" id="warpHealthIcon"></i>
+								Run Health Check
+							</button>
+							<div class="flex gap-2">
+								<button onclick="window.serverView.repairWarp({{ server.id }})" id="warpRepairBtn" class="flex-1 py-1.5 rounded-lg bg-surface-hover hover:bg-primary/10 hover:text-primary border border-surface-border/50 text-xs transition-all flex items-center justify-center gap-1">
+									<i class="fas fa-tools"></i>
+									Repair
+								</button>
+								<button onclick="window.serverView.reinstallWarp({{ server.id }})" id="warpReinstallBtn" class="flex-1 py-1.5 rounded-lg bg-surface-hover hover:bg-surface-border text-content-secondary border border-surface-border/50 text-xs transition-all flex items-center justify-center gap-1">
+									<i class="fas fa-redo"></i>
+									Reinstall
+								</button>
+								<button onclick="window.serverView.uninstallWarp({{ server.id }}, '{{ server.name|e('js') }}')" id="warpUninstallBtn" class="flex-1 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs transition-all flex items-center justify-center gap-1">
+									<i class="fas fa-trash-alt"></i>
+									Remove
+								</button>
+							</div>
+						</div>
+					{% endif %}
+				</div>
+
 				<div class="panel p-5">
 					<h3 class="text-sm font-semibold mb-4 uppercase tracking-wider opacity-70">{{ t('clients.add') }}</h3>
 					<form onsubmit="handleAjaxForm(event, '/servers/{{ server.id }}/clients/create')" id="createClientForm">

@@ -195,6 +195,25 @@ const Dashboard = {
         const container = document.getElementById('searchResults');
         if (!container) return;
 
+        const getRoutingBadge = (c) => {
+            if (c.routing_mode === 'warp') {
+                if (c.effective_routing === 'warp') {
+                    return `
+                        <span class="inline-flex items-center gap-1 text-[9px] text-primary font-bold bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded-md leading-none w-fit">
+                            <i class="fas fa-shield-alt text-[8px]"></i>WARP
+                        </span>
+                    `;
+                } else {
+                    return `
+                        <span class="inline-flex items-center gap-1 text-[9px] text-amber-400 font-bold bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-md leading-none w-fit animate-pulse" title="WARP interface degraded. Falling back to direct WAN egress.">
+                            <i class="fas fa-exclamation-triangle text-[8px]"></i>Direct (WARP down)
+                        </span>
+                    `;
+                }
+            }
+            return '';
+        };
+
         if (!results || results.length === 0) {
             container.innerHTML = `<div class="p-20 text-center opacity-30 animate-in fade-in slide-in-from-bottom-4">
                 <i class="fas fa-search text-4xl mb-4"></i>
@@ -234,8 +253,9 @@ const Dashboard = {
                                     </span>
                                 </div>
                             </div>
-                            <div class="flex items-center gap-1.5">
+                            <div class="flex items-center gap-1.5 flex-wrap justify-end">
                                 ${NK.renderStatusBadge(dbStatus, c.connection_status, this.labels)}
+                                ${getRoutingBadge(c)}
                             </div>
                         </div>
                         <div class="flex items-center justify-between text-[10px] bg-panel/50 rounded p-2">
@@ -301,8 +321,11 @@ const Dashboard = {
                         const statusCell = row.querySelector('.cell-status');
                         if (statusCell) {
                             const statusHtml = `
-                                <div class="flex flex-col gap-1">
-                                    ${NK.renderStatusBadge(dbStatus, c.connection_status, this.labels)}
+                                <div class="flex flex-col gap-1.5">
+                                    <div class="flex items-center gap-1.5">
+                                        ${NK.renderStatusBadge(dbStatus, c.connection_status, this.labels)}
+                                        ${getRoutingBadge(c)}
+                                    </div>
                                     <code class="text-[10px] text-secondary font-mono">${highlightedIp}</code>
                                 </div>
                             `;
@@ -389,8 +412,11 @@ const Dashboard = {
                                     </div>
                                 </td>
                                 <td class="px-5 py-4 text-left whitespace-nowrap cell-status">
-                                    <div class="flex flex-col gap-1">
-                                        ${NK.renderStatusBadge(dbStatus, c.connection_status, this.labels)}
+                                    <div class="flex flex-col gap-1.5">
+                                        <div class="flex items-center gap-1.5">
+                                            ${NK.renderStatusBadge(dbStatus, c.connection_status, this.labels)}
+                                            ${getRoutingBadge(c)}
+                                        </div>
                                         <code class="text-[10px] text-secondary font-mono">${highlightedIp}</code>
                                     </div>
                                 </td>
@@ -488,8 +514,11 @@ const Dashboard = {
                         </div>
                     </td>
                     <td class="px-5 py-4 text-left whitespace-nowrap cell-status">
-                        <div class="flex flex-col gap-1">
-                            ${NK.renderStatusBadge(dbStatus, c.connection_status, this.labels)}
+                        <div class="flex flex-col gap-1.5">
+                            <div class="flex items-center gap-1.5">
+                                ${NK.renderStatusBadge(dbStatus, c.connection_status, this.labels)}
+                                ${getRoutingBadge(c)}
+                            </div>
                             <code class="text-[10px] text-secondary font-mono">${highlightedIp}</code>
                         </div>
                     </td>

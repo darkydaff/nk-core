@@ -219,7 +219,7 @@ class VpnConfigRenderer
     /**
      * Synchronize the nftables set of warp clients on the host server based on the database state.
      */
-    private function syncWarpRoutingClients(): void
+    public function syncWarpRoutingClients(): void
     {
         $pdo = DB::conn();
         
@@ -236,24 +236,48 @@ class VpnConfigRenderer
         $warpClients = $stmtWarp->fetchAll(PDO::FETCH_COLUMN);
 
         $syncCmds = [
-            "nft flush set inet nkcore warp_clients 2>/dev/null || true"
+            "mkdir -p /var/lib/nk-core/state",
+            "nft flush set inet nkcore warp_clients_v4 2>/dev/null || true",
+            "nft flush set inet nkcore warp_clients_v6 2>/dev/null || true"
         ];
         
+        $v4Ips = [];
+        $v6Ips = [];
+        
         if (!empty($warpClients)) {
-            $validIps = [];
             foreach ($warpClients as $ip) {
                 if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-                    $validIps[] = $ip;
+                    $v4Ips[] = $ip;
+                } elseif (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+                    $v6Ips[] = $ip;
                 } else {
                     Logger::channel('control-plane')->warning("Security Alert: Skip invalid IP address for routing set sync", ['ip' => $ip]);
                 }
             }
             
-            if (!empty($validIps)) {
-                $ipList = implode(', ', $validIps);
-                $syncCmds[] = "nft add element inet nkcore warp_clients { {$ipList} } 2>/dev/null || true";
+            if (!empty($v4Ips)) {
+                $ipList = implode(', ', $v4Ips);
+                $syncCmds[] = "nft add element inet nkcore warp_clients_v4 { {$ipList} } 2>/dev/null || true";
+            }
+            if (!empty($v6Ips)) {
+                $ipList = implode(', ', $v6Ips);
+                $syncCmds[] = "nft add element inet nkcore warp_clients_v6 { {$ipList} } 2>/dev/null || true";
             }
         }
+
+        // Write persistent state files on the host to recover sets on server reboot
+        $v4IpsStr = implode("\n", $v4Ips);
+        $v6IpsStr = implode("\n", $v6Ips);
+        $base64V4 = base64_encode($v4IpsStr);
+        $base64V6 = base64_encode($v6IpsStr);
+        
+        $syncCmds[] = "echo '{$base64V4}' | base64 -d > /var/lib/nk-core/state/warp-clients-v4.txt";
+        $syncCmds[] = "echo '{$base64V6}' | base64 -d > /var/lib/nk-core/state/warp-clients-v6.txt";
+        
+        // Update the warp_client_count cache in database
+        $totalCount = count($v4Ips) + count($v6Ips);
+        $pdo->prepare("UPDATE vpn_servers SET warp_client_count = ? WHERE id = ?")
+            ->execute([$totalCount, $this->server->getId()]);
         
         $this->ssh->executeCommand(implode(' && ', $syncCmds), true, true);
     }

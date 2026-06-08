@@ -101,8 +101,15 @@ class ClientController {
             $defaultSpeedLimitUp = (int)Config::get('DEFAULT_SPEED_LIMIT_UP', 0);
             $defaultSpeedLimitDown = (int)Config::get('DEFAULT_SPEED_LIMIT_DOWN', 0);
 
+            // Fetch server's warp_status
+            $pdo = DB::conn();
+            $stmtServer = $pdo->prepare("SELECT warp_status FROM vpn_servers WHERE id = ?");
+            $stmtServer->execute([$clientData['server_id']]);
+            $serverWarpStatus = $stmtServer->fetchColumn() ?: 'not_installed';
+
             View::render('clients/view.twig', [
                 'client' => $clientData,
+                'server_warp_status' => $serverWarpStatus,
                 'stats' => $stats,
                 'default_speed_limit_up' => $defaultSpeedLimitUp,
                 'default_speed_limit_down' => $defaultSpeedLimitDown
