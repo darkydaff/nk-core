@@ -430,7 +430,9 @@ class LinuxProvisioner
             // 1. Install and register Cloudflare WARP automatically if not present
             "if [ ! -f /etc/wireguard/wg-warp.conf ]; then " .
                 "if [ ! -f /usr/local/bin/wgcf ]; then " .
-                    "curl -fsSL https://github.com/ViRb3/wgcf/releases/latest/download/wgcf_linux_amd64 -o /usr/local/bin/wgcf && " .
+                    "WGCF_URL=\$(curl -fsSL https://api.github.com/repos/ViRb3/wgcf/releases/latest 2>/dev/null | grep \"browser_download_url\" | grep \"linux_amd64\" | cut -d '\"' -f 4 || true) && " .
+                    "if [ -z \"\$WGCF_URL\" ]; then WGCF_URL=\"https://github.com/ViRb3/wgcf/releases/download/v2.2.31/wgcf_2.2.31_linux_amd64\"; fi && " .
+                    "curl -fsSL \"\$WGCF_URL\" -o /usr/local/bin/wgcf && " .
                     "chmod +x /usr/local/bin/wgcf; " .
                 "fi && " .
                 "mkdir -p /tmp/wgcf_setup && " .
