@@ -122,6 +122,26 @@ class Translator
             'clients.speed_limit_help' => ['en' => 'Enter custom speed in Mbps, 0 for unlimited, or leave empty to inherit settings.', 'uk' => 'Введіть швидкість у Мбіт/с, 0 для необмеженої або залиште порожнім, щоб успадкувати.', 'ru' => 'Введите скорость в Мбит/с, 0 для неограниченной или оставьте пустым, чтобы наследовать.'],
             'servers.vpn_subnet' => ['en' => 'VPN Subnet', 'uk' => 'Підмережа VPN', 'ru' => 'Подсеть VPN'],
             'servers.vpn_subnet_hint' => ['en' => 'Choose a subnet for the VPN network to avoid conflicts.', 'uk' => 'Виберіть підмережу для мережі VPN, щоб уникнути конфліктів.', 'ru' => 'Выберите подсеть для сети VPN во избежание конфликтов.'],
+            // Cloudflare WARP panel strings
+            'warp.connected' => ['en' => 'Connected', 'uk' => 'Підключено', 'ru' => 'Подключено'],
+            'warp.setup' => ['en' => 'Setup...', 'uk' => 'Налаштування...', 'ru' => 'Настройка...'],
+            'warp.degraded' => ['en' => 'Degraded', 'uk' => 'Деградований', 'ru' => 'Деградирован'],
+            'warp.error' => ['en' => 'Error', 'uk' => 'Помилка', 'ru' => 'Ошибка'],
+            'warp.not_installed' => ['en' => 'Not Installed', 'uk' => 'Не встановлено', 'ru' => 'Не установлен'],
+            'warp.install_desc' => ['en' => 'Route client egress traffic through Cloudflare\'s network. Prevents destination blocking and hides host server IP.', 'uk' => 'Направляє вихідний трафік клієнтів через мережу Cloudflare. Запобігає блокуванню адреси призначення та приховує IP хост-сервера.', 'ru' => 'Направляет исходящий трафик клиентов через сеть Cloudflare. Предотвращает блокировку адреса назначения и скрывает IP хост-сервера.'],
+            'warp.install_btn' => ['en' => 'Install Cloudflare WARP', 'uk' => 'Встановити Cloudflare WARP', 'ru' => 'Установить Cloudflare WARP'],
+            'warp.installing_hint' => ['en' => 'Orchestrating Cloudflare WARP backend setup. This might take up to a minute...', 'uk' => 'Налаштування бекенду Cloudflare WARP. Це може зайняти до хвилини...', 'ru' => 'Настройка бэкенда Cloudflare WARP. Это может занять до минуты...'],
+            'warp.cloudflare_ip' => ['en' => 'Cloudflare IP', 'uk' => 'IP Cloudflare', 'ru' => 'IP Cloudflare'],
+            'warp.active_clients' => ['en' => 'Active Clients', 'uk' => 'Активні клієнти', 'ru' => 'Активные клиенты'],
+            'warp.clients_suffix' => ['en' => 'clients', 'uk' => 'клієнтів', 'ru' => 'клиентов'],
+            'warp.health_status' => ['en' => 'Health Status', 'uk' => 'Стан здоров\'я', 'ru' => 'Состояние здоровья'],
+            'warp.checked' => ['en' => 'Checked', 'uk' => 'Перевірено', 'ru' => 'Проверено'],
+            'warp.last_auto_repair' => ['en' => 'Last Auto Repair', 'uk' => 'Останнє авторемонтування', 'ru' => 'Последний авторемонт'],
+            'warp.last_error' => ['en' => 'Last Error', 'uk' => 'Остання помилка', 'ru' => 'Последняя ошибка'],
+            'warp.run_health_check' => ['en' => 'Run Health Check', 'uk' => 'Запустити перевірку', 'ru' => 'Запустить проверку'],
+            'warp.repair' => ['en' => 'Repair', 'uk' => 'Відновити', 'ru' => 'Восстановить'],
+            'warp.reinstall' => ['en' => 'Reinstall', 'uk' => 'Перевстановити', 'ru' => 'Переустановить'],
+            'warp.remove' => ['en' => 'Remove', 'uk' => 'Видалити', 'ru' => 'Удалить'],
         ];
 
         $stmt = $pdo->prepare("INSERT INTO translations (locale, category, key_name, translation) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE translation = VALUES(translation)");
