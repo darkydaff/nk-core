@@ -925,7 +925,13 @@ class ServerView {
                 const speedDownSpan = el.querySelector('.bg-emerald-500\\/10');
                 const speedUpSpan = el.querySelector('.bg-primary\\/10');
                 const trafficSpan = el.querySelector('.cell-traffic span.font-medium') || el.querySelector('.font-mono.font-medium');
-                const statusContainer = el.querySelector('.cell-status div') || el.querySelector('.flex.items-center.gap-1\\.5');
+                // Target the inner badge-row div, NOT the outer flex-col wrapper.
+                // The outer wrapper also contains the IP <code> element — overwriting it
+                // via innerHTML would silently destroy the IP on every telemetry tick.
+                const statusCellOuter = el.querySelector('.cell-status > div');
+                const statusContainer = statusCellOuter
+                    ? (statusCellOuter.querySelector('div.flex') || statusCellOuter)
+                    : el.querySelector('.flex.items-center.gap-1\\.5');
                 const seenSpan = el.querySelector('.cell-traffic span.text-muted') || el.querySelector('.font-mono.font-medium + .text-muted') || el.querySelector('.font-mono.font-medium + div + .text-muted');
 
                 this.telemetryRows.set(id, {
