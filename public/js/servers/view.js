@@ -606,8 +606,6 @@ class ServerView {
         }
     }
 
-    }
-
     async installWarp(serverId) {
         const btn = document.getElementById('installWarpBtn');
         if (btn) btn.disabled = true;
