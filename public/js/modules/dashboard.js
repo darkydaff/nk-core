@@ -199,8 +199,11 @@ const Dashboard = {
             if (c.routing_mode === 'warp') {
                 if (c.effective_routing === 'warp') {
                     return `
-                        <span class="inline-flex items-center gap-1 text-[9px] text-primary font-bold bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded-md leading-none w-fit">
-                            <i class="fas fa-shield-alt text-[8px]"></i>WARP
+                        <span class="inline-flex items-center bg-[#F6821F]/10 border border-[#F6821F]/30 px-1.5 py-0.5 rounded-md w-fit" title="Cloudflare WARP">
+                            <svg width="16" height="10" viewBox="0 0 109 74" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                <path d="M82.4 24.3c-.7 0-1.3 0-2 .1C78.2 10.5 66 0 51.2 0 37.5 0 26 9 22.7 21.4c-1-.2-2-.3-3-.3C8.8 21.1 0 29.9 0 40.7s8.8 19.6 19.7 19.6h62.7c10.8 0 19.6-8.8 19.6-19.6 0-9.3-6.5-17.1-15.3-19.1-1.4-.3-2.9-.4-4.3-.3z" fill="#F6821F"/>
+                                <path d="M96.4 44.2l-4.1-14.4c-3.3-1.2-6.9-1.8-10.6-1.5-.7 0-1.3 0-2 .1-2.2-13.9-14.4-24.4-29.2-24.4-13.7 0-25.2 9-28.5 21.4-1-.2-2-.3-3-.3C8.8 25 0 33.8 0 44.6s8.8 19.6 19.7 19.6h62.7c10.8 0 19.6-8.8 19.6-19.6 0-.2 0-.3-.1-.4h-5.5z" fill="#FBAD41" opacity=".4"/>
+                            </svg>
                         </span>
                     `;
                 } else {
