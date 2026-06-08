@@ -451,16 +451,23 @@ class LinuxProvisioner
                 "rm -rf /tmp/wgcf_setup; " .
             "fi",
 
-            // Clean up any existing Table, PostUp, PostDown, or DNS configuration lines to ensure idempotency and correct section placement
+            // Clean up any existing Table, PostUp, PostDown, DNS, or MTU configuration lines to ensure idempotency and correct section placement
             "sed -i '/^[[:space:]]*Table[[:space:]]*=/d' /etc/wireguard/wg-warp.conf",
             "sed -i '/^[[:space:]]*PostUp[[:space:]]*=/d' /etc/wireguard/wg-warp.conf",
             "sed -i '/^[[:space:]]*PostDown[[:space:]]*=/d' /etc/wireguard/wg-warp.conf",
             "sed -i '/^[[:space:]]*DNS[[:space:]]*=/d' /etc/wireguard/wg-warp.conf",
+            "sed -i '/^[[:space:]]*MTU[[:space:]]*=/d' /etc/wireguard/wg-warp.conf",
             
-            // Ensure Table, PostUp, and PostDown rules are correctly placed in the [Interface] section of configuration
+            // Ensure Table, PostUp, PostDown, and MTU rules are correctly placed in the [Interface] section of configuration
             "sed -i '/\\[Interface\\]/a Table = off' /etc/wireguard/wg-warp.conf",
+            "sed -i '/\\[Interface\\]/a MTU = 1280' /etc/wireguard/wg-warp.conf",
             "sed -i '/\\[Interface\\]/a PostUp = /etc/wireguard/post-up.d/wg-warp.sh' /etc/wireguard/wg-warp.conf",
             "sed -i '/\\[Interface\\]/a PostDown = ip rule del fwmark 100 lookup warp priority 11000 2>/dev/null || true' /etc/wireguard/wg-warp.conf",
+            
+            // Resolve engage.cloudflareclient.com to IPv4 to prevent connection failures on hosts with broken IPv6 routing
+            "EP_IP=\$(getent ahostsv4 engage.cloudflareclient.com 2>/dev/null | head -n 1 | awk '{print \$1}') && " .
+            "if [ -z \"\$EP_IP\" ]; then EP_IP=\"162.159.192.1\"; fi && " .
+            "sed -i \"s|Endpoint[[:space:]]*=[[:space:]]*.*:2408|Endpoint = \${EP_IP}:2408|g\" /etc/wireguard/wg-warp.conf",
             
             // 2. Ensure Table warp (ID 200) registered
             "if ! grep -q '200 warp' /etc/iproute2/rt_tables; then echo '200 warp' >> /etc/iproute2/rt_tables; fi",
