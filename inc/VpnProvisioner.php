@@ -85,7 +85,19 @@ class VpnProvisioner
             $containerName = $serverData['container_name'] ?? 'nk-awg-v2';
             $containerRunning = !empty(trim($this->server->executeCommand("docker ps --filter name={$containerName} --format '{{.Names}}'")));
             
-            if ($containerRunning && !$forceRebuild) {
+            // Validate if the running container is using host network mode as required
+            $needsRebuild = false;
+            if ($containerRunning) {
+                $netMode = trim($this->server->executeCommand("docker inspect {$containerName} --format='{{.HostConfig.NetworkMode}}' 2>/dev/null || echo 'bridge'"));
+                if ($netMode !== 'host') {
+                    $needsRebuild = true;
+                    Logger::channel('deployments')->info("Container running but in network mode '{$netMode}'. Rebuilding to enforce 'host' network mode.", [
+                        'server_id' => $this->getId()
+                    ]);
+                }
+            }
+            
+            if ($containerRunning && !$forceRebuild && !$needsRebuild) {
                 if ($this->tryAdoptExistingConfig()) {
                     return DeploymentResult::success($this->timings, $this->getDeploymentResult(), $this->warnings);
                 }

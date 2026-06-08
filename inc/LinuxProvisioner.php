@@ -620,13 +620,19 @@ if [ "$IS_HEALTHY" -eq 1 ]; then
     REPAIRS=0
     STATUS_STR="connected"
     
-    # Restore WARP route
+    # Restore routes in warp table
+    if [ -n "$VPN_SUBNET" ] && ip link show wg0 >/dev/null 2>&1; then
+        ip route replace "$VPN_SUBNET" dev wg0 table warp 2>/dev/null || true
+    fi
     ip route replace default dev "$WARP_DEV" table warp 2>/dev/null || true
 else
     FAILURES=$((FAILURES + 1))
     
     if [ "$FAILURES" -ge 3 ]; then
         STATUS_STR="error"
+        if [ -n "$VPN_SUBNET" ] && ip link show wg0 >/dev/null 2>&1; then
+            ip route replace "$VPN_SUBNET" dev wg0 table warp 2>/dev/null || true
+        fi
         if [ -n "$ORIG_GW" ] && [ -n "$ORIG_DEV" ]; then
             ip route replace default via "$ORIG_GW" dev "$ORIG_DEV" table warp 2>/dev/null || true
             STATUS_STR="degraded"
