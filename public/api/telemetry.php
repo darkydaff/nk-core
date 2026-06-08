@@ -366,7 +366,8 @@ try {
                 'down' => VpnClient::formatSpeed($speedDown),
                 'traffic' => VpnClient::formatBytes((float)$client['bytes_sent'] + $diffSent + (float)$client['bytes_received'] + $diffReceived),
                 'online' => ($peer['latest_handshake'] > 0 && ($timestamp - $peer['latest_handshake']) < 300),
-                'seen' => $handshakeStr ? 'Active' : 'Never'
+                'seen' => $handshakeStr ? 'Active' : 'Never',
+                'ip' => ($newExternalIp && $newExternalIp !== '(none)') ? $newExternalIp : null,
             ];
         }
     }

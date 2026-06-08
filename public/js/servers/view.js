@@ -932,6 +932,8 @@ class ServerView {
                 const statusContainer = statusCellOuter
                     ? (statusCellOuter.querySelector('div.flex') || statusCellOuter)
                     : el.querySelector('.flex.items-center.gap-1\\.5');
+                // The IP <code> is a sibling of the badge row inside the outer flex-col wrapper
+                const ipCode = statusCellOuter ? statusCellOuter.querySelector('code') : null;
                 const seenSpan = el.querySelector('.cell-traffic span.text-muted') || el.querySelector('.font-mono.font-medium + .text-muted') || el.querySelector('.font-mono.font-medium + div + .text-muted');
 
                 this.telemetryRows.set(id, {
@@ -940,6 +942,7 @@ class ServerView {
                     speedUp: speedUpSpan,
                     traffic: trafficSpan,
                     status: statusContainer,
+                    ip: ipCode,
                     seen: seenSpan
                 });
             }
@@ -1005,6 +1008,13 @@ class ServerView {
                 if (row.status.innerHTML.trim() !== badgeHtml.trim()) {
                     row.status.innerHTML = badgeHtml;
                 }
+            }
+
+            // 6. Hydrate External IP (reconnects from a different address are reflected in real-time)
+            if (row.ip && client.ip && row.ip.innerText !== client.ip) {
+                row.ip.innerText = client.ip;
+                row.ip.classList.add('pulse-glow');
+                setTimeout(() => row.ip.classList.remove('pulse-glow'), 600);
             }
         });
     }
