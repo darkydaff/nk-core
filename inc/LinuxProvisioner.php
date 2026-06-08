@@ -451,10 +451,16 @@ class LinuxProvisioner
                 "rm -rf /tmp/wgcf_setup; " .
             "fi",
 
-            // Ensure Table, PostUp, and PostDown rules are present in configuration
-            "if ! grep -q 'Table = off' /etc/wireguard/wg-warp.conf; then echo 'Table = off' >> /etc/wireguard/wg-warp.conf; fi",
-            "if ! grep -q 'PostUp = /etc/wireguard/post-up.d/wg-warp.sh' /etc/wireguard/wg-warp.conf; then echo 'PostUp = /etc/wireguard/post-up.d/wg-warp.sh' >> /etc/wireguard/wg-warp.conf; fi",
-            "if ! grep -q 'PostDown' /etc/wireguard/wg-warp.conf; then echo 'PostDown = ip rule del fwmark 100 lookup warp priority 11000 2>/dev/null || true' >> /etc/wireguard/wg-warp.conf; fi",
+            // Clean up any existing Table, PostUp, PostDown, or DNS configuration lines to ensure idempotency and correct section placement
+            "sed -i '/^[[:space:]]*Table[[:space:]]*=/d' /etc/wireguard/wg-warp.conf",
+            "sed -i '/^[[:space:]]*PostUp[[:space:]]*=/d' /etc/wireguard/wg-warp.conf",
+            "sed -i '/^[[:space:]]*PostDown[[:space:]]*=/d' /etc/wireguard/wg-warp.conf",
+            "sed -i '/^[[:space:]]*DNS[[:space:]]*=/d' /etc/wireguard/wg-warp.conf",
+            
+            // Ensure Table, PostUp, and PostDown rules are correctly placed in the [Interface] section of configuration
+            "sed -i '/\\[Interface\\]/a Table = off' /etc/wireguard/wg-warp.conf",
+            "sed -i '/\\[Interface\\]/a PostUp = /etc/wireguard/post-up.d/wg-warp.sh' /etc/wireguard/wg-warp.conf",
+            "sed -i '/\\[Interface\\]/a PostDown = ip rule del fwmark 100 lookup warp priority 11000 2>/dev/null || true' /etc/wireguard/wg-warp.conf",
             
             // 2. Ensure Table warp (ID 200) registered
             "if ! grep -q '200 warp' /etc/iproute2/rt_tables; then echo '200 warp' >> /etc/iproute2/rt_tables; fi",
