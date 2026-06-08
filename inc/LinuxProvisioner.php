@@ -480,7 +480,10 @@ class LinuxProvisioner
             // Ensure they are included in /etc/nftables.conf
             "if ! grep -q 'nkcore-warp.nft' /etc/nftables.conf; then echo 'include \"/etc/nftables.d/nkcore-warp.nft\"' >> /etc/nftables.conf; fi",
             "if ! grep -q 'nkcore-nat.nft' /etc/nftables.conf; then echo 'include \"/etc/nftables.d/nkcore-nat.nft\"' >> /etc/nftables.conf; fi",
-            "systemctl reload nftables 2>/dev/null || systemctl restart nftables 2>/dev/null || true",
+            
+            // Apply nftables configurations directly without restarting the nftables service (which flushes rules and disrupts Docker)
+            "nft -f /etc/nftables.d/nkcore-warp.nft 2>/dev/null || true",
+            "nft -f /etc/nftables.d/nkcore-nat.nft 2>/dev/null || true",
 
             // 4. Create persistent startup routing commands
             "mkdir -p /etc/wireguard/post-up.d",
@@ -522,7 +525,9 @@ class LinuxProvisioner
             "mkdir -p /etc/nftables.d",
             "echo '{$base64NftNat}' | base64 -d > /etc/nftables.d/nkcore-vpn-nat.nft",
             "if ! grep -q 'nkcore-vpn-nat.nft' /etc/nftables.conf; then echo 'include \"/etc/nftables.d/nkcore-vpn-nat.nft\"' >> /etc/nftables.conf; fi",
-            "systemctl reload nftables 2>/dev/null || systemctl restart nftables 2>/dev/null || true"
+            
+            // Apply nftables configurations directly without restarting the nftables service (which flushes rules and disrupts Docker)
+            "nft -f /etc/nftables.d/nkcore-vpn-nat.nft 2>/dev/null || true"
         ]);
 
         $this->ssh->executeCommand($setupCmd, true, true);
@@ -743,7 +748,10 @@ SYSTEMD;
             "rm -rf /var/lib/nk-core",
             
             "systemctl daemon-reload",
-            "systemctl reload nftables 2>/dev/null || systemctl restart nftables 2>/dev/null || true",
+            
+            // Clean up custom nftables rules directly without flushing the ruleset (avoiding Docker disruption)
+            "nft delete table inet nkcore 2>/dev/null || true",
+            "nft delete chain ip nat postrouting 2>/dev/null || true",
             
             // Delete PBR rules & table (ignore if fail)
             "ip rule del fwmark 100 lookup warp priority 11000 2>/dev/null || true"
