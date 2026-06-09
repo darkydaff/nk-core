@@ -526,6 +526,12 @@ class LinuxProvisioner
         $setupCmd = implode(' && ', [
             "which nft >/dev/null 2>&1 || (apt-get update -q && apt-get install -y nftables) || (yum install -y nftables) || true",
             "systemctl enable nftables",
+            // Clean up any legacy duplicate iptables rules for this subnet to prevent NAT ambiguity
+            "iptables -t nat -D POSTROUTING -s {$vpnSubnet} -o ens3 -j MASQUERADE 2>/dev/null || true",
+            "iptables -t nat -D POSTROUTING -s {$vpnSubnet} -j MASQUERADE 2>/dev/null || true",
+            "iptables -t nat -D POSTROUTING -s {$vpnSubnet} -o wg-warp -j MASQUERADE 2>/dev/null || true",
+            "iptables -D FORWARD -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true",
+            "iptables -D FORWARD -d {$vpnSubnet} -j ACCEPT 2>/dev/null || true",
             "mkdir -p /etc/nftables.d",
             "echo '{$base64NftNat}' | base64 -d > /etc/nftables.d/nkcore-vpn-nat.nft",
             "if ! grep -q 'nkcore-vpn-nat.nft' /etc/nftables.conf; then echo 'include \"/etc/nftables.d/nkcore-vpn-nat.nft\"' >> /etc/nftables.conf; fi",

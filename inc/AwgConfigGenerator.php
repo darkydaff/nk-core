@@ -301,25 +301,30 @@ else
 fi
 
 # 5. Apply Firewall Rules (Centralized)
-echo "Applying firewall rules..."
-iptables -I INPUT -i wg0 -j ACCEPT 2>/dev/null
-iptables -I FORWARD -i wg0 -j ACCEPT 2>/dev/null
-iptables -I FORWARD -o wg0 -j ACCEPT 2>/dev/null
-iptables -I OUTPUT -o wg0 -j ACCEPT 2>/dev/null
+if [ "\$NET_MODE" != "host" ]; then
+    echo "Applying firewall rules..."
+    iptables -I INPUT -i wg0 -j ACCEPT 2>/dev/null
+    iptables -I FORWARD -i wg0 -j ACCEPT 2>/dev/null
+    iptables -I FORWARD -o wg0 -j ACCEPT 2>/dev/null
+    iptables -I OUTPUT -o wg0 -j ACCEPT 2>/dev/null
 
-if [ "{$vpnPort}" != "0" ]; then
-    # Use -I (Insert) for the external port to ensure it bypasses other restrictive rules
-    iptables -I INPUT -p udp --dport {$vpnPort} -j ACCEPT 2>/dev/null
+    if [ "{$vpnPort}" != "0" ]; then
+        # Use -I (Insert) for the external port to ensure it bypasses other restrictive rules
+        iptables -I INPUT -p udp --dport {$vpnPort} -j ACCEPT 2>/dev/null
+    fi
+
+    # Enable forwarding
+    sysctl -w net.ipv4.ip_forward=1 || echo 'Notice: sysctl ip_forward failed, check host config'
+    iptables -I FORWARD -i wg0 -o "\$DEFAULT_IF" -s {$subnet} -j ACCEPT 2>/dev/null
+    iptables -I FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null
+
+    # NAT and MSS Clamping
+    iptables -t nat -I POSTROUTING -s {$subnet} -o "\$DEFAULT_IF" -j MASQUERADE 2>/dev/null
+    iptables -t mangle -I FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null
+else
+    echo "Host network mode detected. Skipping conflicting container iptables rules."
+    sysctl -w net.ipv4.ip_forward=1 || echo 'Notice: sysctl ip_forward failed, check host config'
 fi
-
-# Enable forwarding
-sysctl -w net.ipv4.ip_forward=1 || echo 'Notice: sysctl ip_forward failed, check host config'
-iptables -I FORWARD -i wg0 -o "\$DEFAULT_IF" -s {$subnet} -j ACCEPT 2>/dev/null
-iptables -I FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null
-
-# NAT and MSS Clamping
-iptables -t nat -I POSTROUTING -s {$subnet} -o "\$DEFAULT_IF" -j MASQUERADE 2>/dev/null
-iptables -t mangle -I FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null
 
 # Restore traffic shaping rules if they exist
 if [ -f /opt/amnezia/awg/tc_rules.sh ]; then

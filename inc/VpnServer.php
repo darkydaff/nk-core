@@ -935,7 +935,7 @@ class VpnServer
         $base64 = base64_encode($wgConfig);
         $this->executeCommand("echo \"{$base64}\" | docker exec -i {$containerName} sh -c 'base64 -d > /opt/amnezia/awg/wg0.conf && chmod 600 /opt/amnezia/awg/wg0.conf'", true);
         $this->executeCommand("echo \"{$clientsTableBase64}\" | docker exec -i {$containerName} sh -c 'base64 -d > /opt/amnezia/awg/clientsTable'", true);
-        $this->executeCommand("docker exec -i {$containerName} bash -c '/usr/local/bin/awg syncconf wg0 <(/usr/local/bin/awg-quick strip /opt/amnezia/awg/wg0.conf)'", true);
+        $this->executeCommand("docker exec -i {$containerName} bash -c '/usr/local/bin/awg-quick strip /opt/amnezia/awg/wg0.conf > /opt/amnezia/awg/wg0.conf.stripped && /usr/local/bin/awg syncconf wg0 /opt/amnezia/awg/wg0.conf.stripped && rm -f /opt/amnezia/awg/wg0.conf.stripped'", true);
     }
 
     

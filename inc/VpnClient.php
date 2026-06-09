@@ -364,7 +364,9 @@ class VpnClient {
                 "echo " . escapeshellarg($base64) . " | base64 -d > /opt/amnezia/awg/wg0.conf.tmp && " .
                 "mv /opt/amnezia/awg/wg0.conf.tmp /opt/amnezia/awg/wg0.conf && " .
                 "chmod 600 /opt/amnezia/awg/wg0.conf && " .
-                "/usr/local/bin/awg syncconf wg0 <(/usr/local/bin/awg-quick strip /opt/amnezia/awg/wg0.conf)"
+                "/usr/local/bin/awg-quick strip /opt/amnezia/awg/wg0.conf > /opt/amnezia/awg/wg0.conf.stripped && " .
+                "/usr/local/bin/awg syncconf wg0 /opt/amnezia/awg/wg0.conf.stripped && " .
+                "rm -f /opt/amnezia/awg/wg0.conf.stripped"
             ),
             $containerName
         );
@@ -551,7 +553,7 @@ class VpnClient {
 
         // 2. APPLY (syncconf)
         $syncCmd = sprintf(
-            "docker exec -i %s bash -c '/usr/local/bin/awg syncconf wg0 <(/usr/local/bin/awg-quick strip /opt/amnezia/awg/wg0.conf)'",
+            "docker exec -i %s bash -c '/usr/local/bin/awg-quick strip /opt/amnezia/awg/wg0.conf > /opt/amnezia/awg/wg0.conf.stripped && /usr/local/bin/awg syncconf wg0 /opt/amnezia/awg/wg0.conf.stripped && rm -f /opt/amnezia/awg/wg0.conf.stripped'",
             $containerName
         );
         self::executeServerCommand($server, $syncCmd, true);

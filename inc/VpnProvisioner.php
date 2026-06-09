@@ -526,7 +526,7 @@ WantedBy=multi-user.target' > /etc/systemd/system/nk-telemetry.service",
         // Using --network host for zero-latency performance.
         // Mounting /opt/amnezia/nk-awg-v2 to /opt/amnezia/awg for persistent storage on the host.
         $runOptions = sprintf(
-            '--privileged --network host --cap-add=NET_ADMIN --cap-add=SYS_MODULE -v /lib/modules:/lib/modules -v /opt/amnezia/nk-awg-v2:/opt/amnezia/awg -e WG_THREADS=4'
+            '--privileged --network host --cap-add=NET_ADMIN --cap-add=SYS_MODULE -v /lib/modules:/lib/modules -v /opt/amnezia/nk-awg-v2:/opt/amnezia/awg -e WG_THREADS=4 -e NET_MODE=host'
         );
 
         DeploymentService::deployDockerContainer($this->server, $containerName, $containerName, $runOptions);

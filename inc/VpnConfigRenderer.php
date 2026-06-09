@@ -109,7 +109,7 @@ class VpnConfigRenderer
             
             // 4. Hot Swap & Sync
             // Atomic swap
-            $swapCmd = "docker exec $containerName bash -c 'mv /opt/amnezia/awg/wg0.conf.next /opt/amnezia/awg/wg0.conf && /usr/local/bin/awg syncconf wg0 <(/usr/local/bin/awg-quick strip /opt/amnezia/awg/wg0.conf)'";
+            $swapCmd = "docker exec $containerName bash -c 'mv /opt/amnezia/awg/wg0.conf.next /opt/amnezia/awg/wg0.conf && /usr/local/bin/awg-quick strip /opt/amnezia/awg/wg0.conf > /opt/amnezia/awg/wg0.conf.stripped && /usr/local/bin/awg syncconf wg0 /opt/amnezia/awg/wg0.conf.stripped && rm -f /opt/amnezia/awg/wg0.conf.stripped'";
             $this->ssh->executeCommand($swapCmd, true, true);
             
             // Apply traffic shaping limits
