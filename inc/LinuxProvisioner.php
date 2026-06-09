@@ -383,7 +383,7 @@ class LinuxProvisioner
         $base64NftWarp = base64_encode($nftWarp);
 
         // Construct the custom nftables rule for masquerading nat
-        $nftNat = "table ip nat {\n" .
+        $nftNat = "table ip nkcore_warp_nat {\n" .
                   "    chain postrouting {\n" .
                   "        type nat hook postrouting priority 100; policy accept;\n" .
                   "        ip saddr {$vpnSubnet} oifname \"wg-warp\" masquerade\n" .
@@ -479,15 +479,18 @@ class LinuxProvisioner
             // 3. Deploy nftables custom config
             "mkdir -p /etc/nftables.d",
             "echo '{$base64NftWarp}' | base64 -d > /etc/nftables.d/nkcore-warp.nft",
-            "echo '{$base64NftNat}' | base64 -d > /etc/nftables.d/nkcore-nat.nft",
+            "echo '{$base64NftNat}' | base64 -d > /etc/nftables.d/nkcore-warp-nat.nft",
+            "nft delete rule ip nat postrouting ip saddr {$vpnSubnet} oifname \"wg-warp\" masquerade 2>/dev/null || true",
+            "rm -f /etc/nftables.d/nkcore-nat.nft",
+            "sed -i '/nkcore-nat.nft/d' /etc/nftables.conf 2>/dev/null || true",
             
             // Ensure they are included in /etc/nftables.conf
             "if ! grep -q 'nkcore-warp.nft' /etc/nftables.conf; then echo 'include \"/etc/nftables.d/nkcore-warp.nft\"' >> /etc/nftables.conf; fi",
-            "if ! grep -q 'nkcore-nat.nft' /etc/nftables.conf; then echo 'include \"/etc/nftables.d/nkcore-nat.nft\"' >> /etc/nftables.conf; fi",
+            "if ! grep -q 'nkcore-warp-nat.nft' /etc/nftables.conf; then echo 'include \"/etc/nftables.d/nkcore-warp-nat.nft\"' >> /etc/nftables.conf; fi",
             
             // Apply nftables configurations directly without restarting the nftables service (which flushes rules and disrupts Docker)
             "nft -f /etc/nftables.d/nkcore-warp.nft 2>/dev/null || true",
-            "nft -f /etc/nftables.d/nkcore-nat.nft 2>/dev/null || true",
+            "nft -f /etc/nftables.d/nkcore-warp-nat.nft 2>/dev/null || true",
 
             // 4. Create persistent startup routing commands
             "mkdir -p /etc/wireguard/post-up.d",
@@ -508,12 +511,18 @@ class LinuxProvisioner
     /**
      * Setup native host-level NAT masquerading rules for the VPN subnet via nftables
      */
-    public function setupHostNatRules(string $vpnSubnet): void
+    public function setupHostNatRules(string $vpnSubnet, string $serverHost): void
     {
+        $hostIp = filter_var($serverHost, FILTER_VALIDATE_IP) ? $serverHost : gethostbyname($serverHost);
+        $useSnat = !empty($hostIp) && filter_var($hostIp, FILTER_VALIDATE_IP);
+        $natRule = $useSnat 
+            ? "ip saddr {$vpnSubnet} oifname != \"wg-warp\" snat to {$hostIp}"
+            : "ip saddr {$vpnSubnet} oifname != \"wg-warp\" masquerade";
+
         $nftNat = "table ip nkcore_vpn_nat {\n" .
                   "    chain postrouting {\n" .
                   "        type nat hook postrouting priority 100; policy accept;\n" .
-                  "        ip saddr {$vpnSubnet} masquerade\n" .
+                  "        {$natRule}\n" .
                   "    }\n" .
                   "    chain forward {\n" .
                   "        type filter hook forward priority 0; policy accept;\n" .
@@ -526,6 +535,10 @@ class LinuxProvisioner
         $setupCmd = implode(' && ', [
             "which nft >/dev/null 2>&1 || (apt-get update -q && apt-get install -y nftables) || (yum install -y nftables) || true",
             "systemctl enable nftables",
+            // Enable IP forwarding and optimize UDP conntrack timeouts for game console UDP persistence
+            "sysctl -w net.ipv4.ip_forward=1",
+            "sysctl -w net.netfilter.nf_conntrack_udp_timeout=60 2>/dev/null || true",
+            "sysctl -w net.netfilter.nf_conntrack_udp_timeout_stream=180 2>/dev/null || true",
             // Clean up any legacy duplicate iptables rules for this subnet to prevent NAT ambiguity
             "iptables -t nat -D POSTROUTING -s {$vpnSubnet} -o ens3 -j MASQUERADE 2>/dev/null || true",
             "iptables -t nat -D POSTROUTING -s {$vpnSubnet} -j MASQUERADE 2>/dev/null || true",
