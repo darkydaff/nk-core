@@ -484,7 +484,9 @@ class LinuxProvisioner
             // Setup iptables forwarding and NAT masquerade rules for wg-warp
             "iptables -t nat -D POSTROUTING -s {$vpnSubnet} -o wg-warp -j MASQUERADE 2>/dev/null || true",
             "iptables -D FORWARD -i wg0 -o wg-warp -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true",
+            "iptables -D FORWARD -i ifb+ -o wg-warp -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true",
             "iptables -I FORWARD -i wg0 -o wg-warp -s {$vpnSubnet} -j ACCEPT",
+            "iptables -I FORWARD -i ifb+ -o wg-warp -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true",
             "iptables -t nat -I POSTROUTING -s {$vpnSubnet} -o wg-warp -j MASQUERADE",
 
             // 4. Create persistent startup routing commands
@@ -537,29 +539,42 @@ class LinuxProvisioner
             "iptables -t nat -D POSTROUTING -s {$vpnSubnet} ! -o wg0 -j MASQUERADE 2>/dev/null || true",
             "iptables -D FORWARD -i wg0 -j ACCEPT 2>/dev/null || true",
             "iptables -D FORWARD -o wg0 -j ACCEPT 2>/dev/null || true",
+            "iptables -D FORWARD -i ifb+ -j ACCEPT 2>/dev/null || true",
+            "iptables -D FORWARD -o ifb+ -j ACCEPT 2>/dev/null || true",
             "iptables -D FORWARD -i wg0 -o {$defaultIf} -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true",
+            "iptables -D FORWARD -i ifb+ -o {$defaultIf} -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true",
             "iptables -D FORWARD -i wg0 -o wg-warp -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true",
+            "iptables -D FORWARD -i ifb+ -o wg-warp -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true",
             "iptables -D FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || true",
             "iptables -D FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || true",
             "iptables -D INPUT -i wg0 -j ACCEPT 2>/dev/null || true",
+            "iptables -D INPUT -i ifb+ -j ACCEPT 2>/dev/null || true",
             "iptables -D OUTPUT -o wg0 -j ACCEPT 2>/dev/null || true",
+            "iptables -D OUTPUT -o ifb+ -j ACCEPT 2>/dev/null || true",
             
             // Insert fresh rules
             "iptables -I INPUT -i wg0 -j ACCEPT",
+            "iptables -I INPUT -i ifb+ -j ACCEPT 2>/dev/null || true",
             "iptables -I OUTPUT -o wg0 -j ACCEPT",
+            "iptables -I OUTPUT -o ifb+ -j ACCEPT 2>/dev/null || true",
             "iptables -I FORWARD -i wg0 -j ACCEPT",
             "iptables -I FORWARD -o wg0 -j ACCEPT",
+            "iptables -I FORWARD -i ifb+ -j ACCEPT 2>/dev/null || true",
+            "iptables -I FORWARD -o ifb+ -j ACCEPT 2>/dev/null || true",
             "iptables -I FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT",
             "iptables -I FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || true",
             "iptables -I FORWARD -i wg0 -o {$defaultIf} -s {$vpnSubnet} -j ACCEPT",
+            "iptables -I FORWARD -i ifb+ -o {$defaultIf} -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true",
             "iptables -t nat -I POSTROUTING -s {$vpnSubnet} -o {$defaultIf} -j MASQUERADE",
             "iptables -t nat -I POSTROUTING -s {$vpnSubnet} ! -o wg0 -j MASQUERADE",
             
             // If warp interface exists, also allow forwarding and masquerading through it
             "if ip link show wg-warp >/dev/null 2>&1; then " .
                 "iptables -D FORWARD -i wg0 -o wg-warp -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true && " .
+                "iptables -D FORWARD -i ifb+ -o wg-warp -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true && " .
                 "iptables -t nat -D POSTROUTING -s {$vpnSubnet} -o wg-warp -j MASQUERADE 2>/dev/null || true && " .
                 "iptables -I FORWARD -i wg0 -o wg-warp -s {$vpnSubnet} -j ACCEPT && " .
+                "iptables -I FORWARD -i ifb+ -o wg-warp -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true && " .
                 "iptables -t nat -I POSTROUTING -s {$vpnSubnet} -o wg-warp -j MASQUERADE; " .
             "fi",
             

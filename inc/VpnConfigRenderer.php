@@ -186,7 +186,6 @@ class VpnConfigRenderer
                         $uploadRules .= "ip link set dev ifb-wg0 txqueuelen 1000\n";
                         $uploadRules .= "ip link set dev ifb-wg0 up\n";
                         $uploadRules .= "tc qdisc add dev wg0 handle ffff: ingress\n";
-                        $uploadRules .= "tc filter add dev wg0 parent ffff: protocol ip u32 match u32 0 0 action mirred egress redirect dev ifb-wg0\n";
                         $uploadRules .= "tc qdisc add dev ifb-wg0 root handle 1: htb default 10\n";
                         $uploadRules .= "tc class add dev ifb-wg0 parent 1: classid 1:10 htb rate 100gbit burst 256k cburst 256k\n";
                         $hasUploadLimits = true;
@@ -194,6 +193,7 @@ class VpnConfigRenderer
                     $uploadRules .= "tc class add dev ifb-wg0 parent 1: classid 1:{$classId} htb rate {$limitUp}mbit ceil {$limitUp}mbit burst 256k cburst 256k\n";
                     $uploadRules .= "tc qdisc add dev ifb-wg0 parent 1:{$classId} handle {$classId}: fq_codel\n";
                     $uploadRules .= "tc filter add dev ifb-wg0 protocol ip parent 1:0 prio 1 u32 match ip src {$clientIp} flowid 1:{$classId}\n";
+                    $uploadRules .= "tc filter add dev wg0 parent ffff: protocol ip prio 1 u32 match ip src {$clientIp} action mirred egress redirect dev ifb-wg0\n";
                 }
             }
             
