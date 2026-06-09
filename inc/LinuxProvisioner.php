@@ -508,8 +508,11 @@ class LinuxProvisioner
      */
     public function setupHostNatRules(string $vpnSubnet, string $serverHost): void
     {
-        // 1. Detect default interface dynamically on the host
-        $defaultIf = trim($this->ssh->executeCommand("ip route show default | awk '/default/ {print \$5}' | head -n1"));
+        // 1. Detect default physical interface dynamically on the host, ignoring any virtual tunnel interfaces like wg-warp
+        $defaultIf = trim($this->ssh->executeCommand("ip route show default | grep -E '^default via' | awk '{print \$5}' | head -n1"));
+        if (empty($defaultIf)) {
+            $defaultIf = trim($this->ssh->executeCommand("ip route show default | grep -v -E 'wg-warp|wg0|docker0' | awk '{print \$5}' | head -n1"));
+        }
         if (empty($defaultIf)) {
             $defaultIf = 'ens3'; // Fallback
         }
@@ -531,6 +534,7 @@ class LinuxProvisioner
             "iptables -t nat -D POSTROUTING -s {$vpnSubnet} -o {$defaultIf} -j MASQUERADE 2>/dev/null || true",
             "iptables -t nat -D POSTROUTING -s {$vpnSubnet} -j MASQUERADE 2>/dev/null || true",
             "iptables -t nat -D POSTROUTING -s {$vpnSubnet} -o wg-warp -j MASQUERADE 2>/dev/null || true",
+            "iptables -t nat -D POSTROUTING -s {$vpnSubnet} ! -o wg0 -j MASQUERADE 2>/dev/null || true",
             "iptables -D FORWARD -i wg0 -j ACCEPT 2>/dev/null || true",
             "iptables -D FORWARD -i wg0 -o {$defaultIf} -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true",
             "iptables -D FORWARD -i wg0 -o wg-warp -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true",
@@ -545,6 +549,7 @@ class LinuxProvisioner
             "iptables -I FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT",
             "iptables -I FORWARD -i wg0 -o {$defaultIf} -s {$vpnSubnet} -j ACCEPT",
             "iptables -t nat -I POSTROUTING -s {$vpnSubnet} -o {$defaultIf} -j MASQUERADE",
+            "iptables -t nat -I POSTROUTING -s {$vpnSubnet} ! -o wg0 -j MASQUERADE",
             
             // If warp interface exists, also allow forwarding and masquerading through it
             "if ip link show wg-warp >/dev/null 2>&1; then " .
