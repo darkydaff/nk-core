@@ -230,7 +230,7 @@ class VpnProvisioner
                 
                 // Re-apply host NAT rules during adoption
                 try {
-                    $this->linux->setupHostNatRules($serverData['vpn_subnet'] ?? '10.8.1.0/24', $serverData['host'] ?? '');
+                    $this->linux->setupHostNatRules($serverData['vpn_subnet'] ?? '10.8.1.0/24', $serverData['host'] ?? '', (int)($serverData['vpn_port'] ?? 0));
                 } catch (Exception $e) {
                     Logger::channel('deployments')->error("Failed to setup host NAT rules during adoption: " . $e->getMessage(), [
                         'server_id' => $this->getId()
@@ -300,7 +300,7 @@ class VpnProvisioner
 
         // Setup host-level NAT masquerading rules
         try {
-            $this->linux->setupHostNatRules($serverData['vpn_subnet'] ?? '10.8.1.0/24', $serverData['host'] ?? '');
+            $this->linux->setupHostNatRules($serverData['vpn_subnet'] ?? '10.8.1.0/24', $serverData['host'] ?? '', (int)($serverData['vpn_port'] ?? $vpnPort));
         } catch (Exception $e) {
             Logger::channel('deployments')->error("Failed to setup host NAT rules: " . $e->getMessage(), [
                 'server_id' => $this->getId()

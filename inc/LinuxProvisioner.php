@@ -508,7 +508,7 @@ class LinuxProvisioner
     /**
      * Setup native host-level NAT masquerading rules for the VPN subnet via iptables (adapting old panel's exact rules)
      */
-    public function setupHostNatRules(string $vpnSubnet, string $serverHost): void
+    public function setupHostNatRules(string $vpnSubnet, string $serverHost, int $vpnPort = 0): void
     {
         // 1. Detect default physical interface dynamically on the host, ignoring any virtual tunnel interfaces like wg-warp
         $defaultIf = trim($this->ssh->executeCommand("ip route show default | grep -E '^default via' | awk '{print \$5}' | head -n1"));
@@ -519,7 +519,7 @@ class LinuxProvisioner
             $defaultIf = 'ens3'; // Fallback
         }
 
-        $setupCmd = implode(' && ', [
+        $rules = [
             // Enable IP forwarding
             "sysctl -w net.ipv4.ip_forward=1",
             
@@ -551,37 +551,47 @@ class LinuxProvisioner
             "iptables -D INPUT -i ifb+ -j ACCEPT 2>/dev/null || true",
             "iptables -D OUTPUT -o wg0 -j ACCEPT 2>/dev/null || true",
             "iptables -D OUTPUT -o ifb+ -j ACCEPT 2>/dev/null || true",
-            
-            // Insert fresh rules
-            "iptables -I INPUT -i wg0 -j ACCEPT",
-            "iptables -I INPUT -i ifb+ -j ACCEPT 2>/dev/null || true",
-            "iptables -I OUTPUT -o wg0 -j ACCEPT",
-            "iptables -I OUTPUT -o ifb+ -j ACCEPT 2>/dev/null || true",
-            "iptables -I FORWARD -i wg0 -j ACCEPT",
-            "iptables -I FORWARD -o wg0 -j ACCEPT",
-            "iptables -I FORWARD -i ifb+ -j ACCEPT 2>/dev/null || true",
-            "iptables -I FORWARD -o ifb+ -j ACCEPT 2>/dev/null || true",
-            "iptables -I FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT",
-            "iptables -I FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || true",
-            "iptables -I FORWARD -i wg0 -o {$defaultIf} -s {$vpnSubnet} -j ACCEPT",
-            "iptables -I FORWARD -i ifb+ -o {$defaultIf} -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true",
-            "iptables -t nat -I POSTROUTING -s {$vpnSubnet} -o {$defaultIf} -j MASQUERADE",
-            "iptables -t nat -I POSTROUTING -s {$vpnSubnet} ! -o wg0 -j MASQUERADE",
-            
-            // If warp interface exists, also allow forwarding and masquerading through it
-            "if ip link show wg-warp >/dev/null 2>&1; then " .
-                "iptables -D FORWARD -i wg0 -o wg-warp -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true && " .
-                "iptables -D FORWARD -i ifb+ -o wg-warp -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true && " .
-                "iptables -t nat -D POSTROUTING -s {$vpnSubnet} -o wg-warp -j MASQUERADE 2>/dev/null || true && " .
-                "iptables -I FORWARD -i wg0 -o wg-warp -s {$vpnSubnet} -j ACCEPT && " .
-                "iptables -I FORWARD -i ifb+ -o wg-warp -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true && " .
-                "iptables -t nat -I POSTROUTING -s {$vpnSubnet} -o wg-warp -j MASQUERADE; " .
-            "fi",
-            
-            // TCP MSS Clamping to prevent fragmentation issues
-            "iptables -t mangle -D FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || true",
-            "iptables -t mangle -I FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu"
-        ]);
+        ];
+
+        if ($vpnPort > 0) {
+            $rules[] = "iptables -D INPUT -p udp --dport {$vpnPort} -j ACCEPT 2>/dev/null || true";
+        }
+
+        // Insert fresh rules
+        $rules[] = "iptables -I INPUT -i wg0 -j ACCEPT";
+        $rules[] = "iptables -I INPUT -i ifb+ -j ACCEPT 2>/dev/null || true";
+        $rules[] = "iptables -I OUTPUT -o wg0 -j ACCEPT";
+        $rules[] = "iptables -I OUTPUT -o ifb+ -j ACCEPT 2>/dev/null || true";
+        $rules[] = "iptables -I FORWARD -i wg0 -j ACCEPT";
+        $rules[] = "iptables -I FORWARD -o wg0 -j ACCEPT";
+        $rules[] = "iptables -I FORWARD -i ifb+ -j ACCEPT 2>/dev/null || true";
+        $rules[] = "iptables -I FORWARD -o ifb+ -j ACCEPT 2>/dev/null || true";
+        $rules[] = "iptables -I FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT";
+        $rules[] = "iptables -I FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || true";
+        $rules[] = "iptables -I FORWARD -i wg0 -o {$defaultIf} -s {$vpnSubnet} -j ACCEPT";
+        $rules[] = "iptables -I FORWARD -i ifb+ -o {$defaultIf} -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true";
+        $rules[] = "iptables -t nat -I POSTROUTING -s {$vpnSubnet} -o {$defaultIf} -j MASQUERADE";
+        $rules[] = "iptables -t nat -I POSTROUTING -s {$vpnSubnet} ! -o wg0 -j MASQUERADE";
+
+        if ($vpnPort > 0) {
+            $rules[] = "iptables -I INPUT -p udp --dport {$vpnPort} -j ACCEPT";
+        }
+
+        // If warp interface exists, also allow forwarding and masquerading through it
+        $rules[] = "if ip link show wg-warp >/dev/null 2>&1; then " .
+            "iptables -D FORWARD -i wg0 -o wg-warp -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true && " .
+            "iptables -D FORWARD -i ifb+ -o wg-warp -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true && " .
+            "iptables -t nat -D POSTROUTING -s {$vpnSubnet} -o wg-warp -j MASQUERADE 2>/dev/null || true && " .
+            "iptables -I FORWARD -i wg0 -o wg-warp -s {$vpnSubnet} -j ACCEPT && " .
+            "iptables -I FORWARD -i ifb+ -o wg-warp -s {$vpnSubnet} -j ACCEPT 2>/dev/null || true && " .
+            "iptables -t nat -I POSTROUTING -s {$vpnSubnet} -o wg-warp -j MASQUERADE; " .
+        "fi";
+
+        // TCP MSS Clamping to prevent fragmentation issues
+        $rules[] = "iptables -t mangle -D FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu 2>/dev/null || true";
+        $rules[] = "iptables -t mangle -I FORWARD -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu";
+
+        $setupCmd = implode(' && ', $rules);
 
         $this->ssh->executeCommand($setupCmd, true, true);
     }
